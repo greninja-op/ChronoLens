@@ -2,10 +2,12 @@
 
 ## Overview
 
-ChronoLens closes a reliability loop on top of SigNoz: **foresee → prevent →
-verify → record**, plus cascade prediction. It reads telemetry through the
-SigNoz Query Builder v5 (MCP-compatible), acts through a target's control API
-with only reversible actions, and proves its saves with a durable ledger.
+ChronoLens closes a reliability loop on top of SigNoz:
+**learn → foresee → cascade → prevent → verify → cooldown → record**, where each
+incident's receipt becomes the memory (LEARN) for the next run. It reads
+telemetry through the SigNoz Query Builder v5 (MCP-compatible), acts through a
+target's control API with only reversible actions, gives capacity back when the
+spike passes (cost), and proves its saves with a durable ledger.
 
 ## Architecture
 
@@ -13,11 +15,15 @@ with only reversible actions, and proves its saves with a durable ledger.
 demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
                           ▲     │  Query Builder v5 reads
                           │     ▼
-                     ChronoLens loop
-   foresee ─▶ cascade ─▶ prevent ─▶ verify ─▶ record
-                          │ reversible lever (HTTP)      │ ledger (JSON)
-                          ▼                              ▼
-                   demo_store /admin/lever         Mission Control UI
+                     ChronoLens closed loop
+   learn ─▶ foresee ─▶ cascade ─▶ prevent ─▶ verify ─▶ cooldown ─▶ record
+     ▲        │ reversible levers (HTTP)                              │
+     │        ▼                                                       │
+     │  demo_store /admin/lever  (scale up / scale down)              │
+     └──────────────── ledger (JSON) feeds LEARN next time ──────────┘
+                          │
+                          ▼
+                   Mission Control UI
 ```
 
 ## Components
@@ -35,13 +41,21 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
   traces queries); writes alerts/dashboards; `_first_scalar` walks the v5
   response defensively. Errors become tagged `SigNozError`.
 
+- **learn.py** — `recall(service)` reads the ledger; for a repeat offender it
+  recommends a pre-provision floor and a wider lead window (act earlier). This
+  is the memory that closes the loop.
+
 - **foresee.py** — samples p99 N times, least-squares slope, projects
   time-to-breach; `worst_service` ranks all services.
 
 - **cascade.py** — topology-derived blast path; names the root hop.
 
-- **prevent.py** — `propose` a reversible action; `apply`/`rollback` via the
-  store's `/admin/lever`.
+- **prevent.py** — `propose` a reversible action; `apply`/`rollback`/`scale_by`
+  via the store's `/admin/lever`.
+
+- **cooldown.py** — watches headroom; once the spike subsides, scales back to
+  baseline and reports the capacity units returned (cost saved). Never scales
+  down into a breach.
 
 - **verify.py** — polls p99 through a grace window; verified iff it ends below
   SLO and trends down.
@@ -62,11 +76,16 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
 ## Data models
 
 ```
+Memory(service, incident_count, recurrence, recommended_floor, lead_window_s, note)
 Forecast(service, current_p99_ms, slope_ms_per_s, seconds_to_breach, breaching_now, samples)
 Remediation(action, params, rollback, applied, result, error)
 Verification(verified, final_p99_ms, peak_p99_ms, samples)
+CoolDown(scaled_down, capacity_before, capacity_after, cost_units_returned, waited_s, note)
 CaseFile(id, at, service, predicted_breach_in_s, p99_at_prediction_ms, slo_ms,
-         action, rollback, verified, final_p99_ms, peak_p99_ms, outcome, evidence)
+         action, rollback, verified, final_p99_ms, peak_p99_ms, outcome,
+         load_onset_at, learning_applied, recommended_floor, prior_incidents,
+         scaled_down, capacity_before, capacity_after, cost_units_returned,
+         cooldown_note, evidence)
 ```
 
 ## Latency / prevention model (why it's honest)

@@ -88,6 +88,25 @@ def store_status():
         return JSONResponse({"error": str(e)}, status_code=502)
 
 
+@app.post("/api/cooldown")
+def cooldown():
+    """Give capacity back once load has subsided, and attach the cost saved to
+    the most recent incident (the closed-loop 'revert to save cost' step)."""
+    try:
+        from chronolens.cooldown import cool_down
+        cd = cool_down(cfg, checks=2, interval_s=1.0)
+        if cd.scaled_down:
+            Ledger().update_last(
+                scaled_down=True, capacity_before=cd.capacity_before,
+                capacity_after=cd.capacity_after, cost_units_returned=cd.cost_units_returned,
+                cooldown_note=cd.note,
+            )
+        return {"scaled_down": cd.scaled_down, "cost_units_returned": cd.cost_units_returned,
+                "note": cd.note}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.post("/api/respond")
 def respond(managed: bool = True):
     """Run one ChronoLens loop. managed=false is the baseline (no-action) A/B arm."""
@@ -105,6 +124,7 @@ def prevented():
         return {
             "prevented": ledger.prevented_count(),
             "total": ledger.total_count(),
+            "cost_units_saved": ledger.total_cost_units_saved(),
             "incidents": list(reversed(ledger.list()))[:20],
         }
     except Exception as e:

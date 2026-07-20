@@ -4,14 +4,20 @@
 
 Built for the **Agents of SigNoz** hackathon (Track: AI & Agent Observability).
 
-## The loop
+## The closed loop (loop engineering)
 ```
+LEARN    → read past incidents; for a repeat offender, pre-provision a higher
+           floor BEFORE any breach and act earlier
 FORESEE  → watch a service's p99, project the trend to a time-to-breach
+CASCADE  → name the root hop the failure will spread from (fix cause, not symptom)
 PREVENT  → take one reversible action (scale out) before the breach lands
 VERIFY   → confirm via SigNoz the breach was actually avoided (else roll back)
-RECORD   → file the "incident prevented" receipt so an invisible save is provable
+COOLDOWN → once the load subsides, scale back to baseline and SAVE COST
+RECORD   → file the receipt (load onset, learning, cost saved, outcome)
+   ▲                                                                    │
+   └──────────────── the ledger feeds LEARN next time ──────────────────┘
 ```
-Plus **cascade prediction**: ChronoLens reads the service topology and names the *root* hop a failure will spread from, so it fixes the cause, not the symptom. ChronoLens is itself OpenTelemetry-instrumented, so its own loop shows up in SigNoz (full-circle).
+It's a genuine closed loop: every incident's receipt becomes the memory that makes the next one less likely — and when the spike passes, ChronoLens gives the capacity back so you're not paying for idle headroom. ChronoLens is itself OpenTelemetry-instrumented, so its own loop shows up in SigNoz (full-circle).
 
 ## Architecture (local dev)
 ```
@@ -89,9 +95,10 @@ Same fault, run twice: one breaches, one gets defused. That's the demo.
 ### From the CLI
 ```bash
 python -m chronolens.cli foresee       # forecast the worst service now
-python -m chronolens.cli respond       # full loop (managed): predict → prevent → verify → record
+python -m chronolens.cli respond       # full closed loop: learn→foresee→prevent→verify→cooldown→record
 python -m chronolens.cli respond off   # baseline arm: predict + record, no action (A/B)
-python -m chronolens.cli prevented     # the receipts ledger
+python -m chronolens.cli cooldown      # give spare capacity back once load subsides (save cost)
+python -m chronolens.cli prevented     # the receipts ledger (with capacity units saved)
 ```
 
 ---
@@ -109,8 +116,8 @@ chronolens/
 ├── demo_store/store.py        # the watched app: rising-load fault + reversible levers
 ├── src/chronolens/
 │   ├── config.py  signoz.py  otel_self.py
-│   ├── foresee.py  prevent.py  verify.py  cascade.py  record.py
-│   ├── loop.py    # foresee → prevent → verify → record
+│   ├── learn.py   foresee.py  cascade.py  prevent.py  verify.py  cooldown.py  record.py
+│   ├── loop.py    # learn → foresee → prevent → verify → cooldown → record
 │   └── cli.py
 ├── app.py + static/index.html # Mission Control UI
 ├── scripts/bringup.sh         # one-command SigNoz + MCP (Foundry)

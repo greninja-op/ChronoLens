@@ -3,6 +3,13 @@ from __future__ import annotations
 
 import sys
 
+# Force UTF-8 stdout so arrows/unicode in timeline text don't crash the Windows
+# cp1252 console (see ERROR-AND-FIXES.md #5).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 from .config import Config
 from .foresee import forecast_service, worst_service
 from .loop import run_loop
@@ -59,10 +66,25 @@ def cmd_respond(args: list[str]) -> int:
     return 0
 
 
+def cmd_cooldown(_: list[str]) -> int:
+    """Give spare capacity back once load has subsided (save cost)."""
+    from .cooldown import cool_down
+    cfg = Config.load()
+    cd = cool_down(cfg, checks=2, interval_s=1.0)
+    print(cd.note)
+    if cd.scaled_down:
+        Ledger().update_last(scaled_down=True, capacity_before=cd.capacity_before,
+                             capacity_after=cd.capacity_after,
+                             cost_units_returned=cd.cost_units_returned, cooldown_note=cd.note)
+        print(f"Returned {cd.cost_units_returned} capacity units.")
+    return 0
+
+
 def cmd_prevented(_: list[str]) -> int:
     ledger = Ledger()
     rows = ledger.list()
-    print(f"Prevented: {ledger.prevented_count()} / {ledger.total_count()} incidents\n")
+    print(f"Prevented: {ledger.prevented_count()} / {ledger.total_count()} incidents "
+          f"({ledger.total_cost_units_saved()} capacity units saved)\n")
     for c in rows[-15:]:
         print(f"  {c['at']}  {c['service']:<18} {c['outcome']:<16} "
               f"p99@predict={c['p99_at_prediction_ms']}ms → final={c['final_p99_ms']}ms")
@@ -71,7 +93,7 @@ def cmd_prevented(_: list[str]) -> int:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python -m chronolens.cli <services|foresee|respond [off]|prevented>")
+        print("Usage: python -m chronolens.cli <services|foresee|respond [off]|cooldown|prevented>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     if cmd == "services":
@@ -80,6 +102,8 @@ def main() -> int:
         return cmd_foresee(rest)
     if cmd == "respond":
         return cmd_respond(rest)
+    if cmd == "cooldown":
+        return cmd_cooldown(rest)
     if cmd == "prevented":
         return cmd_prevented(rest)
     print(f"Unknown command: {cmd}")

@@ -53,13 +53,29 @@ _state = {
 }
 
 
+WAVE_PEAK_S = 45.0  # traffic-wave rises for this long, then decays back down
+
+
 def _demand(now: float) -> float:
-    """Current demand on the service. The traffic ramp grows it gradually."""
-    if _state["fault_mode"] == "traffic-ramp":
-        elapsed = max(0.0, now - _state["fault_start"])
+    """Current demand on the service.
+
+    - ``traffic-ramp``  grows demand forever (monotonic) — good for the A/B.
+    - ``traffic-wave``  rises to a peak then decays back to baseline — lets
+      ChronoLens scale up on the rise AND scale back down on the fall (cost).
+    """
+    mode = _state["fault_mode"]
+    rate = _state["fault_level"] / 1000.0
+    elapsed = max(0.0, now - _state["fault_start"])
+    if mode == "traffic-ramp":
         # level/1000 units per second -> level=30 crosses the default capacity
         # (~33s) and breaches the 500ms SLO (~50s): gradual enough to forecast.
-        return BASE_DEMAND + (_state["fault_level"] / 1000.0) * elapsed
+        return BASE_DEMAND + rate * elapsed
+    if mode == "traffic-wave":
+        if elapsed <= WAVE_PEAK_S:
+            return BASE_DEMAND + rate * elapsed
+        # symmetric decay back toward baseline after the peak
+        decayed = rate * WAVE_PEAK_S - rate * (elapsed - WAVE_PEAK_S)
+        return BASE_DEMAND + max(0.0, decayed)
     return BASE_DEMAND
 
 
@@ -125,7 +141,9 @@ def status() -> dict:
     now = time.time()
     return {
         "capacity": round(_state["capacity"], 2),
+        "baseline_capacity": DEFAULT_CAPACITY,
         "demand": round(_demand(now), 3),
+        "headroom": round(_state["capacity"] - _demand(now), 3),
         "fault_mode": _state["fault_mode"],
         "fault_level": _state["fault_level"],
         "est_latency_ms": round(_latency_ms(now), 1),

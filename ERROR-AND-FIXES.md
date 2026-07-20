@@ -25,8 +25,8 @@ won't it start" issues are already here.
 **Fix:** install Foundry in your WSL2 (Ubuntu) shell and run the bring-up from WSL2, not PowerShell.
 
 ### 5. Windows console crash: `UnicodeEncodeError: 'charmap' codec can't encode ...`
-**Cause:** the Windows console is cp1252 and can't print some Unicode/emoji.
-**Fix:** the ChronoLens CLI avoids emoji in output on purpose. If you add any, set `PYTHONIOENCODING=utf-8` before running.
+**Cause:** the Windows console is cp1252 and can't print some Unicode (the cascade/cooldown text uses `→` arrows).
+**Fix:** already handled — `cli.py` calls `sys.stdout.reconfigure(encoding="utf-8")` on startup. The web UI is unaffected (JSON is UTF-8). If you write your own script that prints ChronoLens text, do the same or set `PYTHONIOENCODING=utf-8`.
 
 ### 6. OpenTelemetry warning: `Overriding of current TracerProvider is not allowed`
 **Cause:** both `demo_store/store.py` and `chronolens/otel_self.py` install a TracerProvider. Harmless — it only appears if you import both in one process. In normal use they run as separate processes.

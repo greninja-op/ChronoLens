@@ -85,3 +85,23 @@ will spread from, so I fix the cause not the symptom.
 1. The repo SHALL ship `casting.yaml` and a one-command bring-up (`scripts/bringup.sh`).
 2. Foundry SHALL install SigNoz **and** its MCP server together.
 3. A fresh clone SHALL be runnable by following README quickstart only.
+
+### Requirement 10 — Cost-aware scale-down (COOLDOWN)
+**User story:** As an operator, I want ChronoLens to give capacity back after the
+spike so I'm not paying for idle headroom.
+
+#### Acceptance criteria
+1. WHEN a service is over-provisioned (headroom above a margin) and above baseline THEN ChronoLens SHALL scale it back toward baseline.
+2. WHEN it scales down THEN it SHALL record the capacity units returned (cost saved).
+3. IF the load is still elevated THEN ChronoLens SHALL hold the extra capacity and say so (never scale down into a breach).
+4. The ledger SHALL expose total capacity units saved.
+
+### Requirement 11 — Learn and adjust (LEARN)
+**User story:** As an operator, I want ChronoLens to stop fighting the same fire
+twice — it should adjust so a recurring incident stops happening.
+
+#### Acceptance criteria
+1. WHEN a service has prior incidents in the ledger THEN ChronoLens SHALL treat it as a repeat offender.
+2. FOR a repeat offender ChronoLens SHALL pre-provision a higher baseline floor BEFORE any breach and act earlier (wider lead window).
+3. The case file SHALL record whether learning was applied and how many prior incidents informed it.
+4. The loop SHALL be closed: each incident's receipt becomes LEARN's memory for the next run.

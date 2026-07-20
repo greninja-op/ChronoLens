@@ -27,6 +27,16 @@ class CaseFile:
     final_p99_ms: float
     peak_p99_ms: float
     outcome: str  # "breach avoided" | "escalated" | "watch-only"
+    # --- closed-loop fields ---
+    load_onset_at: str = ""            # when the load/incident was first detected
+    learning_applied: bool = False     # did LEARN pre-provision from past incidents?
+    recommended_floor: float = 0.0     # extra baseline capacity pre-provisioned
+    prior_incidents: int = 0           # how many times this service breached before
+    scaled_down: bool = False          # did COOLDOWN give capacity back?
+    capacity_before: float = 0.0
+    capacity_after: float = 0.0
+    cost_units_returned: float = 0.0   # capacity units released after the spike
+    cooldown_note: str = ""
     evidence: dict = field(default_factory=dict)
 
 
@@ -65,6 +75,23 @@ class Ledger:
 
     def total_count(self) -> int:
         return len(self._load_raw())
+
+    def total_cost_units_saved(self) -> float:
+        """Sum of capacity units returned across all incidents (cost saved)."""
+        return round(sum(float(c.get("cost_units_returned", 0) or 0) for c in self._load_raw()), 2)
+
+    def prior_incidents_for(self, service: str) -> int:
+        return sum(1 for c in self._load_raw() if c.get("service") == service)
+
+    def update_last(self, **fields) -> dict | None:
+        """Patch the most recent case file (e.g. attach a later scale-down)."""
+        data = self._load_raw()
+        if not data:
+            return None
+        data[-1].update(fields)
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+        return data[-1]
 
 
 def new_case(**kwargs) -> CaseFile:

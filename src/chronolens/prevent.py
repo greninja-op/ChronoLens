@@ -53,6 +53,17 @@ def apply(cfg: Config, rem: Remediation, timeout: float = 8.0) -> Remediation:
     return rem
 
 
+def scale_by(cfg: Config, delta: float, timeout: float = 8.0) -> dict:
+    """Scale capacity by ``delta`` (used for learned pre-provisioning)."""
+    try:
+        r = httpx.post(f"{cfg.demo_store_url}/admin/lever",
+                       params={"action": "scale", "value": delta}, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 def rollback(cfg: Config, rem: Remediation, timeout: float = 8.0) -> bool:
     """Undo a scale action (used when verification fails)."""
     if rem.action != "scale":
