@@ -71,10 +71,15 @@ def test_guard_dashboard_has_metrics_readback_panel():
 # grouped-series parser
 # --------------------------------------------------------------------------- #
 def test_series_by_group_parses_labels_and_values():
-    body = {"data": {"result": [
-        {"metric": "payment.db_query", "values": [[1, 1200.0]]},
-        {"metric": "cart.lookup", "values": [[1, 40.0]]},
-    ]}}
+    # Real SigNoz v5 grouped-scalar shape: columns mark group vs aggregation,
+    # data holds [group_value, agg_value] rows.
+    body = {"data": {"data": {"results": [{
+        "columns": [
+            {"name": "name", "columnType": "group"},
+            {"name": "__result_0", "columnType": "aggregation"},
+        ],
+        "data": [["payment.db_query", 1200.0], ["cart.lookup", 40.0]],
+    }]}}}
     got = _series_by_group(body)
     assert got.get("payment.db_query") == 1200.0
     assert got.get("cart.lookup") == 40.0

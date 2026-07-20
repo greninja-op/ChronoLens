@@ -84,3 +84,15 @@ won't it start" issues are already here.
 ### 19. Data-driven CASCADE shows the wrong root
 **Cause:** the grouped p99-by-span query returned an unexpected shape, so the empirical root couldn't be parsed.
 **Fix:** `_series_by_group()` returns `{}` on anything it can't parse, and CASCADE falls back to the static topology (`BlastPath.source == "topology"`). If you see `source == "traces"` but a wrong root, log the raw `query_range` body and extend `_series_by_group`.
+
+### 20. `/api/v5/query_range` 400: `unknown field "queryType" in composite query`
+**Cause:** current SigNoz (v5 query builder) changed the read shape — `compositeQuery` now takes only `queries` (an array of `{type:"builder_query","spec":{...}}`), **not** a `queryType` field.
+**Fix (applied):** `signoz.py` builders (`build_trace_query`, `build_log_query`, `build_span_breakdown_query`) drop `queryType` from `compositeQuery`. The scalar response is `data.data.results[0].data = [[value]]`; grouped is `results[].columns` (group/aggregation) + `results[].data` rows — parsed by `_first_scalar` / `_series_by_group`. Verified live (p99 read returns correctly).
+
+### 21. `POST /api/v2/rules` 400: `validation failed` (empty errors)
+**Cause:** current SigNoz uses the **v2alpha1 / v5** alert schema. The old `condition.builderQueries` + ns threshold shape is rejected, and the error body is unhelpfully empty. Two gotchas: (a) the threshold target is in **ms** with `targetUnit:"ms"` (SigNoz converts to `duration_nano`), not raw ns; (b) **at least one notification channel is required**.
+**Fix (applied):** `build_guard_alert(service, slo_ms, channels)` now emits the v2alpha1 shape — `condition.compositeQuery.queries` (v5), `thresholds.spec[{name:"critical",target:slo_ms,targetUnit:"ms",op:"above",matchType:"at_least_once",channels}]`, `evaluation` (`5m0s`/`1m0s`), `notificationSettings`, `schemaVersion:"v2alpha1"`, `version:"v5"`. The loop discovers an existing channel via `list_channels()` and routes the guard to it. Verified live — our client created a guard alert SigNoz accepted (state: firing). Dashboards (`/api/v1/dashboards`) were already accepted as-is.
+
+### 22. After a fix, p99 stays high for a while (VERIFY looks like it failed)
+**Cause:** SigNoz p99 is a **rolling-window** percentile. Right after remediation the window still holds the backlog of slow traces, so p99 only drops once they age out — a real monitoring reality, not a bug.
+**Fix (applied):** the p99 read window was shortened (`service_p99_ms` default 120s → 30s) and VERIFY polls patiently (14×3s ≈ a couple of window-widths) so recovery is actually observed. Verified live: a managed run confirmed "p99 back to 44ms — breach avoided".

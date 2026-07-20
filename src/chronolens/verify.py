@@ -25,10 +25,16 @@ def verify(
     service: str,
     slo_ms: float,
     *,
-    checks: int = 4,
-    interval_s: float = 2.5,
+    checks: int = 14,
+    interval_s: float = 3.0,
 ) -> Verification:
-    """Confirm the service stays under the SLO after remediation."""
+    """Confirm the service stays under the SLO after remediation.
+
+    Note on windowed metrics: SigNoz p99 is computed over a rolling window, so
+    after a fix the tail only drops once the backlog of slow traces ages out of
+    that window. We therefore poll patiently (a few window-widths) rather than
+    grading the fix in the first couple of seconds.
+    """
     samples: list[float] = []
     for i in range(max(2, checks)):
         samples.append(sn.service_p99_ms(service))

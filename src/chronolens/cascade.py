@@ -61,10 +61,14 @@ def predict_blast_path(entry: str = "/order",
     source = "topology"
     root = ROOT_HOP
     if breakdown:
-        # data-driven: the slowest span the traces actually show is the root
-        measured_root = max(breakdown, key=breakdown.get)
-        if breakdown[measured_root] > 0:
-            root, source = measured_root, "traces"
+        # The entry span (e.g. /order) always wraps its children, so it's the
+        # slowest by construction — exclude it and pick the slowest *downstream*
+        # hop as the empirical root cause.
+        downstream = {k: v for k, v in breakdown.items() if k != entry}
+        if downstream:
+            measured_root = max(downstream, key=downstream.get)
+            if downstream[measured_root] > 0:
+                root, source = measured_root, "traces"
 
     path = _static_path(entry, root)
     if path[-1] != root:

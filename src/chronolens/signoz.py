@@ -56,7 +56,6 @@ def build_trace_query(
         "end": end,
         "requestType": request_type,
         "compositeQuery": {
-            "queryType": "builder",
             "queries": [
                 {
                     "type": "builder_query",
@@ -112,33 +111,61 @@ def _p99_latency_builder_query(service: str) -> dict[str, Any]:
     }
 
 
-def build_guard_alert(service: str, slo_ms: float) -> dict[str, Any]:
+def _p99_traces_spec(service: str) -> dict[str, Any]:
+    """Query Builder v5 spec: p99(duration_nano) for one service (traces)."""
+    return {
+        "name": "A",
+        "signal": "traces",
+        "source": "",
+        "stepInterval": 60,
+        "aggregations": [{"expression": "p99(duration_nano)"}],
+        "filter": {"expression": f"service.name = '{service}'"},
+        "groupBy": [],
+    }
+
+
+def build_guard_alert(service: str, slo_ms: float,
+                      channels: list[str] | None = None) -> dict[str, Any]:
     """Build a guarding SigNoz alert rule on a service's p99 latency.
 
-    Fires when p99(duration_nano) climbs above the SLO. The threshold is stored
-    in **nanoseconds** (``slo_ms * 1e6``) because SigNoz keeps span durations as
-    ``duration_nano``.
+    Uses the SigNoz **v2alpha1 / v5** threshold-rule schema: a Query Builder v5
+    traces query (``p99(duration_nano)``) with a threshold expressed in **ms**
+    (SigNoz converts to ``duration_nano`` internally via ``targetUnit``). At
+    least one notification channel is required by SigNoz.
     """
-    threshold_ns = _slo_ns(slo_ms)
     return {
+        "schemaVersion": "v2alpha1",
+        "version": "v5",
         "alert": f"ChronoLens guard - {service} p99 latency",
         "alertType": "TRACES_BASED_ALERT",
         "ruleType": "threshold_rule",
-        "description": (
-            f"ChronoLens prevented a breach on {service}; this guard keeps the "
-            f"service watched so a recurrence trips an alert at the {slo_ms}ms SLO."
-        ),
         "condition": {
             "compositeQuery": {
-                "queryType": "builder",
+                "queries": [{"type": "builder_query", "spec": _p99_traces_spec(service)}],
                 "panelType": "graph",
-                "builderQueries": {"A": _p99_latency_builder_query(service)},
+                "queryType": "builder",
+                "unit": LATENCY_Y_AXIS_UNIT,
             },
-            "op": ">",
-            "target": threshold_ns,
-            "targetUnit": LATENCY_Y_AXIS_UNIT,
-            "matchType": "1",  # at least once in the window
+            "selectedQueryName": "A",
+            "thresholds": {
+                "kind": "basic",
+                "spec": [
+                    {
+                        "name": "critical",
+                        "target": float(slo_ms),
+                        "targetUnit": "ms",
+                        "recoveryTarget": None,
+                        "matchType": "at_least_once",
+                        "op": "above",
+                        "channels": channels or [],
+                    }
+                ],
+            },
         },
+        "evaluation": {"kind": "rolling", "spec": {"evalWindow": "5m0s", "frequency": "1m0s"}},
+        "notificationSettings": {"renotify": {"enabled": False, "interval": "30m"}},
+        "disabled": False,
+        "source": "chronolens",
         "labels": {"severity": "warning", "chronolens": "guard", "service": service},
         "annotations": {
             "summary": f"{service} p99 latency crossed the {slo_ms}ms SLO",
@@ -228,7 +255,6 @@ def build_log_query(service: str, *, severity: str = "ERROR",
         "end": end,
         "requestType": "scalar",
         "compositeQuery": {
-            "queryType": "builder",
             "queries": [
                 {
                     "type": "builder_query",
@@ -260,7 +286,6 @@ def build_span_breakdown_query(service: str, *, window_seconds: int = 300) -> di
         "end": end,
         "requestType": "scalar",
         "compositeQuery": {
-            "queryType": "builder",
             "queries": [
                 {
                     "type": "builder_query",
@@ -369,7 +394,7 @@ class SigNozClient:
         data = body.get("data") if isinstance(body, dict) else body
         return data or []
 
-    def service_p99_ms(self, service: str, window_seconds: int = 120) -> float:
+    def service_p99_ms(self, service: str, window_seconds: int = 30) -> float:
         """Latest p99 latency (ms) for a service, via Query Builder v5 traces."""
         q = build_trace_query(
             f"service.name = '{service}'",
@@ -520,47 +545,33 @@ def _first_scalar(body: Any) -> float | None:
 def _series_by_group(body: Any) -> dict[str, float]:
     """Extract ``{group_label: value}`` from a grouped Query Builder v5 response.
 
-    Tolerant of v5's shape variance (series/rows/aggregations nesting). Returns
-    ``{}`` on anything it can't parse, so callers fail open to a static fallback.
+    The v5 grouped *scalar* shape is::
+
+        data.data.results[].columns = [{name, columnType: "group"|"aggregation"}]
+        data.data.results[].data    = [[group_value, agg_value], ...]
+
+    Returns ``{}`` on anything it can't parse, so callers fail open to a static
+    fallback.
     """
     out: dict[str, float] = {}
     if not isinstance(body, dict):
         return out
-    data = body.get("data", body)
-
-    def _label(node: dict) -> str | None:
-        for key in ("labels", "labelsArray", "groupBy", "metric", "key", "name"):
-            v = node.get(key)
-            if isinstance(v, str) and v:
-                return v
-            if isinstance(v, dict) and v:
-                # take the first meaningful value in a labels map
-                for vv in v.values():
-                    if isinstance(vv, str) and vv:
-                        return vv
-            if isinstance(v, list) and v:
-                first = v[0]
-                if isinstance(first, dict):
-                    return str(first.get("value") or first.get("name") or "")
-                if isinstance(first, str):
-                    return first
-        return None
-
-    def _walk(node: Any) -> None:
-        if isinstance(node, dict):
-            label = _label(node)
-            value = _first_scalar(node) if label else None
-            if label and value is not None:
-                out[label] = value
-                return
-            for v in node.values():
-                _walk(v)
-        elif isinstance(node, list):
-            for item in node:
-                _walk(item)
-
     try:
-        _walk(data)
+        results = (((body.get("data") or {}).get("data") or {}).get("results")) or []
+        for res in results:
+            cols = res.get("columns") or []
+            group_idx = next((i for i, c in enumerate(cols)
+                              if c.get("columnType") == "group"), None)
+            agg_idx = next((i for i, c in enumerate(cols)
+                            if c.get("columnType") == "aggregation"), None)
+            if group_idx is None or agg_idx is None:
+                continue
+            for row in res.get("data") or []:
+                if isinstance(row, list) and len(row) > max(group_idx, agg_idx):
+                    label, val = row[group_idx], row[agg_idx]
+                    if isinstance(label, str) and isinstance(val, (int, float)) \
+                            and not isinstance(val, bool):
+                        out[label] = float(val)
     except Exception:
         return {}
     return out

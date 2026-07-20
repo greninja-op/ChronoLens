@@ -395,8 +395,12 @@ def _install_guard(sn: SigNozClient, cfg: Config, svc: str, loop_id: str,
     """
     refs: dict = {}
     try:
+        # SigNoz requires >=1 notification channel on a rule — discover any
+        # existing channel and route the guard to it (fail-open to none).
+        channels = _safe(lambda: [c.get("name") for c in sn.list_channels()
+                                  if isinstance(c, dict) and c.get("name")], [])
         with stage_span("guard", loop_id):
-            alert = build_guard_alert(svc, cfg.p99_slo_ms)
+            alert = build_guard_alert(svc, cfg.p99_slo_ms, channels)
             dashboard = build_guard_dashboard(svc, cfg.p99_slo_ms)
             alert_res = sn.create_alert(alert)
             dash_res = sn.create_dashboard(dashboard)

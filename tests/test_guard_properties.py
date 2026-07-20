@@ -21,10 +21,13 @@ slo_ms_strategy = st.floats(
 
 
 @given(slo_ms=slo_ms_strategy)
-def test_alert_threshold_is_slo_in_nanoseconds(slo_ms):
-    alert = build_guard_alert("svc", slo_ms)
-    assert alert["condition"]["target"] == slo_ms * 1e6
-    assert alert["condition"]["targetUnit"] == "ns"
+def test_alert_threshold_is_slo_in_ms(slo_ms):
+    alert = build_guard_alert("svc", slo_ms, channels=["sink"])
+    thr = alert["condition"]["thresholds"]["spec"][0]
+    # Threshold carries the SLO in ms; SigNoz converts to duration_nano.
+    assert thr["target"] == slo_ms
+    assert thr["targetUnit"] == "ms"
+    assert alert["condition"]["compositeQuery"]["unit"] == "ns"
 
 
 @given(slo_ms=slo_ms_strategy)

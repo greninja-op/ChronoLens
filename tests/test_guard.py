@@ -101,18 +101,21 @@ def _run_finish(sn, *, managed: bool, outcome: str, tmp_path) -> tuple[list[dict
 # --------------------------------------------------------------------------- #
 # (a) alert builder — threshold at the SLO, in nanoseconds
 # --------------------------------------------------------------------------- #
-def test_build_guard_alert_threshold_in_nanoseconds():
-    alert = build_guard_alert("checkout", 500.0)
+def test_build_guard_alert_uses_v2alpha1_threshold_shape():
+    alert = build_guard_alert("checkout", 500.0, channels=["sink"])
+    assert alert["schemaVersion"] == "v2alpha1"
+    assert alert["ruleType"] == "threshold_rule"
     cond = alert["condition"]
-    # SLO 500ms => 500 * 1e6 ns.
-    assert cond["target"] == 500.0 * 1e6
-    assert cond["targetUnit"] == "ns"
-    assert cond["op"] == ">"
-    # Watches p99(duration_nano) for the right service.
-    q = cond["compositeQuery"]["builderQueries"]["A"]
-    assert q["aggregateOperator"] == "p99"
-    assert q["aggregateAttribute"]["key"] == "duration_nano"
-    assert q["filters"]["items"][0]["value"] == "checkout"
+    thr = cond["thresholds"]["spec"][0]
+    # SLO expressed in ms (SigNoz converts to duration_nano via targetUnit).
+    assert thr["target"] == 500.0
+    assert thr["targetUnit"] == "ms"
+    assert thr["op"] == "above"
+    assert thr["channels"] == ["sink"]
+    # Watches p99(duration_nano) for the right service via the v5 queries shape.
+    spec = cond["compositeQuery"]["queries"][0]["spec"]
+    assert spec["aggregations"] == [{"expression": "p99(duration_nano)"}]
+    assert "checkout" in spec["filter"]["expression"]
     assert "checkout" in alert["alert"]
 
 
