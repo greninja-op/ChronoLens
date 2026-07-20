@@ -6,352 +6,466 @@
 <title>ChronoLens · Mission Control</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --card:#fff; --line:#e7ebf3; --line2:#eef1f7;
-    --tx:#0f1729; --mut:#5f6b7e; --mut2:#98a2b3;
-    --teal:#12b3a6; --emerald:#0eaa6f; --amber:#e0921f; --red:#e5484d; --slate:#64748b;
-    --shadow:0 1px 2px rgba(16,24,40,.05), 0 10px 28px -16px rgba(16,24,40,.22);
+    --bg0:#f4f7f5; --bg1:#eaf0ec;
+    --card:#ffffff; --card2:#fbfcfb;
+    --line:#e5eae6; --line2:#eef2ef;
+    --ink:#0f1b16; --ink2:#33443c; --mut:#6a7b72; --mut2:#9aa8a0;
+    --emerald:#0f9d63; --emerald2:#16b877; --teal:#0e9488; --forest:#0b7a56;
+    --gold:#c98a1a; --gold2:#e0a43b; --sand:#f5ede0;
+    --red:#e0584e; --slate:#5c7267;
+    --grad:linear-gradient(135deg,#12a56a,#0e9488);
+    --shadow:0 1px 2px rgba(12,32,24,.04), 0 12px 30px -18px rgba(12,32,24,.22);
+    --shadow2:0 2px 6px rgba(12,32,24,.05), 0 20px 44px -22px rgba(12,32,24,.28);
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;overflow:hidden;}
-  body{font-family:"Inter",system-ui,"Segoe UI",Roboto,Arial;color:var(--tx);font-size:13.5px;line-height:1.5;
-    letter-spacing:-.01em;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;
+  body{font-family:"Inter",system-ui,"Segoe UI",Roboto,Arial;color:var(--ink);font-size:13.5px;line-height:1.5;
+    letter-spacing:-.006em;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;
     background:
-      radial-gradient(900px 520px at 100% -12%, rgba(18,179,166,.08), transparent 60%),
-      radial-gradient(760px 480px at -6% 112%, rgba(224,146,31,.06), transparent 55%),
-      linear-gradient(180deg,#f7faf9 0%, #eef3f1 100%);}
+      radial-gradient(1100px 620px at 100% -15%, rgba(16,184,119,.09), transparent 58%),
+      radial-gradient(820px 520px at -8% 115%, rgba(224,164,59,.08), transparent 55%),
+      linear-gradient(180deg,var(--bg0) 0%, var(--bg1) 100%);}
   .mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:0;}
+  svg{display:block;}
+  ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:#cdd8d1;border-radius:8px;} ::-webkit-scrollbar-thumb:hover{background:#b7c5bc;}
 
-  header{flex:none;height:54px;display:flex;align-items:center;gap:12px;padding:0 22px;background:var(--card);border-bottom:1px solid var(--line);}
-  .glyph{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--emerald));display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;}
-  .name{font-weight:800;font-size:16px;} .sub{color:var(--mut);font-size:13px;margin-left:10px;padding-left:12px;border-left:1px solid var(--line);}
-  .hdr-r{margin-left:auto;color:var(--mut);font-size:12.5px;display:flex;align-items:center;gap:8px;}
+  /* ---------- header ---------- */
+  header{flex:none;height:58px;display:flex;align-items:center;gap:13px;padding:0 20px;background:rgba(255,255,255,.86);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:10;}
+  .brand{display:flex;align-items:center;gap:11px;}
+  .mark{width:32px;height:32px;border-radius:10px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 18px -8px rgba(15,157,99,.7);}
+  .brand .nm{font-weight:800;font-size:16px;letter-spacing:-.02em;}
+  .brand .sb{color:var(--mut);font-size:12.5px;padding-left:12px;margin-left:2px;border-left:1px solid var(--line);}
+  .hdr-r{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink2);
+    background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;}
+  .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 3px rgba(15,157,99,.15);}
+  .pill.warn .dot{background:var(--gold2);box-shadow:0 0 0 3px rgba(224,164,59,.18);}
+  .pill svg{width:14px;height:14px;color:var(--mut);}
 
+  /* ---------- shell ---------- */
   .shell{flex:1;min-height:0;display:flex;}
-  .side{flex:none;width:194px;background:var(--card);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:3px;}
-  .side .grp{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut2);padding:12px 12px 6px;}
-  .navitem{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;transition:.12s;}
-  .navitem:hover{background:#f1f5f4;color:var(--tx);} .navitem.active{background:rgba(18,179,166,.12);color:var(--teal);}
-  .navitem .ni{width:18px;display:grid;place-items:center;}
-  .side .foot{margin-top:auto;font-size:11px;color:var(--mut2);padding:10px 12px;border-top:1px solid var(--line2);}
+  .side{flex:none;width:210px;background:rgba(255,255,255,.7);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;}
+  .side .grp{font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut2);padding:10px 12px 7px;}
+  .navitem{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;color:var(--mut);font-size:13.5px;font-weight:600;cursor:pointer;transition:.14s;position:relative;}
+  .navitem svg{width:18px;height:18px;stroke-width:1.9;}
+  .navitem:hover{background:#eef4f0;color:var(--ink);}
+  .navitem.active{background:linear-gradient(135deg,rgba(18,165,106,.14),rgba(14,148,136,.1));color:var(--forest);}
+  .navitem.active::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--grad);}
+  .side .foot{margin-top:auto;padding:12px;border-top:1px solid var(--line2);}
+  .side .foot .k{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);}
+  .side .foot .v{font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.6;}
 
-  .wrap{flex:1;min-width:0;min-height:0;padding:16px 22px;display:flex;flex-direction:column;gap:14px;}
+  /* ---------- content ---------- */
+  .wrap{flex:1;min-width:0;min-height:0;padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
   .view{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;}
   .view.hidden{display:none;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
-  .card .hd{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line2);}
-  .card .hd .t{font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:#59637a;}
-  .card .hd .r{margin-left:auto;color:var(--mut);font-size:12px;}
-  .card .bd{padding:16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+  .card .hd{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--line2);flex:none;}
+  .card .hd .ti{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#5a6b62;}
+  .card .hd .ti svg{width:15px;height:15px;vertical-align:-3px;margin-right:6px;color:var(--teal);}
+  .card .hd .r{margin-left:auto;color:var(--mut);font-size:12px;display:flex;gap:7px;align-items:center;}
+  .card .bd{padding:15px;min-height:0;}
 
-  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-  button{font-family:inherit;cursor:pointer;border-radius:10px;font-size:13px;font-weight:600;padding:10px 14px;display:inline-flex;align-items:center;gap:9px;transition:.15s;border:1px solid var(--line);background:var(--card);color:var(--tx);}
-  button:hover{box-shadow:var(--shadow);transform:translateY(-1px);}
-  button .ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;}
-  .b-amber .ic{background:rgba(224,146,31,.14);color:#c9821f;} .b-slate .ic{background:rgba(100,116,139,.14);color:var(--slate);}
-  button.primary{background:linear-gradient(135deg,var(--teal),var(--emerald));color:#fff;border:none;font-weight:700;box-shadow:0 8px 20px -10px rgba(18,179,166,.7);}
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+  button{font-family:inherit;cursor:pointer;border-radius:11px;font-size:13px;font-weight:600;padding:9px 13px;display:inline-flex;align-items:center;gap:8px;transition:.15s;border:1px solid var(--line);background:var(--card);color:var(--ink2);}
+  button svg{width:16px;height:16px;stroke-width:2;}
+  button:hover{box-shadow:var(--shadow);transform:translateY(-1px);border-color:#d7e0da;}
+  button:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+  button.primary{background:var(--grad);color:#fff;border:none;box-shadow:0 10px 22px -11px rgba(15,157,99,.75);}
+  button.primary:hover{box-shadow:0 12px 26px -10px rgba(15,157,99,.85);}
+  button.gold{color:var(--gold);} button.gold svg{color:var(--gold);}
   button.ghost{color:var(--mut);}
-  button:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+  .sep{flex:1;}
   .msg{color:var(--mut);font-size:12px;}
 
-  .grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 344px;gap:14px;}
+  /* ---------- kpi strip ---------- */
+  .kpis{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow);display:flex;align-items:center;gap:13px;}
+  .kpi .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;}
+  .kpi .ic svg{width:19px;height:19px;stroke-width:2;}
+  .kpi .k{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2);}
+  .kpi .v{font-size:22px;font-weight:800;line-height:1.1;letter-spacing:-.02em;margin-top:2px;}
+  .kpi .v small{font-size:12px;font-weight:600;color:var(--mut);}
+  .ic.g{background:rgba(15,157,99,.12);color:var(--emerald);} .ic.gold{background:rgba(224,164,59,.15);color:var(--gold);}
+  .ic.teal{background:rgba(14,148,136,.12);color:var(--teal);} .ic.slate{background:rgba(92,114,103,.13);color:var(--slate);}
+
+  /* ---------- main grid ---------- */
+  .grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 360px;gap:14px;}
   .col{min-height:0;display:flex;flex-direction:column;gap:14px;}
-  .health{flex:1;min-height:160px;display:flex;flex-direction:column;}
-  .health .bd{flex:1;min-height:0;display:flex;flex-direction:column;}
-  .health-top{display:flex;align-items:baseline;gap:10px;}
-  .big{font-size:36px;font-weight:800;line-height:1;letter-spacing:-.03em;} .big small{font-size:13px;color:var(--mut);font-weight:600;margin-left:5px;}
-  .statustag{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--mut);}
-  .statustag .sd{width:8px;height:8px;border-radius:50%;background:var(--emerald);}
-  .s-warning{color:#c9821f;} .s-warning .sd{background:var(--amber);} .s-critical{color:var(--red);} .s-critical .sd{background:var(--red);animation:blink 1s infinite;}
+
+  /* chart */
+  .chartcard{flex:1;min-height:190px;}
+  .chartcard .bd{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .chart-top{display:flex;align-items:flex-end;gap:12px;}
+  .big{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.03em;} .big small{font-size:13px;color:var(--mut);font-weight:600;margin-left:5px;}
+  .stat{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;}
+  .stat .sd{width:8px;height:8px;border-radius:50%;}
+  .st-healthy{color:var(--emerald);background:rgba(15,157,99,.1);} .st-healthy .sd{background:var(--emerald);}
+  .st-warning{color:var(--gold);background:rgba(224,164,59,.13);} .st-warning .sd{background:var(--gold2);}
+  .st-critical{color:var(--red);background:rgba(224,88,78,.11);} .st-critical .sd{background:var(--red);animation:blink 1s infinite;}
   @keyframes blink{50%{opacity:.35}}
-  .sub2{color:var(--mut);font-size:12px;margin-top:4px;}
-  .chartbox{flex:1;min-height:80px;margin-top:12px;} svg.chart{width:100%;height:100%;display:block;} .axis{fill:var(--mut2);font-size:10px;}
+  .subline{color:var(--mut);font-size:12px;margin-top:5px;}
+  .chartbox{flex:1;min-height:90px;margin-top:10px;} svg.chart{width:100%;height:100%;} .axis{fill:var(--mut2);font-size:10px;font-family:"JetBrains Mono",monospace;}
 
-  .pipeline{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr 26px 1fr;align-items:stretch;height:176px;}
-  .stage{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;overflow:hidden;}
-  .stage .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;margin-bottom:9px;flex:none;}
-  .stage .nm{font-weight:800;font-size:12px;letter-spacing:.4px;flex:none;}
-  .stage .ds{color:var(--mut);font-size:11.5px;margin-top:5px;line-height:1.45;flex:1;min-height:0;overflow-y:auto;}
-  .stage .prog{height:4px;border-radius:3px;background:var(--line2);margin-top:10px;overflow:hidden;flex:none;}
-  .stage .prog>i{display:block;height:100%;width:0;transition:width .5s;}
-  .st-fs .ic{background:rgba(224,146,31,.14);color:var(--amber);} .st-fs .prog>i{background:var(--amber);}
-  .st-pv .ic{background:rgba(18,179,166,.14);color:var(--teal);} .st-pv .prog>i{background:var(--teal);}
-  .st-vf .ic{background:rgba(14,170,111,.14);color:var(--emerald);} .st-vf .prog>i{background:var(--emerald);}
-  .st-rc .ic{background:rgba(100,116,139,.14);color:var(--slate);} .st-rc .prog>i{background:var(--slate);}
-  .flow{display:grid;place-items:center;color:var(--mut2);font-size:16px;}
-  .stagelinks{margin-top:7px;display:flex;flex-wrap:wrap;gap:6px;flex:none;}
-  .looprail{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
-  .rl{font-size:10px;font-weight:800;letter-spacing:.6px;padding:5px 9px;border-radius:8px;background:#f1f5f4;color:var(--mut);}
-  .rl-le{color:#7c5cf5;background:rgba(124,92,245,.10);} .rl-fs{color:var(--amber);background:rgba(224,146,31,.12);}
-  .rl-pv{color:var(--teal);background:rgba(18,179,166,.12);} .rl-vf{color:var(--emerald);background:rgba(14,170,111,.12);}
-  .rl-cd{color:#2f6bff;background:rgba(47,107,255,.10);} .rl-rc{color:var(--slate);background:rgba(100,116,139,.12);}
-  .ar{color:var(--mut2);font-size:12px;}
-  .looptl{height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-  .tlrow{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:#fff;}
-  .tlrow .st{font-size:10px;font-weight:800;letter-spacing:1px;} .tlrow .tx{font-size:12px;color:var(--tx);margin-top:3px;line-height:1.45;}
-  .tlrow.warn .st{color:var(--amber);} .tlrow.info .st{color:var(--teal);} .tlrow.done .st{color:var(--emerald);} .tlrow.ok .st{color:var(--emerald);} .tlrow.pending .st{color:var(--slate);}
+  /* loop rail + timeline */
+  .rail{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:11px;flex:none;}
+  .stg{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 9px;border-radius:8px;background:#f0f4f2;color:var(--mut);}
+  .stg svg{width:12px;height:12px;stroke-width:2.2;}
+  .stg.on{color:#fff;background:var(--grad);}
+  .rail .arw{color:var(--mut2);}
+  .tl{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding-right:4px;}
+  .tlrow{border:1px solid var(--line);border-left-width:3px;border-radius:9px;padding:8px 12px;background:var(--card2);}
+  .tlrow .st{font-size:9.5px;font-weight:800;letter-spacing:.8px;display:flex;align-items:center;gap:6px;}
+  .tlrow .st svg{width:12px;height:12px;stroke-width:2.2;}
+  .tlrow .tx{font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.45;}
+  .tlrow.done{border-left-color:var(--emerald);} .tlrow.done .st{color:var(--emerald);}
+  .tlrow.ok{border-left-color:var(--emerald);} .tlrow.ok .st{color:var(--emerald);}
+  .tlrow.info{border-left-color:var(--teal);} .tlrow.info .st{color:var(--teal);}
+  .tlrow.warn{border-left-color:var(--gold2);} .tlrow.warn .st{color:var(--gold);}
+  .tlrow.pending{border-left-color:var(--slate);} .tlrow.pending .st{color:var(--slate);}
 
-  .scoreboard{flex:1;min-height:0;display:flex;flex-direction:column;}
-  .scoreboard .bd{flex:1;min-height:0;overflow-y:auto;}
-  .prevhead{display:flex;gap:22px;margin-bottom:12px;}
-  .prevnum{font-size:26px;font-weight:800;line-height:1;} .prevnum small{display:block;font-size:10px;color:var(--mut);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
-  .caserow{padding:10px 0;border-bottom:1px solid var(--line2);} .caserow:last-child{border-bottom:none;}
-  .caserow .top{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;}
-  .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;}
-  .badge.ok{background:rgba(14,170,111,.13);color:var(--emerald);} .badge.esc{background:rgba(229,72,77,.12);color:var(--red);} .badge.watch{background:rgba(100,116,139,.13);color:var(--slate);}
-  .caserow .det{color:var(--mut);font-size:11.5px;margin-top:3px;}
-  .how{color:var(--mut);font-size:12.5px;line-height:1.7;} .how b{font-weight:700;}
-  .stbl{width:100%;border-collapse:collapse;font-size:13px;} .stbl th{position:sticky;top:0;background:var(--card);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--line);}
+  /* incidents */
+  .fill{flex:1;min-height:0;}
+  .fill .bd{flex:1;overflow-y:auto;min-height:0;}
+  .caserow{padding:11px 0;border-bottom:1px solid var(--line2);} .caserow:last-child{border-bottom:none;}
+  .caserow .top{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;}
+  .caserow .det{color:var(--mut);font-size:11.5px;margin-top:4px;}
+  .caserow .ev{color:var(--mut2);font-size:11px;margin-top:3px;}
+  .badge{font-size:10px;font-weight:800;letter-spacing:.3px;padding:3px 9px;border-radius:999px;}
+  .badge.ok{background:rgba(15,157,99,.13);color:var(--emerald);} .badge.esc{background:rgba(224,88,78,.12);color:var(--red);}
+  .badge.watch{background:rgba(92,114,103,.13);color:var(--slate);} .badge.pre{background:rgba(224,164,59,.15);color:var(--gold);}
+  .chip{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;}
+  .chip.g{background:rgba(15,157,99,.12);color:var(--emerald);} .chip.gold{background:rgba(224,164,59,.15);color:var(--gold);}
+  .chip.teal{background:rgba(14,148,136,.12);color:var(--teal);} .chip.slate{background:rgba(92,114,103,.13);color:var(--slate);}
+  .chip.r{background:rgba(224,88,78,.12);color:var(--red);}
+
+  .how{color:var(--mut);font-size:12.5px;line-height:1.75;} .how b{font-weight:700;}
+  .how .row{display:flex;gap:9px;align-items:flex-start;padding:5px 0;}
+  .how .row svg{width:15px;height:15px;flex:none;margin-top:2px;}
+
+  /* tables */
+  .stbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .stbl th{position:sticky;top:0;background:var(--card);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);font-weight:800;padding:9px 10px;border-bottom:1px solid var(--line);}
   .stbl td{padding:12px 10px;border-bottom:1px solid var(--line2);} .stbl tbody tr:last-child td{border-bottom:none;}
-  .sdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;} .chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
-  .chip.g{background:rgba(14,170,111,.13);color:var(--emerald);} .chip.a{background:rgba(224,146,31,.14);color:#c9821f;} .chip.r{background:rgba(229,72,77,.12);color:var(--red);}
-  .muted{color:var(--mut);} .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px;} @keyframes s{to{transform:rotate(360deg);}}
-  .bd::-webkit-scrollbar,.stage .ds::-webkit-scrollbar{width:7px;} .bd::-webkit-scrollbar-thumb,.stage .ds::-webkit-scrollbar-thumb{background:#d5dae4;border-radius:7px;}
+  .sdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;}
+
+  /* A/B */
   .abgrid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .abcol{min-height:0;display:flex;flex-direction:column;}
-  .abcol .bd{flex:1;min-height:0;overflow-y:auto;}
-  .abhd{display:flex;align-items:center;gap:8px;}
-  .abtag{font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:20px;}
-  .abtag.off{background:rgba(229,72,77,.12);color:var(--red);} .abtag.on{background:rgba(14,170,111,.13);color:var(--emerald);}
-  .about{font-size:12px;font-weight:700;margin-left:auto;} .chip.b{background:rgba(47,107,255,.10);color:#2f6bff;}
+  .abhd .tag{font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:999px;}
+  .abhd .tag.off{background:rgba(224,88,78,.12);color:var(--red);} .abhd .tag.on{background:rgba(15,157,99,.13);color:var(--emerald);}
+  .muted{color:var(--mut);} .center{display:grid;place-items:center;height:100%;text-align:center;color:var(--mut);}
+  .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;} @keyframes s{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 <header>
-  <span class="glyph">C</span><span class="name">ChronoLens</span><span class="sub">Mission Control</span>
-  <span class="hdr-r">🕐 <span id="clock">--:--</span></span>
+  <div class="brand">
+    <span class="mark">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>
+      </svg>
+    </span>
+    <span class="nm">ChronoLens</span><span class="sb">Mission Control</span>
+  </div>
+  <div class="hdr-r">
+    <span class="pill" id="autoPill" title="Autonomy mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/></svg>
+      <span id="autoTx">auto</span>
+    </span>
+    <span class="pill" id="sigPill" title="SigNoz connection">
+      <span class="dot"></span><span id="sigTx">SigNoz</span>
+    </span>
+    <span class="pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="mono" id="clock">--:--</span>
+    </span>
+  </div>
 </header>
 
 <div class="shell">
   <aside class="side">
-    <div class="grp">Menu</div>
-    <div class="navitem active" data-view="dashboard" onclick="showView('dashboard')"><span class="ni">▦</span> Dashboard</div>
-    <div class="navitem" data-view="ab" onclick="showView('ab')"><span class="ni">⇄</span> A / B</div>
-    <div class="navitem" data-view="prevented" onclick="showView('prevented')"><span class="ni">🛡</span> Prevented</div>
-    <div class="navitem" data-view="services" onclick="showView('services')"><span class="ni">🧩</span> Services</div>
-    <div class="foot"><span id="cfgFoot">learn · foresee<br>prevent · verify</span></div>
+    <div class="grp">Monitor</div>
+    <div class="navitem active" data-view="dashboard" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
+    </div>
+    <div class="navitem" data-view="ab" onclick="showView('ab')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>
+      A / B compare
+    </div>
+    <div class="navitem" data-view="prevented" onclick="showView('prevented')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg>
+      Incidents
+    </div>
+    <div class="navitem" data-view="services" onclick="showView('services')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><path d="M7 9v6"/><path d="M17 9v6"/></svg>
+      Services
+    </div>
+    <div class="foot">
+      <div class="k">Cost model</div>
+      <div class="v" id="footCfg">—</div>
+    </div>
   </aside>
 
   <div class="wrap">
-    <!-- DASHBOARD -->
+    <!-- ================= DASHBOARD ================= -->
     <div id="view-dashboard" class="view">
       <div class="card">
-        <div class="hd"><span class="t">Incident Controls</span><span class="r" id="faultMsg"></span></div>
-        <div class="bd controls">
-          <button class="b-amber" onclick="doFault('traffic-ramp',30)"><span class="ic">↗</span> Inject rising load</button>
-          <button class="b-slate ghost" onclick="doFault('off',0)"><span class="ic">↺</span> Reset to healthy</button>
-          <button class="b-slate ghost" onclick="doCooldown()"><span class="ic">💰</span> Release capacity</button>
-          <button class="ghost" id="baseBtn" onclick="runLoop(false)" style="margin-left:auto"><span class="ic">🚫</span> Run baseline (no fix)</button>
-          <button class="primary" id="runBtn" onclick="runLoop(true)"><span>▶</span> Run ChronoLens</button>
+        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6"/><path d="M6 20V10"/><path d="M18 20V4"/></svg>Incident Controls</span><span class="r" id="faultMsg"></span></div>
+        <div class="bd toolbar">
+          <button class="gold" onclick="doFault('traffic-ramp',20)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg>Inject rising load</button>
+          <button class="ghost" onclick="doFault('off',0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+          <button class="ghost" onclick="doCooldown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7l4-4 4 4"/><path d="M5 21h14"/></svg>Release capacity</button>
+          <span class="sep"></span>
+          <button class="ghost" id="baseBtn" onclick="runLoop(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/></svg>Baseline (no fix)</button>
+          <button class="primary" id="runBtn" onclick="runLoop(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l12 7-12 7V5Z"/></svg>Run ChronoLens</button>
         </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><span class="ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></span><div><div class="k">Prevented</div><div class="v" id="kPrev">0<small id="kPrevTot"></small></div></div></div>
+        <div class="kpi"><span class="ic gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9a2.5 2.5 0 0 0-5 0c0 3 5 1.5 5 4.5a2.5 2.5 0 0 1-5 0"/><path d="M12 6v1.5M12 16v1.5"/></svg></span><div><div class="k">Cost saved</div><div class="v mono" id="kCost">$0.00</div></div></div>
+        <div class="kpi"><span class="ic teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span><div><div class="k">Current p99</div><div class="v mono" id="kP99">—<small> ms</small></div></div></div>
+        <div class="kpi"><span class="ic slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/></svg></span><div><div class="k">Autonomy</div><div class="v" id="kAuto" style="font-size:18px">auto</div></div></div>
       </div>
 
       <div class="grid">
         <div class="col">
-          <div class="card health">
-            <div class="hd"><span class="t">Live Service Health</span><span class="r" id="svcCount"></span></div>
+          <div class="card chartcard">
+            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-6"/></svg>Live Service Health</span><span class="r" id="svcCount"></span></div>
             <div class="bd">
-              <div class="health-top"><span class="big"><span id="heroP99" class="mono">—</span><small>ms p99</small></span>
-                <span class="statustag s-healthy" id="heroStatus">Status <span class="sd"></span><span id="heroStatusTx">—</span></span></div>
-              <div class="sub2" id="heroSub">&nbsp;</div>
-              <div class="chartbox"><svg class="chart" id="chart" viewBox="0 0 600 210">
-                <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--teal)" stop-opacity=".28"/><stop offset="1" stop-color="var(--teal)" stop-opacity="0"/></linearGradient></defs>
+              <div class="chart-top">
+                <span class="big"><span id="heroP99" class="mono">—</span><small>ms p99</small></span>
+                <span class="stat st-healthy" id="heroStatus"><span class="sd"></span><span id="heroStatusTx">—</span></span>
+              </div>
+              <div class="subline" id="heroSub">&nbsp;</div>
+              <div class="chartbox"><svg class="chart" id="chart" viewBox="0 0 600 220">
+                <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--emerald)" stop-opacity=".26"/><stop offset="1" stop-color="var(--emerald)" stop-opacity="0"/></linearGradient></defs>
               </svg></div>
             </div>
           </div>
 
-          <div class="card">
-            <div class="hd"><span class="t">ChronoLens Loop · learn → foresee → prevent → verify → cooldown → record</span></div>
-            <div class="bd">
-              <div class="looprail">
-                <span class="rl rl-le">LEARN</span><span class="ar">→</span>
-                <span class="rl rl-fs">FORESEE</span><span class="ar">→</span>
-                <span class="rl rl-pv">PREVENT</span><span class="ar">→</span>
-                <span class="rl rl-vf">VERIFY</span><span class="ar">→</span>
-                <span class="rl rl-cd">COOLDOWN</span><span class="ar">→</span>
-                <span class="rl rl-rc">RECORD</span>
-              </div>
-              <div class="looptl" id="loopTL"><div class="muted">Inject rising load, then <b>Run ChronoLens</b> to watch the closed loop execute live.</div></div>
+          <div class="card" style="flex:none">
+            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Closed Loop</span></div>
+            <div class="bd" style="display:flex;flex-direction:column;min-height:0;height:238px">
+              <div class="rail" id="rail"></div>
+              <div class="tl" id="loopTL"><div class="center">Inject load, then <b style="color:var(--ink);margin:0 4px">Run ChronoLens</b> to watch the loop execute live.</div></div>
             </div>
           </div>
         </div>
 
         <div class="col">
-          <div class="card scoreboard">
-            <div class="hd"><span class="t">🛡 Incidents Prevented</span><span class="r" id="prevBadge"></span></div>
+          <div class="card fill">
+            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>Incidents Prevented</span><span class="r" id="prevBadge"></span></div>
             <div class="bd" id="prevList"><div class="muted">Loading…</div></div>
           </div>
-          <div class="card">
-            <div class="hd"><span class="t">How It Works</span></div>
-            <div class="bd how">
-              <b style="color:var(--amber)">Foresee</b> projects a rising trend to a breach time.
-              <b style="color:var(--teal)">Prevent</b> takes a reversible action (scale out) early.
-              <b style="color:var(--emerald)">Verify</b> checks SigNoz that the breach was avoided.
-              <b style="color:var(--slate)">Record</b> files the receipt so an invisible save is provable.
-            </div>
+          <div class="card" style="flex:none">
+            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>How it works</span></div>
+            <div class="bd how" id="howBox"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- A/B -->
+    <!-- ================= A/B ================= -->
     <div id="view-ab" class="view hidden">
-      <div class="card">
-        <div class="hd"><span class="t">Same fault, two arms — with and without ChronoLens</span><span class="r" id="abMsg"></span></div>
-        <div class="bd controls">
-          <button class="b-amber" onclick="doFault('traffic-ramp',30)"><span class="ic">↗</span> Inject rising load</button>
-          <button class="primary" id="abBtn" onclick="runAB()"><span>⇄</span> Run A/B comparison</button>
-          <span class="msg">Baseline forecasts and records what <b>would</b> happen but takes no action. Managed runs the full loop.</span>
+      <div class="card" style="flex:none">
+        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>Same fault, two arms</span><span class="r" id="abMsg"></span></div>
+        <div class="bd toolbar">
+          <button class="gold" onclick="doFault('traffic-ramp',20)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg>Inject rising load</button>
+          <button class="primary" id="abBtn" onclick="runAB()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>Run A/B comparison</button>
+          <span class="msg">Baseline forecasts and records but takes no action. Managed runs the full loop.</span>
         </div>
       </div>
       <div class="abgrid">
-        <div class="card abcol">
-          <div class="hd abhd"><span class="abtag off">A · BASELINE</span><span class="t">ChronoLens OFF</span><span class="about chip r" id="abOutA">—</span></div>
-          <div class="bd looptl" id="abTLa" style="height:auto"><div class="muted">Run the comparison to populate.</div></div>
+        <div class="card">
+          <div class="hd abhd"><span class="tag off">A · BASELINE</span><span class="ti" style="margin-left:2px">ChronoLens OFF</span><span class="r"><span class="badge esc" id="abOutA">—</span></span></div>
+          <div class="bd tl" id="abTLa" style="height:auto;flex:1"><div class="center">Run the comparison to populate.</div></div>
         </div>
-        <div class="card abcol">
-          <div class="hd abhd"><span class="abtag on">B · MANAGED</span><span class="t">ChronoLens ON</span><span class="about chip g" id="abOutB">—</span></div>
-          <div class="bd looptl" id="abTLb" style="height:auto"><div class="muted">Run the comparison to populate.</div></div>
+        <div class="card">
+          <div class="hd abhd"><span class="tag on">B · MANAGED</span><span class="ti" style="margin-left:2px">ChronoLens ON</span><span class="r"><span class="badge ok" id="abOutB">—</span></span></div>
+          <div class="bd tl" id="abTLb" style="height:auto;flex:1"><div class="center">Run the comparison to populate.</div></div>
         </div>
       </div>
     </div>
 
-    <!-- PREVENTED (full list) -->
+    <!-- ================= INCIDENTS ================= -->
     <div id="view-prevented" class="view hidden">
-      <div class="card scoreboard">
-        <div class="hd"><span class="t">Incidents Prevented · full history</span><span class="r" id="prevBadge2"></span></div>
+      <div class="kpis" id="prevKpis"></div>
+      <div class="card fill">
+        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>Incident ledger · full history</span><span class="r" id="prevBadge2"></span></div>
         <div class="bd" id="prevFull"><div class="muted">Loading…</div></div>
       </div>
     </div>
 
-    <!-- SERVICES -->
+    <!-- ================= SERVICES ================= -->
     <div id="view-services" class="view hidden">
-      <div class="card scoreboard">
-        <div class="hd"><span class="t">All Services</span><span class="r"><span class="chip g" id="svcAll"></span></span></div>
+      <div class="card fill">
+        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/></svg>All Services</span><span class="r"><span class="chip g" id="svcAll"></span></span></div>
         <div class="bd" id="servicesList"><div class="muted">Loading…</div></div>
       </div>
     </div>
   </div>
 </div>
-
 <script>
 const $=(id)=>document.getElementById(id);
 const samples={}; let selected=null; let sloMs=500; let curView='dashboard'; const MAX=48;
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function sColor(s){return s==='critical'?'var(--red)':s==='warning'?'var(--amber)':'var(--emerald)';}
+function sColor(s){return s==='critical'?'var(--red)':s==='warning'?'var(--gold2)':'var(--emerald)';}
 function sLabel(s){return s==='critical'?'Critical':s==='warning'?'Warning':'Healthy';}
 
+/* ---- inline SVG icons (stroke = currentColor) ---- */
+function I(p){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';}
+const ICON={
+  LEARN:I('<path d="M12 3l9 5-9 5-9-5 9-5Z"/><path d="M21 8v5"/><path d="M7 11v4c0 1.5 2.5 3 5 3s5-1.5 5-3v-4"/>'),
+  FORESEE:I('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
+  CLASSIFY:I('<path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/>'),
+  CASCADE:I('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7l8 4M8 17l8-4"/>'),
+  GOVERN:I('<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/>'),
+  SILENCE:I('<path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8l4 8M21 8l-4 8"/>'),
+  PREVENT:I('<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/>'),
+  VERIFY:I('<path d="M20 6L9 17l-5-5"/>'),
+  COOLDOWN:I('<path d="M12 21V3"/><path d="M8 17l4 4 4-4"/><path d="M5 3h14"/>'),
+  EXPLAIN:I('<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>'),
+  NOTIFY:I('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/>'),
+  GUARD:I('<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/>'),
+  RECORD:I('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M13 3v5h5"/>'),
+  ERROR:I('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'),
+};
+function stepIcon(s){return ICON[s]||ICON.CLASSIFY;}
+
+const RAIL=['LEARN','FORESEE','CLASSIFY','GOVERN','PREVENT','VERIFY','COOLDOWN','RECORD'];
+function renderRail(active){
+  const set=new Set((active||[]).map(x=>x.toUpperCase()));
+  $('rail').innerHTML=RAIL.map((s,i)=>{
+    const on=set.has(s)?' on':'';
+    return `<span class="stg${on}">${stepIcon(s)}${s}</span>`+(i<RAIL.length-1?'<span class="arw">›</span>':'');
+  }).join('');
+}
+renderRail([]);
+
+$('howBox').innerHTML=[
+  ['FORESEE','var(--teal)','Projects a rising p99 trend to a time-to-breach, behind a confidence guard.'],
+  ['CLASSIFY','var(--emerald)','Matches the signal to a reversible fix — scale, circuit-break, rollback…'],
+  ['PREVENT','var(--emerald)','Acts early behind anti-flap guardrails; every action is undoable.'],
+  ['VERIFY','var(--emerald)','Confirms via SigNoz the breach was avoided — else rolls back.'],
+  ['RECORD','var(--slate)','Files the receipt so an invisible save becomes provable.'],
+].map(r=>`<div class="row" style="color:${r[1]}">${stepIcon(r[0])}<div style="color:var(--mut)"><b style="color:${r[1]}">${r[0]}</b> — ${r[2]}</div></div>`).join('');
+
+/* ---------------- live health + chart ---------------- */
 async function loadServices(){
   try{
     const r=await fetch('/api/services'); const d=await r.json();
-    if(d.error){$('heroSub').textContent='SigNoz error: '+d.error;return;}
+    if(d.error){$('heroSub').textContent='SigNoz error: '+d.error;setSig(false);return;}
+    setSig(true);
     const svc=d.services||[]; $('svcCount').textContent=svc.length?svc.length+' services':'';
     if(!svc.length){$('heroSub').textContent='No services in the last 5 min — is the demo store running?';return;}
     if(svc[0].slo_ms) sloMs=svc[0].slo_ms;
     svc.forEach(s=>{if(!samples[s.name])samples[s.name]=[s.p99_ms,s.p99_ms];samples[s.name].push(s.p99_ms);if(samples[s.name].length>MAX)samples[s.name].shift();});
     if(!selected||!svc.find(s=>s.name===selected)) selected=svc[0].name;
     const cur=svc.find(s=>s.name===selected)||svc[0];
-    $('heroP99').textContent=cur.p99_ms; $('heroStatus').className='statustag s-'+cur.state; $('heroStatusTx').textContent=sLabel(cur.state);
-    $('heroSub').innerHTML=`<b style="color:var(--tx)">${esc(cur.name)}</b> · SLO ${cur.slo_ms}ms · ${cur.error_pct}% errors · ${cur.calls} calls`;
+    $('heroP99').textContent=cur.p99_ms; $('kP99').innerHTML=cur.p99_ms+'<small> ms</small>';
+    $('heroStatus').className='stat st-'+cur.state; $('heroStatusTx').textContent=sLabel(cur.state);
+    $('heroSub').innerHTML=`<b style="color:var(--ink)">${esc(cur.name)}</b> · SLO ${cur.slo_ms}ms · ${cur.error_pct}% errors · ${cur.calls} calls`;
     drawChart(selected);
     $('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  }catch(e){$('heroSub').textContent=String(e);}
+  }catch(e){$('heroSub').textContent=String(e);setSig(false);}
 }
+function setSig(ok){const p=$('sigPill');p.classList.toggle('warn',!ok);$('sigTx').textContent=ok?'SigNoz live':'SigNoz down';}
+
 function drawChart(name){
-  const svg=$('chart'); const arr=samples[name]||[]; const W=Math.max(320,Math.round(svg.clientWidth||600)),H=Math.max(120,Math.round(svg.clientHeight||210));
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); const padL=46,padR=18,padT=14,padB=24; const defs=svg.querySelector('defs').outerHTML;
+  const svg=$('chart'); const arr=samples[name]||[]; const W=Math.max(320,Math.round(svg.clientWidth||600)),H=Math.max(120,Math.round(svg.clientHeight||220));
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); const padL=48,padR=18,padT=14,padB=24; const defs=svg.querySelector('defs').outerHTML;
   if(arr.length<2){svg.innerHTML=defs+`<text x="${W/2}" y="${H/2}" class="axis" text-anchor="middle">collecting samples…</text>`;return;}
   let mn=Math.min(...arr),mx=Math.max(...arr),rg=mx-mn; if(rg<mx*0.06||rg<4)rg=Math.max(mx*0.06,4);
   let yMin=Math.max(0,mn-rg*0.45),yMax=mx+rg*0.55; const showSlo=sloMs>=yMin&&sloMs<=yMax; if(showSlo)yMax=Math.max(yMax,sloMs*1.02);
   const x=i=>padL+i*((W-padL-padR)/(arr.length-1)); const y=v=>H-padB-((v-yMin)/((yMax-yMin)||1))*(H-padT-padB);
   const ticks=[yMin,(yMin+yMax)/2,yMax]; const grid=ticks.map(t=>{const yy=y(t).toFixed(1);return `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${padL-8}" y="${+yy+3.5}" class="axis" text-anchor="end">${Math.round(t)}</text>`;}).join('');
-  const now=new Date(); const tl=i=>{const d=new Date(now-(arr.length-1-i)*2500);return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});};
+  const now=new Date(); const tl=i=>{const dd=new Date(now-(arr.length-1-i)*2500);return dd.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});};
   const xl=[0,Math.floor((arr.length-1)/2),arr.length-1].map(i=>`<text x="${x(i).toFixed(1)}" y="${H-7}" class="axis" text-anchor="${i===0?'start':i===arr.length-1?'end':'middle'}">${tl(i)}</text>`).join('');
-  const pts=arr.map((v,i)=>[x(i),y(v)]); const sm=p=>{if(p.length<2)return'';let d=`M ${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)} `;for(let i=0;i<p.length-1;i++){const p0=p[i-1]||p[i],p1=p[i],p2=p[i+1],p3=p[i+2]||p2;const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;d+=`C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} `;}return d;};
+  const pts=arr.map((v,i)=>[x(i),y(v)]); const sm=p=>{if(p.length<2)return'';let dd=`M ${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)} `;for(let i=0;i<p.length-1;i++){const p0=p[i-1]||p[i],p1=p[i],p2=p[i+1],p3=p[i+2]||p2;const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;dd+=`C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} `;}return dd;};
   const line=sm(pts); const area=line+`L ${x(arr.length-1).toFixed(1)} ${H-padB} L ${x(0).toFixed(1)} ${H-padB} Z`;
   let slo=''; if(showSlo){const sy=y(sloMs).toFixed(1);slo=`<line x1="${padL}" x2="${W-padR}" y1="${sy}" y2="${sy}" stroke="var(--red)" stroke-dasharray="5 5" opacity=".6"/><text x="${W-padR}" y="${sy-5}" class="axis" text-anchor="end" fill="var(--red)">SLO ${sloMs}ms</text>`;}else{slo=`<text x="${W-padR}" y="${padT+9}" class="axis" text-anchor="end" fill="var(--red)">SLO ${sloMs}ms ↑</text>`;}
-  svg.innerHTML=defs+grid+slo+`<path d="${area}" fill="url(#ag)"/><path d="${line}" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linejoin="round"/><circle cx="${x(arr.length-1).toFixed(1)}" cy="${y(arr[arr.length-1]).toFixed(1)}" r="4" fill="var(--teal)" stroke="#fff" stroke-width="2"/>`+xl;
+  svg.innerHTML=defs+grid+slo+`<path d="${area}" fill="url(#ag)"/><path d="${line}" fill="none" stroke="var(--emerald)" stroke-width="2.4" stroke-linejoin="round"/><circle cx="${x(arr.length-1).toFixed(1)}" cy="${y(arr[arr.length-1]).toFixed(1)}" r="4" fill="var(--emerald)" stroke="#fff" stroke-width="2"/>`+xl;
 }
 window.addEventListener('resize',()=>{if(selected)drawChart(selected);});
 
-function badge(o){return o==='breach avoided'?'<span class="badge ok">avoided</span>':o==='pre-empted'?'<span class="badge ok">pre-empted</span>':o==='escalated'?'<span class="badge esc">escalated</span>':'<span class="badge watch">'+esc(o)+'</span>';}
+/* ---------------- incidents ---------------- */
+function badge(o){const m={'breach avoided':['ok','avoided'],'pre-empted':['pre','pre-empted'],'escalated':['esc','escalated'],'suggested':['watch','suggested'],'held':['watch','held']};const b=m[o]||['watch',o];return `<span class="badge ${b[0]}">${esc(b[1])}</span>`;}
 function renderPrev(d,el){
-  const inc=d.incidents||[]; if(!inc.length){el.innerHTML='<div class="muted">No incidents yet. Inject rising load, then Run ChronoLens.</div>';return;}
+  const inc=d.incidents||[]; if(!inc.length){el.innerHTML='<div class="center">No incidents yet. Inject rising load, then Run ChronoLens.</div>';return;}
   el.innerHTML=inc.map(c=>{
-    const extra=[];
-    if(c.learning_applied) extra.push('learned pre-provision');
-    if(c.scaled_down) extra.push('scaled down · returned '+c.cost_units_returned+'u');
-    if(c.dollars_saved) extra.push('$'+Number(c.dollars_saved).toFixed(2)+' saved');
-    const tail=extra.length?(' · '+extra.join(' · ')):'';
-    const sig=c.signal?`<span class="chip b" style="margin-left:6px">${esc(c.signal)}</span>`:'';
-    const ev=c.evidence||{};
-    const ev2=[];
-    if(ev.cascade_source==='traces') ev2.push('root from traces: '+esc(ev.blast_root||''));
-    if(ev.exemplar_trace_id) ev2.push('trace '+esc(String(ev.exemplar_trace_id).slice(0,10)));
-    if(ev.silence_id) ev2.push('alert silenced during fix');
-    const evLine=ev2.length?`<div class="det" style="opacity:.85">${ev2.join(' · ')}</div>`:'';
-    return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b>${sig}<span class="muted" style="margin-left:auto;font-size:11px">${esc(c.at)}</span></div>
-    <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail}</div>${evLine}</div>`;
+    const tail=[]; if(c.learning_applied)tail.push('learned pre-provision'); if(c.scaled_down)tail.push('returned '+c.cost_units_returned+'u'); if(c.dollars_saved)tail.push('$'+Number(c.dollars_saved).toFixed(2));
+    const ev=c.evidence||{}; const ev2=[];
+    if(ev.cascade_source==='traces')ev2.push('root from traces: '+esc(ev.blast_root||''));
+    if(ev.exemplar_trace_id)ev2.push('trace '+esc(String(ev.exemplar_trace_id).slice(0,10)));
+    if(ev.silence_id)ev2.push('alert silenced during fix');
+    const sig=c.signal?`<span class="chip teal">${esc(c.signal)}</span>`:'';
+    return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b>${sig}<span class="muted" style="margin-left:auto;font-size:11px;font-weight:600">${esc(c.at)}</span></div>
+    <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail.length?(' · '+tail.join(' · ')):''}</div>
+    ${ev2.length?`<div class="ev">${ev2.join(' · ')}</div>`:''}</div>`;
   }).join('');
 }
+function kpi(ic,cls,k,v){return `<div class="kpi"><span class="ic ${cls}">${ic}</span><div><div class="k">${k}</div><div class="v mono">${v}</div></div></div>`;}
 async function loadPrevented(){
   try{const d=await(await fetch('/api/prevented')).json();
     const usd=(d.dollars_saved||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    $('prevBadge').innerHTML=`<span class="chip g">${d.prevented||0} avoided</span> <span class="chip a">$${usd} saved</span>`;
-    $('prevBadge2').innerHTML=`<span class="chip g">${d.prevented||0} / ${d.total||0}</span> <span class="chip a">${d.cost_units_saved||0}u · $${usd}</span>`;
+    $('kPrev').textContent=d.prevented||0; $('kPrevTot').textContent=' / '+(d.total||0);
+    $('kCost').textContent='$'+usd;
+    $('prevBadge').innerHTML=`<span class="chip g">${d.prevented||0} avoided</span><span class="chip gold">$${usd}</span>`;
+    $('prevBadge2').innerHTML=`<span class="chip g">${d.prevented||0} / ${d.total||0}</span><span class="chip gold">$${usd}</span>`;
     renderPrev(d,$('prevList'));
     if(curView==='prevented'){
-      const head=`<div class="prevhead"><div class="prevnum">${d.prevented||0}<small>Prevented</small></div><div class="prevnum">${d.total||0}<small>Total incidents</small></div><div class="prevnum">${d.cost_units_saved||0}<small>Capacity units saved</small></div><div class="prevnum">$${(d.dollars_saved||0).toFixed(2)}<small>Cost saved</small></div></div>`;
-      const tmp=document.createElement('div'); renderPrev(d,tmp); $('prevFull').innerHTML=head+tmp.innerHTML;
+      $('prevKpis').innerHTML=kpi(stepIcon('GUARD'),'g','Prevented',(d.prevented||0))+kpi(stepIcon('RECORD'),'slate','Total incidents',(d.total||0))+kpi(stepIcon('COOLDOWN'),'teal','Units saved',(d.cost_units_saved||0))+kpi(stepIcon('EXPLAIN'),'gold','Cost saved','$'+usd);
+      const tmp=document.createElement('div'); renderPrev(d,tmp); $('prevFull').innerHTML=tmp.innerHTML;
     }
   }catch(e){}
 }
 async function loadServicesView(){
   try{const d=await(await fetch('/api/services')).json(); const svc=d.services||[]; $('svcAll').textContent=svc.length+' services';
-    if(!svc.length){$('servicesList').innerHTML='<div class="muted">No services in the last 5 min.</div>';return;}
+    if(!svc.length){$('servicesList').innerHTML='<div class="center">No services in the last 5 min.</div>';return;}
     $('servicesList').innerHTML=`<table class="stbl"><thead><tr><th>Service</th><th>p99</th><th>SLO</th><th>Errors</th><th>Calls</th><th>Status</th></tr></thead><tbody>`+
-      svc.map(s=>`<tr><td><span class="sdot" style="background:${sColor(s.state)}"></span><b>${esc(s.name)}</b></td><td class="mono">${s.p99_ms} ms</td><td class="mono">${s.slo_ms} ms</td><td class="mono">${s.error_pct}%</td><td class="mono">${s.calls}</td><td><span class="chip ${s.state==='critical'?'r':s.state==='warning'?'a':'g'}">${sLabel(s.state)}</span></td></tr>`).join('')+`</tbody></table>`;
-  }catch(e){$('servicesList').innerHTML=`<div class="muted">${esc(e)}</div>`;}
+      svc.map(s=>`<tr><td><span class="sdot" style="background:${sColor(s.state)}"></span><b>${esc(s.name)}</b></td><td class="mono">${s.p99_ms} ms</td><td class="mono">${s.slo_ms} ms</td><td class="mono">${s.error_pct}%</td><td class="mono">${s.calls}</td><td><span class="chip ${s.state==='critical'?'r':s.state==='warning'?'gold':'g'}">${sLabel(s.state)}</span></td></tr>`).join('')+`</tbody></table>`;
+  }catch(e){$('servicesList').innerHTML=`<div class="center">${esc(e)}</div>`;}
+}
+async function loadConfig(){
+  try{const c=await(await fetch('/api/config')).json();
+    $('autoTx').textContent=c.autonomy; $('kAuto').textContent=c.autonomy;
+    $('footCfg').innerHTML=`$${c.cost_per_unit_hr}/unit·hr<br>LLM: ${esc(c.llm_provider)} · ceiling ${c.max_capacity}`;
+  }catch(e){}
 }
 
-function showView(n){curView=n;document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('view-'+n).classList.remove('hidden');
-  document.querySelectorAll('.navitem').forEach(i=>i.classList.toggle('active',i.dataset.view===n));
-  if(n==='prevented')loadPrevented(); if(n==='services')loadServicesView();}
-
-function tlHtml(tl){return (tl||[]).map(e=>`<div class="tlrow ${esc(e.status)}"><div class="st">${esc(e.step)}</div><div class="tx">${esc(e.text)}</div></div>`).join('')||'<div class="muted">No activity returned.</div>';}
+/* ---------------- loop runs ---------------- */
+function tlHtml(tl){return (tl||[]).map(e=>`<div class="tlrow ${esc(e.status)}"><div class="st">${stepIcon(e.step)}${esc(e.step)}</div><div class="tx">${esc(e.text)}</div></div>`).join('')||'<div class="center">No activity returned.</div>';}
+async function runLoop(managed){
+  $('runBtn').disabled=true;$('baseBtn').disabled=true; renderRail([]);
+  $('loopTL').innerHTML='<div class="center"><span class="spin"></span>Running the closed loop against SigNoz…</div>';
+  try{
+    const d=await(await fetch('/api/respond?managed='+managed,{method:'POST'})).json();
+    const tl=d.timeline||[]; renderRail(tl.map(e=>e.step));
+    let html=tlHtml(tl); if(d.error) html+=`<div class="tlrow warn"><div class="st">${stepIcon('ERROR')}ERROR</div><div class="tx">${esc(d.error)}</div></div>`;
+    $('loopTL').innerHTML=html;
+  }catch(e){$('loopTL').innerHTML=`<div class="center">${esc(e)}</div>`;}
+  $('runBtn').disabled=false;$('baseBtn').disabled=false;loadServices();loadPrevented();
+}
 async function runAB(){
   $('abBtn').disabled=true;
-  $('abTLa').innerHTML='<div class="muted"><span class="spin"></span>baseline running…</div>';
-  $('abTLb').innerHTML='<div class="muted"><span class="spin"></span>waiting for baseline…</div>';
+  $('abTLa').innerHTML='<div class="center"><span class="spin"></span>baseline running…</div>';
+  $('abTLb').innerHTML='<div class="center">waiting for baseline…</div>';
   try{
     const d=await(await fetch('/api/ab',{method:'POST'})).json();
-    if(d.error){$('abTLa').innerHTML=`<div class="muted">${esc(d.error)}</div>`;$('abBtn').disabled=false;return;}
+    if(d.error){$('abTLa').innerHTML=`<div class="center">${esc(d.error)}</div>`;$('abBtn').disabled=false;return;}
     $('abTLa').innerHTML=tlHtml(d.baseline&&d.baseline.timeline);
     $('abTLb').innerHTML=tlHtml(d.managed&&d.managed.timeline);
     $('abOutA').textContent=(d.baseline&&d.baseline.outcome)||'watch-only';
     $('abOutB').textContent=(d.managed&&d.managed.outcome)||'—';
-  }catch(e){$('abTLa').innerHTML=`<div class="muted">${esc(e)}</div>`;}
+  }catch(e){$('abTLa').innerHTML=`<div class="center">${esc(e)}</div>`;}
   $('abBtn').disabled=false;loadServices();loadPrevented();
-}
-async function loadConfig(){
-  try{const c=await(await fetch('/api/config')).json();
-    $('cfgFoot').innerHTML=`autonomy · <b>${esc(c.autonomy)}</b><br>$${c.cost_per_unit_hr}/unit·hr · ${esc(c.llm_provider)}`;
-  }catch(e){}
-}
-
-async function runLoop(managed){
-  $('runBtn').disabled=true;$('baseBtn').disabled=true;
-  $('loopTL').innerHTML='<div class="muted"><span class="spin"></span>ChronoLens is running the closed loop against SigNoz…</div>';
-  try{
-    const d=await(await fetch('/api/respond?managed='+managed,{method:'POST'})).json();
-    const tl=d.timeline||[];
-    let html=tl.map(e=>`<div class="tlrow ${esc(e.status)}"><div class="st">${esc(e.step)}</div><div class="tx">${esc(e.text)}</div></div>`).join('');
-    if(d.error) html+=`<div class="tlrow warn"><div class="st">ERROR</div><div class="tx">${esc(d.error)}</div></div>`;
-    $('loopTL').innerHTML=html||'<div class="muted">No activity returned.</div>';
-  }catch(e){$('loopTL').innerHTML=`<div class="muted">${esc(e)}</div>`;}
-  $('runBtn').disabled=false;$('baseBtn').disabled=false;loadServices();loadPrevented();
 }
 async function doFault(mode,level){
   $('faultMsg').textContent='sending…';
@@ -362,11 +476,13 @@ async function doFault(mode,level){
 }
 async function doCooldown(){
   $('faultMsg').textContent='releasing spare capacity…';
-  try{const d=await(await fetch('/api/cooldown',{method:'POST'})).json();
-    $('faultMsg').textContent=d.error?('⚠ '+d.error):d.note;
-  }catch(e){$('faultMsg').textContent=String(e);}
+  try{const d=await(await fetch('/api/cooldown',{method:'POST'})).json();$('faultMsg').textContent=d.error?('⚠ '+d.error):d.note;}
+  catch(e){$('faultMsg').textContent=String(e);}
   loadServices();loadPrevented();
 }
+function showView(n){curView=n;document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('view-'+n).classList.remove('hidden');
+  document.querySelectorAll('.navitem').forEach(i=>i.classList.toggle('active',i.dataset.view===n));
+  if(n==='prevented')loadPrevented(); if(n==='services')loadServicesView();}
 
 loadServices();loadPrevented();loadConfig();
 setInterval(loadServices,2500);setInterval(loadPrevented,6000);
