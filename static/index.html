@@ -109,6 +109,13 @@
   .chip.g{background:rgba(14,170,111,.13);color:var(--emerald);} .chip.a{background:rgba(224,146,31,.14);color:#c9821f;} .chip.r{background:rgba(229,72,77,.12);color:var(--red);}
   .muted{color:var(--mut);} .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px;} @keyframes s{to{transform:rotate(360deg);}}
   .bd::-webkit-scrollbar,.stage .ds::-webkit-scrollbar{width:7px;} .bd::-webkit-scrollbar-thumb,.stage .ds::-webkit-scrollbar-thumb{background:#d5dae4;border-radius:7px;}
+  .abgrid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .abcol{min-height:0;display:flex;flex-direction:column;}
+  .abcol .bd{flex:1;min-height:0;overflow-y:auto;}
+  .abhd{display:flex;align-items:center;gap:8px;}
+  .abtag{font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:20px;}
+  .abtag.off{background:rgba(229,72,77,.12);color:var(--red);} .abtag.on{background:rgba(14,170,111,.13);color:var(--emerald);}
+  .about{font-size:12px;font-weight:700;margin-left:auto;} .chip.b{background:rgba(47,107,255,.10);color:#2f6bff;}
 </style>
 </head>
 <body>
@@ -121,9 +128,10 @@
   <aside class="side">
     <div class="grp">Menu</div>
     <div class="navitem active" data-view="dashboard" onclick="showView('dashboard')"><span class="ni">▦</span> Dashboard</div>
+    <div class="navitem" data-view="ab" onclick="showView('ab')"><span class="ni">⇄</span> A / B</div>
     <div class="navitem" data-view="prevented" onclick="showView('prevented')"><span class="ni">🛡</span> Prevented</div>
     <div class="navitem" data-view="services" onclick="showView('services')"><span class="ni">🧩</span> Services</div>
-    <div class="foot">predict · prevent<br>verify · record</div>
+    <div class="foot"><span id="cfgFoot">learn · foresee<br>prevent · verify</span></div>
   </aside>
 
   <div class="wrap">
@@ -184,6 +192,28 @@
               <b style="color:var(--slate)">Record</b> files the receipt so an invisible save is provable.
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A/B -->
+    <div id="view-ab" class="view hidden">
+      <div class="card">
+        <div class="hd"><span class="t">Same fault, two arms — with and without ChronoLens</span><span class="r" id="abMsg"></span></div>
+        <div class="bd controls">
+          <button class="b-amber" onclick="doFault('traffic-ramp',30)"><span class="ic">↗</span> Inject rising load</button>
+          <button class="primary" id="abBtn" onclick="runAB()"><span>⇄</span> Run A/B comparison</button>
+          <span class="msg">Baseline forecasts and records what <b>would</b> happen but takes no action. Managed runs the full loop.</span>
+        </div>
+      </div>
+      <div class="abgrid">
+        <div class="card abcol">
+          <div class="hd abhd"><span class="abtag off">A · BASELINE</span><span class="t">ChronoLens OFF</span><span class="about chip r" id="abOutA">—</span></div>
+          <div class="bd looptl" id="abTLa" style="height:auto"><div class="muted">Run the comparison to populate.</div></div>
+        </div>
+        <div class="card abcol">
+          <div class="hd abhd"><span class="abtag on">B · MANAGED</span><span class="t">ChronoLens ON</span><span class="about chip g" id="abOutB">—</span></div>
+          <div class="bd looptl" id="abTLb" style="height:auto"><div class="muted">Run the comparison to populate.</div></div>
         </div>
       </div>
     </div>
@@ -253,18 +283,21 @@ function renderPrev(d,el){
     const extra=[];
     if(c.learning_applied) extra.push('learned pre-provision');
     if(c.scaled_down) extra.push('scaled down · returned '+c.cost_units_returned+'u');
+    if(c.dollars_saved) extra.push('$'+Number(c.dollars_saved).toFixed(2)+' saved');
     const tail=extra.length?(' · '+extra.join(' · ')):'';
-    return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b><span class="muted" style="margin-left:auto;font-size:11px">${esc(c.at)}</span></div>
+    const sig=c.signal?`<span class="chip b" style="margin-left:6px">${esc(c.signal)}</span>`:'';
+    return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b>${sig}<span class="muted" style="margin-left:auto;font-size:11px">${esc(c.at)}</span></div>
     <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail}</div></div>`;
   }).join('');
 }
 async function loadPrevented(){
   try{const d=await(await fetch('/api/prevented')).json();
-    $('prevBadge').innerHTML=`<span class="chip g">${d.prevented||0} avoided</span> <span class="chip a">${d.cost_units_saved||0}u saved</span>`;
-    $('prevBadge2').innerHTML=`<span class="chip g">${d.prevented||0} / ${d.total||0}</span> <span class="chip a">${d.cost_units_saved||0}u saved</span>`;
+    const usd=(d.dollars_saved||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    $('prevBadge').innerHTML=`<span class="chip g">${d.prevented||0} avoided</span> <span class="chip a">$${usd} saved</span>`;
+    $('prevBadge2').innerHTML=`<span class="chip g">${d.prevented||0} / ${d.total||0}</span> <span class="chip a">${d.cost_units_saved||0}u · $${usd}</span>`;
     renderPrev(d,$('prevList'));
     if(curView==='prevented'){
-      const head=`<div class="prevhead"><div class="prevnum">${d.prevented||0}<small>Prevented</small></div><div class="prevnum">${d.total||0}<small>Total incidents</small></div><div class="prevnum">${d.cost_units_saved||0}<small>Capacity units saved</small></div></div>`;
+      const head=`<div class="prevhead"><div class="prevnum">${d.prevented||0}<small>Prevented</small></div><div class="prevnum">${d.total||0}<small>Total incidents</small></div><div class="prevnum">${d.cost_units_saved||0}<small>Capacity units saved</small></div><div class="prevnum">$${(d.dollars_saved||0).toFixed(2)}<small>Cost saved</small></div></div>`;
       const tmp=document.createElement('div'); renderPrev(d,tmp); $('prevFull').innerHTML=head+tmp.innerHTML;
     }
   }catch(e){}
@@ -280,6 +313,27 @@ async function loadServicesView(){
 function showView(n){curView=n;document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('view-'+n).classList.remove('hidden');
   document.querySelectorAll('.navitem').forEach(i=>i.classList.toggle('active',i.dataset.view===n));
   if(n==='prevented')loadPrevented(); if(n==='services')loadServicesView();}
+
+function tlHtml(tl){return (tl||[]).map(e=>`<div class="tlrow ${esc(e.status)}"><div class="st">${esc(e.step)}</div><div class="tx">${esc(e.text)}</div></div>`).join('')||'<div class="muted">No activity returned.</div>';}
+async function runAB(){
+  $('abBtn').disabled=true;
+  $('abTLa').innerHTML='<div class="muted"><span class="spin"></span>baseline running…</div>';
+  $('abTLb').innerHTML='<div class="muted"><span class="spin"></span>waiting for baseline…</div>';
+  try{
+    const d=await(await fetch('/api/ab',{method:'POST'})).json();
+    if(d.error){$('abTLa').innerHTML=`<div class="muted">${esc(d.error)}</div>`;$('abBtn').disabled=false;return;}
+    $('abTLa').innerHTML=tlHtml(d.baseline&&d.baseline.timeline);
+    $('abTLb').innerHTML=tlHtml(d.managed&&d.managed.timeline);
+    $('abOutA').textContent=(d.baseline&&d.baseline.outcome)||'watch-only';
+    $('abOutB').textContent=(d.managed&&d.managed.outcome)||'—';
+  }catch(e){$('abTLa').innerHTML=`<div class="muted">${esc(e)}</div>`;}
+  $('abBtn').disabled=false;loadServices();loadPrevented();
+}
+async function loadConfig(){
+  try{const c=await(await fetch('/api/config')).json();
+    $('cfgFoot').innerHTML=`autonomy · <b>${esc(c.autonomy)}</b><br>$${c.cost_per_unit_hr}/unit·hr · ${esc(c.llm_provider)}`;
+  }catch(e){}
+}
 
 async function runLoop(managed){
   $('runBtn').disabled=true;$('baseBtn').disabled=true;
@@ -308,7 +362,7 @@ async function doCooldown(){
   loadServices();loadPrevented();
 }
 
-loadServices();loadPrevented();
+loadServices();loadPrevented();loadConfig();
 setInterval(loadServices,2500);setInterval(loadPrevented,6000);
 setInterval(()=>{if(curView==='services')loadServicesView();},4000);
 </script>

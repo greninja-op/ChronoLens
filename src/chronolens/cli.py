@@ -84,30 +84,54 @@ def cmd_prevented(_: list[str]) -> int:
     ledger = Ledger()
     rows = ledger.list()
     print(f"Prevented: {ledger.prevented_count()} / {ledger.total_count()} incidents "
-          f"({ledger.total_cost_units_saved()} capacity units saved)\n")
+          f"({ledger.total_cost_units_saved()} units / ${ledger.total_dollars_saved():,.2f} saved)\n")
     for c in rows[-15:]:
-        print(f"  {c['at']}  {c['service']:<18} {c['outcome']:<16} "
+        sig = c.get("signal", "?")
+        print(f"  {c['at']}  {c['service']:<18} {c['outcome']:<16} [{sig:<10}] "
               f"p99@predict={c['p99_at_prediction_ms']}ms → final={c['final_p99_ms']}ms")
+    return 0
+
+
+def cmd_ab(_: list[str]) -> int:
+    """Run the baseline (no-action) arm, then the managed arm, back to back."""
+    cfg = Config.load()
+    with SigNozClient(cfg) as sn:
+        print("=== A: BASELINE (ChronoLens OFF) ===\n")
+        _print_timeline(run_loop(sn, cfg, managed=False))
+        print("\n=== B: MANAGED (ChronoLens ON) ===\n")
+        _print_timeline(run_loop(sn, cfg, managed=True))
+    return 0
+
+
+def cmd_config(_: list[str]) -> int:
+    """Show the active governance / cost / LLM configuration."""
+    cfg = Config.load()
+    print("ChronoLens configuration")
+    print(f"  autonomy         : {cfg.autonomy} (trust_min_saves={cfg.trust_min_saves})")
+    print(f"  guardrails       : min_dwell={cfg.min_dwell_s}s, max_capacity={cfg.max_capacity}")
+    print(f"  confidence guard : min_slope={cfg.min_slope_ms_per_s}ms/s, min_samples={cfg.min_samples}")
+    print(f"  cost model       : ${cfg.cost_per_unit_hr}/unit/hr")
+    print(f"  llm provider     : {cfg.llm_provider}")
+    print(f"  notify webhook   : {'set' if cfg.notify_webhook_url else 'not set'}")
     return 0
 
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python -m chronolens.cli <services|foresee|respond [off]|cooldown|prevented>")
+        print("Usage: python -m chronolens.cli "
+              "<services|foresee|respond [off]|ab|cooldown|prevented|config>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
-    if cmd == "services":
-        return cmd_services(rest)
-    if cmd == "foresee":
-        return cmd_foresee(rest)
-    if cmd == "respond":
-        return cmd_respond(rest)
-    if cmd == "cooldown":
-        return cmd_cooldown(rest)
-    if cmd == "prevented":
-        return cmd_prevented(rest)
-    print(f"Unknown command: {cmd}")
-    return 2
+    dispatch = {
+        "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
+        "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
+        "config": cmd_config,
+    }
+    fn = dispatch.get(cmd)
+    if fn is None:
+        print(f"Unknown command: {cmd}")
+        return 2
+    return fn(rest)
 
 
 if __name__ == "__main__":

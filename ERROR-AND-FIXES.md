@@ -56,3 +56,23 @@ won't it start" issues are already here.
 ### 12. Prediction won't "land" on camera
 **Cause:** the ramp is too fast/slow for the demo.
 **Fix:** tune the fault level: `POST /admin/fault?mode=traffic-ramp&level=30`. Higher level = faster ramp. Default `level=30` crosses the default capacity (~33s) and breaches the 500ms SLO (~50s) — gradual enough to forecast.
+
+### 13. ChronoLens acts on noise / flaps up and down
+**Cause:** an over-eager forecaster reacting to a single jittery sample, or scaling repeatedly.
+**Fix:** already handled by two brakes. The **confidence guard** (`foresee.confidence_guard`) needs `CHRONOLENS_MIN_SAMPLES` samples, a slope above `CHRONOLENS_MIN_SLOPE`, and a sustained rise before it acts. The **anti-flap guardrails** (`guardrails.FlapGuard`) enforce `CHRONOLENS_MIN_DWELL_S` between actions and a `CHRONOLENS_MAX_CAPACITY` ceiling. Tune these in `.env` if the demo needs to act sooner.
+
+### 14. "ChronoLens only suggested, it didn't act"
+**Cause:** the trust ladder. With `CHRONOLENS_AUTONOMY=suggest` it never acts; with `earn` it only acts after `CHRONOLENS_TRUST_MIN_SAVES` verified saves on that service.
+**Fix:** set `CHRONOLENS_AUTONOMY=auto` in `.env` for the demo (the default), or run the loop enough times in `earn` mode to build a track record.
+
+### 15. No Slack message on a prevented incident
+**Cause:** no webhook configured, or the endpoint rejected the post.
+**Fix:** set `CHRONOLENS_WEBHOOK_URL` to a Slack incoming webhook (or any endpoint that accepts `{"text": ...}`). If unset, NOTIFY is skipped and the loop continues — it fails open by design.
+
+### 16. LLM explanation looks generic / no LLM called
+**Cause:** `LLM_PROVIDER=none` (the default), so the rule-based explanation is used.
+**Fix:** that's expected — ChronoLens runs with no API key. To enrich, set `LLM_PROVIDER=openai|bedrock|gemini` and the matching key (`OPENAI_API_KEY`, or AWS creds for Bedrock). Any failure silently falls back to the rule-based text.
+
+### 17. Self-metrics don't appear in SigNoz
+**Cause:** the OTLP metric exporter couldn't reach the collector, or `CHRONOLENS_SELF_OTEL=off`.
+**Fix:** `metrics_self.py` fails open (never crashes the loop). Ensure the collector is up on `OTLP_ENDPOINT` (default `localhost:4317`) and `CHRONOLENS_SELF_OTEL` is not disabled. Metrics export on a 10s cadence and are flushed on CLI exit.

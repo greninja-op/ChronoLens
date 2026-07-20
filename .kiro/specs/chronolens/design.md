@@ -50,8 +50,34 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
 
 - **cascade.py** — topology-derived blast path; names the root hop.
 
-- **prevent.py** — `propose` a reversible action; `apply`/`rollback`/`scale_by`
-  via the store's `/admin/lever`.
+- **playbook.py** — `classify(cfg)` reads the dominant failure signal; `play_for(signal)`
+  maps it to a reversible `Play` (load→scale, dependency→circuit-break,
+  pool→pool-resize, memory→restart, errors→rollback). Turns ChronoLens from a
+  one-trick autoscaler into a signal-matched remediator.
+
+- **foresee.py** — samples p99, least-squares slope, projects time-to-breach,
+  behind a **confidence guard** (`confidence_guard`: min samples, noise-floor
+  slope, sustained-rise fraction) so it won't act on jitter.
+
+- **prevent.py** — `propose` picks the playbook action for the signal; `apply`
+  runs it through **anti-flap guardrails** first; `rollback`/`scale_by` too.
+
+- **guardrails.py** — `FlapGuard`: file-backed per-service dwell timer + capacity
+  ceiling (clamps or blocks); state persists across runs.
+
+- **governance.py** — the trust ladder. `decide(cfg, service, ledger)` returns
+  whether ChronoLens may act (`suggest` / `earn` after N proven saves / `auto`).
+
+- **dollars.py** — `units_to_dollars`: values returned capacity in `$` via
+  `cost_per_unit_hr` (the one place unit↔money math lives).
+
+- **notify.py** — posts a prevented/escalated note to a Slack/webhook; fails open.
+
+- **llm.py** — `explain(evidence)`: rule-based NL explanation, optionally enriched
+  by OpenAI/Bedrock/Gemini; always falls back to rule-based.
+
+- **metrics_self.py** — emits ChronoLens's own OTel gauges (prevented total,
+  seconds-to-breach, cost saved) to SigNoz; fails open.
 
 - **cooldown.py** — watches headroom; once the spike subsides, scales back to
   baseline and reports the capacity units returned (cost saved). Never scales
@@ -111,5 +137,7 @@ The A/B runs the same fault with and without the action to prove causation.
 
 ## Production target (AWS, serverless)
 
-Lambda (loop stages), EventBridge (SigNoz alert → loop), DynamoDB (ledger),
-S3 (evidence), Bedrock (NL explanations), small Fargate (UI).
+Scaffolded under `infra/` (AWS SAM): a scheduled **Lambda** runs `run_loop`
+(EventBridge `rate(2m)`), records incidents to on-demand **DynamoDB**, and uses
+**Bedrock** for NL explanations. Pay-per-use only. `CHRONOLENS_AUTONOMY=earn` in
+prod so the loop earns trust before acting solo. See `infra/README.md`.

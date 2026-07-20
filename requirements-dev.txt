@@ -1,0 +1,4 @@
+-r requirements.txt
+# Test tooling (property-based tests use Hypothesis).
+pytest>=8.0
+hypothesis>=6.100

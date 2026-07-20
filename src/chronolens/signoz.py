@@ -74,6 +74,115 @@ def build_trace_query(
     }
 
 
+# SigNoz stores span durations in nanoseconds, so every latency artifact we
+# create (alert thresholds, dashboard axes) is expressed in ns.
+LATENCY_Y_AXIS_UNIT = "ns"
+
+
+def _slo_ns(slo_ms: float) -> float:
+    """Convert an SLO expressed in milliseconds to nanoseconds (SigNoz native)."""
+    return float(slo_ms) * 1e6
+
+
+def _p99_latency_builder_query(service: str) -> dict[str, Any]:
+    """A Query Builder p99(duration_nano) traces query scoped to one service.
+
+    Shared by the guard alert and the guard dashboard so both watch exactly the
+    same signal the loop forecasts on.
+    """
+    return {
+        "queryName": "A",
+        "expression": "A",
+        "dataSource": "traces",
+        "aggregateOperator": "p99",
+        "aggregateAttribute": {"key": "duration_nano", "dataType": "float64", "type": ""},
+        "filters": {
+            "op": "AND",
+            "items": [
+                {
+                    "key": {"key": "service.name", "dataType": "string", "type": "resource"},
+                    "op": "=",
+                    "value": service,
+                }
+            ],
+        },
+        "groupBy": [],
+        "disabled": False,
+        "stepInterval": 60,
+    }
+
+
+def build_guard_alert(service: str, slo_ms: float) -> dict[str, Any]:
+    """Build a guarding SigNoz alert rule on a service's p99 latency.
+
+    Fires when p99(duration_nano) climbs above the SLO. The threshold is stored
+    in **nanoseconds** (``slo_ms * 1e6``) because SigNoz keeps span durations as
+    ``duration_nano``.
+    """
+    threshold_ns = _slo_ns(slo_ms)
+    return {
+        "alert": f"ChronoLens guard - {service} p99 latency",
+        "alertType": "TRACES_BASED_ALERT",
+        "ruleType": "threshold_rule",
+        "description": (
+            f"ChronoLens prevented a breach on {service}; this guard keeps the "
+            f"service watched so a recurrence trips an alert at the {slo_ms}ms SLO."
+        ),
+        "condition": {
+            "compositeQuery": {
+                "queryType": "builder",
+                "panelType": "graph",
+                "builderQueries": {"A": _p99_latency_builder_query(service)},
+            },
+            "op": ">",
+            "target": threshold_ns,
+            "targetUnit": LATENCY_Y_AXIS_UNIT,
+            "matchType": "1",  # at least once in the window
+        },
+        "labels": {"severity": "warning", "chronolens": "guard", "service": service},
+        "annotations": {
+            "summary": f"{service} p99 latency crossed the {slo_ms}ms SLO",
+            "description": "Auto-filed by ChronoLens after a prevented incident.",
+        },
+    }
+
+
+def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
+    """Build a guarding SigNoz dashboard with a p99 latency panel for a service.
+
+    The latency panel sets ``yAxisUnit = "ns"`` and marks the SLO threshold in
+    nanoseconds, matching how SigNoz stores ``duration_nano``.
+    """
+    threshold_ns = _slo_ns(slo_ms)
+    panel = {
+        "title": f"{service} p99 latency (guarded at {slo_ms}ms SLO)",
+        "description": "ChronoLens guard panel — p99 span duration for the service.",
+        "panelTypes": "graph",
+        "yAxisUnit": LATENCY_Y_AXIS_UNIT,
+        "query": {
+            "queryType": "builder",
+            "builder": {"queryData": [_p99_latency_builder_query(service)]},
+        },
+        "thresholds": [
+            {
+                "index": "slo",
+                "label": f"SLO {slo_ms}ms",
+                "value": threshold_ns,
+                "unit": LATENCY_Y_AXIS_UNIT,
+            }
+        ],
+    }
+    return {
+        "title": f"ChronoLens guard - {service}",
+        "description": (
+            f"Auto-created by ChronoLens after preventing a breach on {service}. "
+            f"Keeps the prevented incident watched."
+        ),
+        "tags": ["chronolens", "guard", service],
+        "widgets": [panel],
+    }
+
+
 class SigNozClient:
     def __init__(self, cfg: Config | None = None, timeout: float = 30.0):
         self.cfg = cfg or Config.load()

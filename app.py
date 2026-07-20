@@ -117,6 +117,33 @@ def respond(managed: bool = True):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.post("/api/ab")
+def ab():
+    """Run both arms of the A/B: baseline (no fix) then managed (ChronoLens on),
+    so the UI can show the same fault breaching on one side and saved on the other."""
+    try:
+        with SigNozClient(cfg) as sn:
+            baseline = run_loop(sn, cfg, managed=False)
+            managed = run_loop(sn, cfg, managed=True)
+        return {"baseline": baseline, "managed": managed}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/config")
+def config_view():
+    """Expose the governance / cost / LLM config so the UI can show trust + $."""
+    return {
+        "autonomy": cfg.autonomy,
+        "trust_min_saves": cfg.trust_min_saves,
+        "cost_per_unit_hr": cfg.cost_per_unit_hr,
+        "llm_provider": cfg.llm_provider,
+        "max_capacity": cfg.max_capacity,
+        "min_dwell_s": cfg.min_dwell_s,
+        "notify": bool(cfg.notify_webhook_url),
+    }
+
+
 @app.get("/api/prevented")
 def prevented():
     try:
@@ -125,6 +152,7 @@ def prevented():
             "prevented": ledger.prevented_count(),
             "total": ledger.total_count(),
             "cost_units_saved": ledger.total_cost_units_saved(),
+            "dollars_saved": ledger.total_dollars_saved(),
             "incidents": list(reversed(ledger.list()))[:20],
         }
     except Exception as e:

@@ -105,3 +105,44 @@ twice — it should adjust so a recurring incident stops happening.
 2. FOR a repeat offender ChronoLens SHALL pre-provision a higher baseline floor BEFORE any breach and act earlier (wider lead window).
 3. The case file SHALL record whether learning was applied and how many prior incidents informed it.
 4. The loop SHALL be closed: each incident's receipt becomes LEARN's memory for the next run.
+5. WHEN prior incidents cluster around a recurring hour-of-day THEN ChronoLens SHALL detect that seasonality and flag when the window is imminent.
+
+### Requirement 12 — Signal-matched remediation (PLAYBOOK)
+**User story:** As an operator, I want the fix to match the failure, not always "scale up".
+
+#### Acceptance criteria
+1. WHEN a breach is predicted THEN ChronoLens SHALL classify the dominant signal (load, dependency, pool, memory, errors).
+2. The system SHALL map each signal to a distinct reversible lever (scale, circuit-break, pool-resize, restart, rollback) and describe its rollback.
+3. IF the signal is unknown THEN ChronoLens SHALL fall back to scale-out.
+
+### Requirement 13 — Confidence guard
+#### Acceptance criteria
+1. ChronoLens SHALL NOT project a breach unless it has at least a minimum number of samples.
+2. ChronoLens SHALL ignore trends whose slope is below a configurable noise floor.
+3. ChronoLens SHALL require a sustained (mostly monotonic) rise before acting, and SHALL expose a confidence score.
+
+### Requirement 14 — Anti-flap guardrails
+#### Acceptance criteria
+1. ChronoLens SHALL NOT act on the same service again within a configurable dwell window.
+2. ChronoLens SHALL NOT scale a service past a configurable capacity ceiling, clamping the action if needed.
+3. Guardrail state SHALL persist across process runs.
+
+### Requirement 15 — Governance / trust ladder
+**User story:** As an operator, I want autonomy to be earned, not assumed.
+
+#### Acceptance criteria
+1. In `suggest` mode ChronoLens SHALL only propose actions (human-in-the-loop), never apply them.
+2. In `earn` mode ChronoLens SHALL act autonomously only after a configurable number of verified saves on that service; otherwise it SHALL suggest.
+3. In `auto` mode ChronoLens SHALL act automatically.
+
+### Requirement 16 — Cost in dollars + notifications
+#### Acceptance criteria
+1. Capacity units returned on cooldown SHALL be valued in dollars via a configurable per-unit hourly rate.
+2. The ledger SHALL expose total dollars saved.
+3. WHEN an actionable outcome occurs THEN ChronoLens SHALL post a human-readable note to a configured Slack/webhook, failing open if none is set.
+
+### Requirement 17 — Pluggable explanations + self-metrics + serverless
+#### Acceptance criteria
+1. ChronoLens SHALL produce a rule-based NL explanation of every incident, optionally enriched by an LLM (OpenAI/Bedrock/Gemini) and always falling back to rule-based on failure.
+2. ChronoLens SHALL emit its own OpenTelemetry metrics (prevented total, seconds-to-breach, cost saved) to SigNoz, failing open.
+3. The repo SHALL ship a serverless AWS scaffold (Lambda + EventBridge + DynamoDB + Bedrock) expressing the pay-per-use production shape.

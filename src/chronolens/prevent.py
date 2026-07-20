@@ -1,17 +1,26 @@
 """PREVENT — take a small, reversible action before the breach lands.
 
-Every action ChronoLens takes must be undoable. That single rule is what makes
-running without a human safe: a wrong guess costs you a briefly-oversized pool,
-not a self-inflicted outage. Actions are applied by pulling the demo store's
-admin levers.
+Two rules make running without a human safe:
+
+1. **Every action is reversible.** A wrong guess costs a briefly-oversized pool
+   or an isolated dependency, not a self-inflicted outage.
+2. **The action fits the signal.** PREVENT doesn't always scale — it asks the
+   :mod:`playbook` what's actually wrong (load / dependency / pool / memory /
+   errors) and picks the matching reversible lever.
+
+Anti-flap :mod:`guardrails` sit in front of every action so the loop can't
+oscillate or scale to infinity. Actions are applied via the demo store's admin
+levers.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
 from .config import Config
+from .guardrails import FlapGuard
+from .playbook import classify, play_for
 
 
 @dataclass
@@ -19,35 +28,74 @@ class Remediation:
     action: str
     params: dict
     rollback: str
+    why: str = ""
+    signal: str = "load"
     applied: bool = False
+    blocked: bool = False
+    block_reason: str = ""
     result: dict | None = None
     error: str | None = None
+    notes: list[str] = field(default_factory=list)
 
 
-def propose(forecast_service: str) -> Remediation:
-    """Choose a reversible action for a predicted breach.
+def propose(service: str, cfg: Config | None = None, *, signal: str | None = None) -> Remediation:
+    """Choose a reversible action, matched to the dominant failure signal.
 
-    For the demo store the breach is load-driven, so the fix is to **scale out**
-    (add capacity) — fully reversible by scaling back down.
+    Reads the signal from the playbook (a proxy for SigNoz metrics + traces) and
+    maps it to a reversible lever. Falls back to scale-out when the signal is
+    unknown or broadly latency-bound.
     """
+    if signal is None and cfg is not None:
+        signal = classify(cfg)
+    play = play_for(signal or "load")
     return Remediation(
-        action="scale",
-        params={"service": forecast_service, "value": 2.0},
-        rollback="Scale the service back down by 2 capacity units once load subsides.",
+        action=play.action,
+        params={"service": service, "value": play.value},
+        rollback=play.rollback,
+        why=play.why,
+        signal=play.signal,
     )
 
 
-def apply(cfg: Config, rem: Remediation, timeout: float = 8.0) -> Remediation:
-    """Execute the reversible action against the demo store's lever API."""
+def _store_capacity(cfg: Config, timeout: float = 6.0) -> float:
+    try:
+        st = httpx.get(f"{cfg.demo_store_url}/admin/status", timeout=timeout).json()
+        return float(st.get("capacity", 0.0))
+    except Exception:
+        return 0.0
+
+
+def apply(cfg: Config, rem: Remediation, *, guard: FlapGuard | None = None,
+          timeout: float = 8.0) -> Remediation:
+    """Execute the reversible action, after clearing anti-flap guardrails."""
+    guard = guard or FlapGuard()
+    value = float(rem.params.get("value", 0.0) or 0.0)
+    cap = _store_capacity(cfg)
+
+    verdict = guard.check(
+        rem.params.get("service", "?"), rem.action,
+        min_dwell_s=cfg.min_dwell_s, current_capacity=cap,
+        scale_value=value, max_capacity=cfg.max_capacity,
+    )
+    if not verdict.allowed:
+        rem.blocked = True
+        rem.block_reason = verdict.reason
+        return rem
+    if verdict.capped_value is not None:
+        value = verdict.capped_value
+        rem.params["value"] = value
+        rem.notes.append(verdict.reason)
+
     try:
         r = httpx.post(
             f"{cfg.demo_store_url}/admin/lever",
-            params={"action": rem.action, "value": rem.params.get("value", 2.0)},
+            params={"action": rem.action, "value": value},
             timeout=timeout,
         )
         r.raise_for_status()
         rem.result = r.json()
         rem.applied = True
+        guard.note_action(rem.params.get("service", "?"), rem.action)
     except Exception as exc:
         rem.error = f"could not apply remediation: {exc}"
     return rem
@@ -65,15 +113,20 @@ def scale_by(cfg: Config, delta: float, timeout: float = 8.0) -> dict:
 
 
 def rollback(cfg: Config, rem: Remediation, timeout: float = 8.0) -> bool:
-    """Undo a scale action (used when verification fails)."""
-    if rem.action != "scale":
+    """Undo an applied action (used when verification fails)."""
+    if not rem.applied:
         return False
+    value = float(rem.params.get("value", 0.0) or 0.0)
     try:
-        httpx.post(
-            f"{cfg.demo_store_url}/admin/lever",
-            params={"action": "scale", "value": -rem.params.get("value", 2.0)},
-            timeout=timeout,
-        )
-        return True
+        if rem.action in ("scale", "pool-resize"):
+            httpx.post(f"{cfg.demo_store_url}/admin/lever",
+                       params={"action": rem.action, "value": -value}, timeout=timeout)
+            return True
+        # circuit-break / restart / rollback are undone by a full reset here.
+        if rem.action in ("circuit-break", "rollback"):
+            httpx.post(f"{cfg.demo_store_url}/admin/lever",
+                       params={"action": "reset", "value": 0.0}, timeout=timeout)
+            return True
     except Exception:
         return False
+    return False

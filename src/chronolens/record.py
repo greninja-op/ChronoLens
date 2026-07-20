@@ -26,7 +26,7 @@ class CaseFile:
     verified: bool
     final_p99_ms: float
     peak_p99_ms: float
-    outcome: str  # "breach avoided" | "escalated" | "watch-only"
+    outcome: str  # "breach avoided" | "escalated" | "watch-only" | "suggested"
     # --- closed-loop fields ---
     load_onset_at: str = ""            # when the load/incident was first detected
     learning_applied: bool = False     # did LEARN pre-provision from past incidents?
@@ -37,6 +37,17 @@ class CaseFile:
     capacity_after: float = 0.0
     cost_units_returned: float = 0.0   # capacity units released after the spike
     cooldown_note: str = ""
+    # --- playbook / trust / cost / explanation ---
+    signal: str = "load"               # dominant failure signal the playbook saw
+    why: str = ""                       # why that action fits the signal
+    confidence: float = 1.0            # forecast confidence (0..1)
+    autonomy_mode: str = "auto"        # suggest | earn | auto
+    proven_saves: int = 0              # verified saves on this service before now
+    dollars_saved: float = 0.0         # $ value of capacity returned on cooldown
+    seasonal_hour: int | None = None   # recurring hour-of-day, if any
+    explanation: str = ""              # NL explanation (rule-based or LLM)
+    explanation_source: str = ""       # "rule-based" | provider name
+    notified: bool = False             # did we post to Slack/webhook?
     evidence: dict = field(default_factory=dict)
 
 
@@ -79,6 +90,10 @@ class Ledger:
     def total_cost_units_saved(self) -> float:
         """Sum of capacity units returned across all incidents (cost saved)."""
         return round(sum(float(c.get("cost_units_returned", 0) or 0) for c in self._load_raw()), 2)
+
+    def total_dollars_saved(self) -> float:
+        """Sum of the dollar value of capacity returned across all incidents."""
+        return round(sum(float(c.get("dollars_saved", 0) or 0) for c in self._load_raw()), 2)
 
     def prior_incidents_for(self, service: str) -> int:
         return sum(1 for c in self._load_raw() if c.get("service") == service)

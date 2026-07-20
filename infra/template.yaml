@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ChronoLens serverless scaffold — a scheduled Lambda runs the reliability loop
+  against SigNoz on a cadence, records incidents to DynamoDB, and (optionally)
+  uses Bedrock for natural-language explanations. Pay-per-use only, no servers.
+
+  This is a SCAFFOLD: it deploys the shape of the system. Provide real SigNoz
+  creds via SSM/Secrets before relying on it. See infra/README.md.
+
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 256
+    Runtime: python3.12
+
+Parameters:
+  SigNozUrl:
+    Type: String
+    Description: Base URL of the SigNoz query API (e.g. https://signoz.example.com).
+  SigNozApiKey:
+    Type: String
+    NoEcho: true
+    Description: SigNoz API key (prefer an SSM SecureString in production).
+  P99SloMs:
+    Type: Number
+    Default: 500
+  LlmProvider:
+    Type: String
+    Default: bedrock
+    AllowedValues: [none, bedrock, openai, gemini]
+  ScheduleExpression:
+    Type: String
+    Default: rate(2 minutes)
+    Description: How often the loop runs.
+
+Resources:
+  IncidentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST      # pay-per-use, no provisioned capacity
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  LoopFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.run
+      CodeUri: lambda/
+      Environment:
+        Variables:
+          SIGNOZ_URL: !Ref SigNozUrl
+          SIGNOZ_API_KEY: !Ref SigNozApiKey
+          P99_SLO_MS: !Ref P99SloMs
+          LLM_PROVIDER: !Ref LlmProvider
+          INCIDENTS_TABLE: !Ref IncidentsTable
+          CHRONOLENS_AUTONOMY: earn         # earn trust in prod before acting solo
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IncidentsTable
+        - Statement:
+            - Effect: Allow                  # Bedrock for NL explanations
+              Action: [bedrock:InvokeModel]
+              Resource: "*"
+      Events:
+        Tick:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref ScheduleExpression
+
+Outputs:
+  IncidentsTableName:
+    Value: !Ref IncidentsTable
+  LoopFunctionArn:
+    Value: !GetAtt LoopFunction.Arn

@@ -6,18 +6,32 @@ Built for the **Agents of SigNoz** hackathon (Track: AI & Agent Observability).
 
 ## The closed loop (loop engineering)
 ```
-LEARN    → read past incidents; for a repeat offender, pre-provision a higher
-           floor BEFORE any breach and act earlier
-FORESEE  → watch a service's p99, project the trend to a time-to-breach
+LEARN    → read past incidents (incl. time-of-day seasonality); for a repeat
+           offender, pre-provision a higher floor BEFORE any breach + act earlier
+FORESEE  → watch a service's p99, project the trend to a time-to-breach,
+           behind a CONFIDENCE GUARD so it won't act on noise
+CLASSIFY → the PLAYBOOK maps the dominant signal to the matching reversible fix
+           (load→scale · dependency→circuit-break · pool→resize · memory→restart · errors→rollback)
 CASCADE  → name the root hop the failure will spread from (fix cause, not symptom)
-PREVENT  → take one reversible action (scale out) before the breach lands
+GOVERN   → the TRUST LADDER decides whether it may act solo yet (suggest/earn/auto)
+PREVENT  → take the reversible action behind ANTI-FLAP GUARDRAILS (dwell + ceiling)
 VERIFY   → confirm via SigNoz the breach was actually avoided (else roll back)
-COOLDOWN → once the load subsides, scale back to baseline and SAVE COST
-RECORD   → file the receipt (load onset, learning, cost saved, outcome)
+COOLDOWN → once the load subsides, scale back to baseline and SAVE COST (in $)
+RECORD   → file the receipt (signal, cost saved, NL explanation, guard artifacts)
+           + NOTIFY a Slack/webhook, + emit ChronoLens's own metrics to SigNoz
    ▲                                                                    │
    └──────────────── the ledger feeds LEARN next time ──────────────────┘
 ```
-It's a genuine closed loop: every incident's receipt becomes the memory that makes the next one less likely — and when the spike passes, ChronoLens gives the capacity back so you're not paying for idle headroom. ChronoLens is itself OpenTelemetry-instrumented, so its own loop shows up in SigNoz (full-circle).
+It's a genuine closed loop: every incident's receipt becomes the memory that makes the next one less likely — and when the spike passes, ChronoLens gives the capacity back so you're not paying for idle headroom. ChronoLens is itself OpenTelemetry-instrumented (traces **and** metrics), so its own loop shows up in SigNoz (full-circle).
+
+### What ChronoLens decides (not just autoscaling)
+- **Playbook** — different failure signals get different reversible fixes, not always "scale". A slow dependency gets circuit-broken; a bad deploy gets rolled back; a leaking pool gets resized.
+- **Confidence guard** — needs enough samples, a slope above a noise floor, and a *sustained* rise before it calls a breach. No acting on jitter.
+- **Anti-flap guardrails** — a minimum dwell time between actions and a hard capacity ceiling, so the loop can't oscillate or scale to infinity.
+- **Trust ladder** — `suggest` (human-in-the-loop) · `earn` (autonomous only after N verified saves on that service) · `auto` (demo default).
+- **Cost in dollars** — capacity units returned on cooldown are valued in `$` via `COST_PER_UNIT_HR`.
+- **Notifications** — posts a prevented/escalated note to a Slack incoming webhook (or any `{"text":...}` webhook).
+- **Pluggable LLM** — plain-English explanations from a rule-based default, optionally enriched by OpenAI / Bedrock / Gemini. Runs with no key.
 
 ## Architecture (local dev)
 ```
@@ -95,10 +109,18 @@ Same fault, run twice: one breaches, one gets defused. That's the demo.
 ### From the CLI
 ```bash
 python -m chronolens.cli foresee       # forecast the worst service now
-python -m chronolens.cli respond       # full closed loop: learn→foresee→prevent→verify→cooldown→record
+python -m chronolens.cli respond       # full closed loop: learn→foresee→classify→govern→prevent→verify→cooldown→record
 python -m chronolens.cli respond off   # baseline arm: predict + record, no action (A/B)
+python -m chronolens.cli ab            # run baseline then managed back-to-back (the A/B)
 python -m chronolens.cli cooldown      # give spare capacity back once load subsides (save cost)
-python -m chronolens.cli prevented     # the receipts ledger (with capacity units saved)
+python -m chronolens.cli prevented     # the receipts ledger (units + $ saved, per-signal)
+python -m chronolens.cli config        # show autonomy / guardrails / cost / LLM config
+```
+
+### Tests
+```bash
+pip install -r requirements-dev.txt
+pytest        # property-based (Hypothesis) + unit tests for every stage
 ```
 
 ---
@@ -113,16 +135,19 @@ python -m chronolens.cli prevented     # the receipts ledger (with capacity unit
 ## Layout
 ```
 chronolens/
-├── demo_store/store.py        # the watched app: rising-load fault + reversible levers
+├── demo_store/store.py        # the watched app: 5 fault types + reversible levers
 ├── src/chronolens/
-│   ├── config.py  signoz.py  otel_self.py
-│   ├── learn.py   foresee.py  cascade.py  prevent.py  verify.py  cooldown.py  record.py
-│   ├── loop.py    # learn → foresee → prevent → verify → cooldown → record
+│   ├── config.py  signoz.py  otel_self.py  metrics_self.py
+│   ├── learn.py   foresee.py  cascade.py  playbook.py  prevent.py  guardrails.py
+│   ├── governance.py  verify.py  cooldown.py  dollars.py  notify.py  llm.py  record.py
+│   ├── loop.py    # learn→foresee→classify→govern→prevent→verify→cooldown→record
 │   └── cli.py
-├── app.py + static/index.html # Mission Control UI
+├── app.py + static/index.html # Mission Control UI (+ side-by-side A/B view)
+├── infra/                     # AWS serverless scaffold (SAM: Lambda+EventBridge+DynamoDB+Bedrock)
+├── tests/                     # property-based (Hypothesis) + unit tests
 ├── scripts/bringup.sh         # one-command SigNoz + MCP (Foundry)
 ├── casting.yaml               # committed Foundry install
-├── requirements.txt  .env.example
+├── requirements.txt  requirements-dev.txt  pytest.ini  .env.example
 └── ERROR-AND-FIXES.md         # every gotcha + fix (read this if something breaks)
 ```
 

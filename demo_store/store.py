@@ -3,23 +3,19 @@
 A small OpenTelemetry-instrumented "online store". Each request fans out into
 cart -> inventory -> payment -> db spans, so SigNoz sees a real service graph.
 
-The point of this app is a *predictable, preventable* failure:
+It can be broken in several *distinct, gradual, preventable* ways, each of which
+maps to a different reversible remediation (the ChronoLens playbook):
 
-    demand(t) rises over time (the "traffic ramp" fault). Latency stays flat
-    while demand <= capacity, then climbs sharply once demand overtakes capacity
-    and eventually breaches the SLO.
+    fault                signal ChronoLens sees     reversible fix (lever)
+    -------------------  ------------------------    -----------------------
+    traffic-ramp/-wave   broad latency (load)        scale out  / scale in
+    dependency-slow      one hop (payment.db) slow   circuit-break the dep
+    pool-leak            saturation → latency+errors pool-resize
+    error-spike          error rate jumps (bad deploy) rollback
+    memory-leak          slow creep → latency        rolling restart
 
-ChronoLens forecasts that crossover and pulls a **reversible lever** — scaling
-capacity — *before* the breach. Scale up in time and the latency never reaches
-the wall. That's an honest, demonstrable "prevent".
-
-Admin API:
-    GET  /admin/fault?mode=traffic-ramp&level=30   -> start a gradual load ramp
-    GET  /admin/fault?mode=off                     -> clear the fault
-    GET  /admin/status                             -> live model state + est. p99
-    POST /admin/lever?action=scale&value=2         -> reversible fix (scale out)
-    POST /admin/lever?action=restart               -> rolling restart (clears ramp)
-    POST /admin/lever?action=reset                 -> capacity + fault back to default
+Each fault ramps gradually so ChronoLens can forecast it; each lever is
+reversible so acting is safe.
 """
 from __future__ import annotations
 
@@ -38,57 +34,98 @@ from opentelemetry.trace import SpanKind, Status, StatusCode
 SERVICE_NAME = os.getenv("STORE_SERVICE_NAME", "chronolens-store")
 OTLP_ENDPOINT = os.getenv("OTLP_ENDPOINT", "localhost:4317")
 
-# --- latency model constants -------------------------------------------------
-BASE_MS = 42.0            # healthy baseline latency
-DEFAULT_CAPACITY = 2.0    # "worker units" of serving capacity
-BASE_DEMAND = 1.0         # steady-state demand (well under default capacity)
-PENALTY_MS = 900.0        # latency added per unit of overload (demand - capacity)
+# --- model constants ---------------------------------------------------------
+BASE_MS = 42.0
+DEFAULT_CAPACITY = 2.0
+DEFAULT_POOL = 2.0
+BASE_DEMAND = 1.0
+PENALTY_MS = 900.0        # latency per unit of load overload
+DEP_PENALTY_MS = 1400.0   # latency per unit of dependency severity
+POOL_PENALTY_MS = 1100.0  # latency per unit of pool overload
+MEM_PENALTY_MS = 700.0    # latency per unit of memory pressure
+WAVE_PEAK_S = 45.0
 
 # --- live model state --------------------------------------------------------
 _state = {
     "capacity": DEFAULT_CAPACITY,
+    "pool_size": DEFAULT_POOL,
     "fault_mode": "off",
     "fault_level": 0.0,
     "fault_start": 0.0,
+    # reversible mitigations
+    "circuit_open": False,   # isolates a slow dependency
+    "rolled_back": False,    # clears a bad-deploy error spike
+    "restarted_at": 0.0,     # resets the memory-leak clock
 }
 
 
-WAVE_PEAK_S = 45.0  # traffic-wave rises for this long, then decays back down
+def _elapsed(now: float) -> float:
+    return max(0.0, now - _state["fault_start"])
 
 
 def _demand(now: float) -> float:
-    """Current demand on the service.
-
-    - ``traffic-ramp``  grows demand forever (monotonic) — good for the A/B.
-    - ``traffic-wave``  rises to a peak then decays back to baseline — lets
-      ChronoLens scale up on the rise AND scale back down on the fall (cost).
-    """
-    mode = _state["fault_mode"]
-    rate = _state["fault_level"] / 1000.0
-    elapsed = max(0.0, now - _state["fault_start"])
+    mode, rate, el = _state["fault_mode"], _state["fault_level"] / 1000.0, _elapsed(now)
     if mode == "traffic-ramp":
-        # level/1000 units per second -> level=30 crosses the default capacity
-        # (~33s) and breaches the 500ms SLO (~50s): gradual enough to forecast.
-        return BASE_DEMAND + rate * elapsed
+        return BASE_DEMAND + rate * el
     if mode == "traffic-wave":
-        if elapsed <= WAVE_PEAK_S:
-            return BASE_DEMAND + rate * elapsed
-        # symmetric decay back toward baseline after the peak
-        decayed = rate * WAVE_PEAK_S - rate * (elapsed - WAVE_PEAK_S)
-        return BASE_DEMAND + max(0.0, decayed)
+        if el <= WAVE_PEAK_S:
+            return BASE_DEMAND + rate * el
+        return BASE_DEMAND + max(0.0, rate * WAVE_PEAK_S - rate * (el - WAVE_PEAK_S))
     return BASE_DEMAND
 
 
+def _severities(now: float) -> dict:
+    """Per-fault severity contributions (each ramps gradually)."""
+    mode, rate, el = _state["fault_mode"], _state["fault_level"] / 1000.0, _elapsed(now)
+    sev = {"load": 0.0, "dependency": 0.0, "pool": 0.0, "memory": 0.0, "errors": 0.0}
+    # load
+    sev["load"] = max(0.0, _demand(now) - _state["capacity"])
+    # dependency (mitigated by circuit breaker)
+    if mode == "dependency-slow" and not _state["circuit_open"]:
+        sev["dependency"] = rate * el
+    # pool saturation (mitigated by pool-resize)
+    if mode == "pool-leak":
+        pool_demand = BASE_DEMAND + rate * el
+        sev["pool"] = max(0.0, pool_demand - _state["pool_size"])
+    # memory creep (mitigated by restart -> resets clock)
+    if mode == "memory-leak":
+        since = max(0.0, now - max(_state["fault_start"], _state["restarted_at"]))
+        sev["memory"] = rate * since
+    # error spike / bad deploy (mitigated by rollback)
+    if mode == "error-spike" and not _state["rolled_back"]:
+        sev["errors"] = min(1.0, 0.1 + rate * el)  # fraction of requests failing
+    return sev
+
+
 def _latency_ms(now: float) -> float:
-    """Model latency from how far demand exceeds capacity."""
-    overload = max(0.0, _demand(now) - _state["capacity"])
-    return BASE_MS + overload * PENALTY_MS + random.uniform(0.0, 8.0)
+    s = _severities(now)
+    return (BASE_MS + s["load"] * PENALTY_MS + s["dependency"] * DEP_PENALTY_MS
+            + s["pool"] * POOL_PENALTY_MS + s["memory"] * MEM_PENALTY_MS
+            + random.uniform(0.0, 8.0))
+
+
+def _error_rate(now: float) -> float:
+    s = _severities(now)
+    # pool overflow and memory pressure also shed errors past a point
+    return min(1.0, s["errors"] + max(0.0, s["pool"] - 0.5) * 0.3 + max(0.0, s["memory"] - 0.8) * 0.2)
+
+
+def _dominant_signal(now: float) -> str:
+    s = _severities(now)
+    weighted = {
+        "load": s["load"] * PENALTY_MS,
+        "dependency": s["dependency"] * DEP_PENALTY_MS,
+        "pool": s["pool"] * POOL_PENALTY_MS,
+        "memory": s["memory"] * MEM_PENALTY_MS,
+        "errors": s["errors"] * 1000.0,
+    }
+    top = max(weighted, key=weighted.get)
+    return top if weighted[top] > 1.0 else "healthy"
 
 
 # --- OpenTelemetry setup -----------------------------------------------------
 def _init_tracer() -> trace.Tracer:
-    resource = Resource.create({"service.name": SERVICE_NAME})
-    provider = TracerProvider(resource=resource)
+    provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
     trace.set_tracer_provider(provider)
     return trace.get_tracer("chronolens.store")
@@ -98,41 +135,46 @@ tracer = _init_tracer()
 app = FastAPI(title="ChronoLens Demo Store")
 
 
-def _child(name: str, ms: float) -> None:
-    """Emit a downstream child span that takes ``ms`` milliseconds."""
+def _child(name: str, ms: float, err: bool = False) -> None:
     with tracer.start_as_current_span(name, kind=SpanKind.INTERNAL) as span:
         span.set_attribute("component", name)
         time.sleep(max(0.0, ms) / 1000.0)
+        if err:
+            span.set_status(Status(StatusCode.ERROR, "downstream error"))
 
 
 @app.get("/order")
 def order() -> dict:
-    """Place an order: cart -> inventory -> payment -> db. Latency tracks the model."""
     now = time.time()
     total = _latency_ms(now)
-    # split the request's latency across the downstream hops
+    sev = _severities(now)
+    failing = random.random() < _error_rate(now)
     with tracer.start_as_current_span("/order", kind=SpanKind.SERVER) as span:
         span.set_attribute("http.method", "GET")
         span.set_attribute("http.route", "/order")
         span.set_attribute("store.capacity", _state["capacity"])
-        span.set_attribute("store.demand", round(_demand(now), 3))
+        span.set_attribute("store.dominant_signal", _dominant_signal(now))
         _child("cart.lookup", total * 0.15)
-        _child("inventory.check", total * 0.20)
+        _child("inventory.check", total * 0.15)
         with tracer.start_as_current_span("payment.charge", kind=SpanKind.INTERNAL):
-            _child("payment.db_query", total * 0.45)
-        _child("order.db_write", total * 0.20)
-        breaching = total >= 500.0
-        if breaching:
-            span.set_status(Status(StatusCode.ERROR, "latency SLO breach"))
-        return {"ok": not breaching, "latency_ms": round(total, 1)}
+            # the dependency fault concentrates in payment.db_query
+            dep_extra = sev["dependency"] * DEP_PENALTY_MS
+            _child("payment.db_query", total * 0.35 + dep_extra)
+        _child("order.db_write", total * 0.20, err=failing)
+        if failing or total >= 500.0:
+            span.set_status(Status(StatusCode.ERROR, "breach/error (injected)"))
+        return {"ok": not (failing or total >= 500.0), "latency_ms": round(total, 1)}
 
 
 @app.get("/admin/fault")
 def set_fault(mode: str = "off", level: float = 0.0) -> dict:
-    """Set the fault mode. 'traffic-ramp' gradually raises demand over time."""
     _state["fault_mode"] = mode
     _state["fault_level"] = float(level)
     _state["fault_start"] = time.time()
+    # a fresh fault clears stale mitigations so it can actually manifest
+    _state["circuit_open"] = False
+    _state["rolled_back"] = False
+    _state["restarted_at"] = 0.0
     return {"fault_mode": mode, "level": level}
 
 
@@ -142,35 +184,46 @@ def status() -> dict:
     return {
         "capacity": round(_state["capacity"], 2),
         "baseline_capacity": DEFAULT_CAPACITY,
+        "pool_size": round(_state["pool_size"], 2),
         "demand": round(_demand(now), 3),
         "headroom": round(_state["capacity"] - _demand(now), 3),
         "fault_mode": _state["fault_mode"],
         "fault_level": _state["fault_level"],
+        "dominant_signal": _dominant_signal(now),
         "est_latency_ms": round(_latency_ms(now), 1),
+        "est_error_pct": round(_error_rate(now) * 100, 1),
+        "circuit_open": _state["circuit_open"],
+        "rolled_back": _state["rolled_back"],
     }
 
 
 @app.post("/admin/lever")
 def lever(action: str, value: float = 2.0) -> dict:
     """Apply a reversible remediation lever. Returns a rollback description."""
-    if action == "scale":
+    a = action
+    if a == "scale":
         _state["capacity"] += value
-        return {
-            "action": "scale",
-            "value": value,
-            "capacity": _state["capacity"],
-            "rollback": f"scale by {-value} (capacity back to {_state['capacity'] - value})",
-        }
-    if action == "restart":
-        # rolling restart clears the accumulated ramp (fresh instance)
-        _state["fault_start"] = time.time()
-        return {"action": "restart", "capacity": _state["capacity"], "rollback": "none (idempotent)"}
-    if action == "reset":
-        _state["capacity"] = DEFAULT_CAPACITY
-        _state["fault_mode"] = "off"
-        _state["fault_level"] = 0.0
-        return {"action": "reset", "capacity": _state["capacity"], "rollback": "none"}
-    return {"error": f"unknown action '{action}'"}
+        return {"action": a, "value": value, "capacity": _state["capacity"],
+                "rollback": f"scale by {-value}"}
+    if a == "circuit-break":
+        _state["circuit_open"] = True
+        return {"action": a, "rollback": "close the circuit breaker"}
+    if a == "pool-resize":
+        _state["pool_size"] += value
+        return {"action": a, "value": value, "pool_size": _state["pool_size"],
+                "rollback": f"resize pool by {-value}"}
+    if a == "restart":
+        _state["restarted_at"] = time.time()
+        return {"action": a, "rollback": "none (idempotent rolling restart)"}
+    if a == "rollback":
+        _state["rolled_back"] = True
+        return {"action": a, "rollback": "re-deploy the new version"}
+    if a == "reset":
+        _state.update(capacity=DEFAULT_CAPACITY, pool_size=DEFAULT_POOL,
+                      fault_mode="off", fault_level=0.0, circuit_open=False,
+                      rolled_back=False, restarted_at=0.0)
+        return {"action": a, "rollback": "none"}
+    return {"error": f"unknown action '{a}'"}
 
 
 @app.get("/health")
