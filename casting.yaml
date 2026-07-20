@@ -1,0 +1,36 @@
+# ChronoLens — reproducible SigNoz + SigNoz MCP install (Foundry)
+#
+# Foundry (`foundryctl`) reads this single file and deploys the whole SigNoz
+# stack — SigNoz UI, OpenTelemetry Collector, ClickHouse, Postgres — plus the
+# SigNoz MCP server, in one command. Committing this file lets a judge
+# reproduce the exact deployment ChronoLens was built and demoed against.
+#
+# One-command bring-up:
+#
+#     foundryctl cast -f casting.yaml
+#
+# or the wrapper that also preflight-checks Docker and waits for health:
+#
+#     bash scripts/bringup.sh
+#
+# After bring-up:
+#   - SigNoz UI          -> http://localhost:8080
+#   - OTLP ingestion     -> localhost:4317 (gRPC) / localhost:4318 (HTTP)
+#   - SigNoz MCP server  -> http://localhost:8000/mcp   (liveness: /livez)
+#
+# Foundry runs on Linux/macOS. On Windows, run it inside WSL2 (Ubuntu).
+
+apiVersion: v1alpha1
+kind: Installation
+metadata:
+  name: signoz
+spec:
+  deployment:
+    flavor: compose
+    mode: docker
+
+  # Enable the SigNoz MCP server so ChronoLens reads (and its query shapes
+  # stay MCP-compatible) through MCP tools in addition to the REST APIs.
+  mcp:
+    spec:
+      enabled: true
