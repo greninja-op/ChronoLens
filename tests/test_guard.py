@@ -205,7 +205,8 @@ def test_run_loop_returns_even_when_guard_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(loop_mod, "worst_service", lambda sn, cfg, **kw: fc)
     monkeypatch.setattr(loop_mod, "recall", lambda svc, ledger: _memory())
     monkeypatch.setattr(loop_mod, "predict_blast_path",
-                        lambda entry: type("B", (), {"narrative": "n", "root": "db"})())
+                        lambda entry, breakdown=None: type(
+                            "B", (), {"narrative": "n", "root": "db", "source": "topology"})())
     monkeypatch.setattr(loop_mod, "propose",
                         lambda svc, cfg=None, **kw: Remediation(
                             action="scale", params={"service": svc, "value": 2.0},

@@ -33,6 +33,7 @@ full loop against a live SigNoz is pending a fresh Foundry bring-up (deferred).
 - [x] 20. AWS serverless scaffold — SAM: Lambda + EventBridge + DynamoDB + Bedrock — _Req 17_
 - [x] 21. Foundry `casting.yaml` + `scripts/bringup.sh` one-command bring-up — _Req 9_
 - [x] 22. README quickstart + ERROR-AND-FIXES log (clone-and-run) — _Req 9_
+- [x] 23. Deep SigNoz surface — logs corroboration, data-driven cascade, alert silences around remediation, alert-state recurrence in LEARN, saved view + metrics-readback panel, exemplar trace (all fail-open) — _Req 18_
 
 ## Task Dependency Graph
 
@@ -45,7 +46,7 @@ Execution waves (each wave depends on the previous):
     { "wave": 2, "tasks": [2, 3, 16], "description": "watched app, SigNoz client, self-observability" },
     { "wave": 3, "tasks": [4, 5, 6], "description": "foresee (confidence guard), cascade, classify" },
     { "wave": 4, "tasks": [8, 7, 9], "description": "govern, prevent (guardrails), verify" },
-    { "wave": 5, "tasks": [10, 11, 12, 13, 14, 15], "description": "cooldown, record, learn, guard, notify, explain" },
+    { "wave": 5, "tasks": [10, 11, 12, 13, 14, 15, 23], "description": "cooldown, record, learn, guard, notify, explain, deep-signoz" },
     { "wave": 6, "tasks": [17, 18, 19], "description": "CLI, UI, tests" },
     { "wave": 7, "tasks": [20, 21, 22], "description": "AWS scaffold, bring-up, docs" }
   ]

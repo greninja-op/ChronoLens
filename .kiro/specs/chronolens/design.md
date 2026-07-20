@@ -37,9 +37,13 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
 
 - **config.py** — env config (SigNoz URL/key, MCP URL, demo store URL, SLO).
 
-- **signoz.py** — SigNoz client. Reads via Query Builder v5 (`p99(duration_nano)`
-  traces queries); writes alerts/dashboards; `_first_scalar` walks the v5
-  response defensively. Errors become tagged `SigNozError`.
+- **signoz.py** — SigNoz client. Reads via Query Builder v5 for **traces**
+  (`p99(duration_nano)`, incl. grouped-by-span-name breakdown) and **logs**
+  (`count()` of `severity_text='ERROR'`); writes alerts, dashboards, and saved
+  views; manages **silences** (create/delete); reads **alert state**
+  (`list_rules` → firing guard rules). `_first_scalar` / `_series_by_group` walk
+  the v5 response defensively. Errors become tagged `SigNozError`; every
+  non-critical call is fail-open.
 
 - **learn.py** — `recall(service)` reads the ledger; for a repeat offender it
   recommends a pre-provision floor and a wider lead window (act earlier). This
@@ -48,7 +52,9 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
 - **foresee.py** — samples p99 N times, least-squares slope, projects
   time-to-breach; `worst_service` ranks all services.
 
-- **cascade.py** — topology-derived blast path; names the root hop.
+- **cascade.py** — blast path + root hop. **Data-driven** when a SigNoz span
+  breakdown is available (slowest measured span = root); falls back to the
+  static store topology otherwise (`BlastPath.source` records which).
 
 - **playbook.py** — `classify(cfg)` reads the dominant failure signal; `play_for(signal)`
   maps it to a reversible `Play` (load→scale, dependency→circuit-break,

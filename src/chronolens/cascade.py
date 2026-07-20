@@ -31,27 +31,50 @@ class BlastPath:
     root: str
     path: list[str]
     narrative: str
+    source: str = "topology"   # "topology" (static) | "traces" (data-driven)
 
 
-def predict_blast_path(entry: str = "/order") -> BlastPath:
-    """Return the predicted spread from the entry span down to the root."""
+def _static_path(entry: str, root: str) -> list[str]:
     path = [entry]
     node = entry
-    # walk the chain toward the root hop
     while node in STORE_TOPOLOGY:
         children = STORE_TOPOLOGY[node]
-        nxt = next((c for c in children if c in STORE_TOPOLOGY or c == ROOT_HOP), None)
+        nxt = next((c for c in children if c in STORE_TOPOLOGY or c == root), None)
         if not nxt:
-            # fall through the last child that leads deepest
             nxt = children[-1]
         path.append(nxt)
-        if nxt == ROOT_HOP:
+        if nxt == root:
             break
         node = nxt
+    return path
 
+
+def predict_blast_path(entry: str = "/order",
+                       breakdown: dict[str, float] | None = None) -> BlastPath:
+    """Return the predicted spread from the entry span down to the root.
+
+    If ``breakdown`` (a ``{span_name: p99_ms}`` map from SigNoz traces) is given,
+    the **slowest measured span** becomes the empirical root — the cascade is
+    then data-driven, not a hardcoded guess. Otherwise it falls back to the
+    static store topology.
+    """
+    source = "topology"
+    root = ROOT_HOP
+    if breakdown:
+        # data-driven: the slowest span the traces actually show is the root
+        measured_root = max(breakdown, key=breakdown.get)
+        if breakdown[measured_root] > 0:
+            root, source = measured_root, "traces"
+
+    path = _static_path(entry, root)
+    if path[-1] != root:
+        path.append(root)
+
+    how = "measured in traces" if source == "traces" else "from topology"
+    p99 = f" (p99 {breakdown[root]}ms)" if source == "traces" and root in breakdown else ""
     narrative = (
-        f"Degradation at '{ROOT_HOP}' propagates up "
+        f"Degradation at '{root}'{p99} ({how}) propagates up "
         f"{' → '.join(reversed(path))}, so '{entry}' breaches last. "
-        f"Fix the root ('{ROOT_HOP}' capacity) to stop the whole chain."
+        f"Fix the root ('{root}') to stop the whole chain."
     )
-    return BlastPath(root=ROOT_HOP, path=path, narrative=narrative)
+    return BlastPath(root=root, path=path, narrative=narrative, source=source)

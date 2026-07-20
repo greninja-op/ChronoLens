@@ -41,12 +41,21 @@ from .signoz import (
     SigNozError,
     build_guard_alert,
     build_guard_dashboard,
+    build_guard_saved_view,
 )
 from .verify import verify
 
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _safe(fn, default):
+    """Run a best-effort SigNoz read/write; never let it break the loop."""
+    try:
+        return fn()
+    except Exception:
+        return default
 
 
 def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
@@ -81,6 +90,13 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
         else:
             timeline.append({"step": "LEARN", "status": "ok", "text": mem.note})
 
+        # Corroborate recurrence with SigNoz's OWN alert state (not just our ledger).
+        fired = _safe(lambda: sn.alert_fired_count(svc), 0)
+        if fired:
+            timeline.append({"step": "LEARN", "status": "info",
+                             "text": f"SigNoz shows {fired} guard alert(s) for {svc} currently firing — "
+                                     f"recurrence confirmed from SigNoz, not just the ledger."})
+
         if not fc.predicted:
             note = f"{svc}: p99 {fc.current_p99_ms}ms — no breach predicted"
             if not fc.confident and fc.reason:
@@ -111,9 +127,27 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
         timeline.append({"step": "CLASSIFY", "status": "info",
                          "text": f"Signal: {rem.signal} → reversible fix '{rem.action}'. {rem.why}"})
 
-        # --- CASCADE ---------------------------------------------------
-        blast = predict_blast_path("/order")
-        timeline.append({"step": "CASCADE", "status": "info", "text": blast.narrative})
+        # Corroborate the 'errors' signal from a SECOND source: SigNoz logs.
+        err_logs = _safe(lambda: sn.error_log_count(svc), 0.0)
+        if err_logs > 0:
+            timeline.append({"step": "CLASSIFY", "status": "info",
+                             "text": f"SigNoz logs corroborate: {int(err_logs)} ERROR log(s) on {svc} "
+                                     f"in the last window."})
+
+        # --- CASCADE (data-driven from trace span breakdown) -----------
+        breakdown = _safe(lambda: sn.span_p99_breakdown(svc), {})
+        blast = predict_blast_path("/order", breakdown or None)
+        trace_id = _safe(lambda: sn.exemplar_trace_id(svc), None)
+        cascade_txt = blast.narrative + (f" Exemplar trace: {trace_id}." if trace_id else "")
+        timeline.append({"step": "CASCADE",
+                         "status": "info" if blast.source == "traces" else "ok",
+                         "text": cascade_txt})
+
+        extra_evidence = {"cascade_source": blast.source, "error_logs": err_logs}
+        if trace_id:
+            extra_evidence["exemplar_trace_id"] = trace_id
+        if breakdown:
+            extra_evidence["span_breakdown"] = breakdown
 
         # --- explanation (rule-based, optionally LLM-enriched) ---------
         ex = explain({"service": svc, "signal": rem.signal, "action": rem.action,
@@ -125,6 +159,7 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
         peak_p99 = fc.current_p99_ms
         cd = None
         outcome = "watch-only"
+        silence_id = None
 
         # --- GOVERN (trust ladder) -------------------------------------
         gov = decide(cfg, svc, ledger) if managed else None
@@ -138,6 +173,14 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
             timeline.append({"step": "GOVERN", "status": "done", "text": gov.reason})
 
         if may_act:
+            # --- SILENCE: mute the guard alert while we actively fix it -
+            sil = _safe(lambda: sn.create_silence(svc, 5), None)
+            silence_id = _silence_id(sil)
+            if silence_id:
+                timeline.append({"step": "SILENCE", "status": "done",
+                                 "text": f"Muted {svc}'s guard alert for 5 min while remediating — "
+                                         f"no human paged for a fix already in flight."})
+
             # --- PREVENT ----------------------------------------------
             with stage_span("prevent", loop_id):
                 rem = apply(cfg, rem)
@@ -145,6 +188,7 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
                 timeline.append({"step": "PREVENT", "status": "warn",
                                  "text": f"Held by guardrails — {rem.block_reason}"})
                 outcome = "held"
+                _lift_silence(sn, silence_id, timeline)
             else:
                 extra = (" " + " ".join(rem.notes)) if rem.notes else ""
                 timeline.append({"step": "PREVENT",
@@ -175,9 +219,14 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
                     timeline.append({"step": "VERIFY", "status": "warn",
                                      "text": f"Action didn't hold (p99 {final_p99}ms). "
                                              f"{'Rolled back and ' if rolled else ''}escalating to a human."})
+                # Lift the silence once the fix is graded — the alert watches again.
+                _lift_silence(sn, silence_id, timeline)
         elif not managed:
             timeline.append({"step": "PREVENT", "status": "pending",
                              "text": "ChronoLens OFF (baseline) — no action. This is the 'without me' A/B arm."})
+
+        if silence_id:
+            extra_evidence["silence_id"] = silence_id
 
         timeline.append({"step": "EXPLAIN", "status": "info",
                          "text": f"{ex.text} [{ex.source}]"})
@@ -196,7 +245,8 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
                 autonomy_mode=cfg.autonomy,
                 proven_saves=gov.proven_saves if gov else 0,
                 dollars_saved=dollars_saved, seasonal_hour=mem.seasonal_hour,
-                explanation=ex.text, explanation_source=ex.source, notified=notified)
+                explanation=ex.text, explanation_source=ex.source, notified=notified,
+                extra_evidence=extra_evidence)
         _emit_metrics(ledger, fc, dollars_saved)
         return {"timeline": timeline, "managed": managed, "outcome": outcome}
     finally:
@@ -221,6 +271,29 @@ def _maybe_notify(cfg, svc, outcome, action, eta_s, p99_before, p99_after,
     return res.sent
 
 
+def _silence_id(result) -> str | None:
+    """Pull a silence id out of a SigNoz create_silence response (best-effort)."""
+    if isinstance(result, dict):
+        data = result.get("data", result)
+        if isinstance(data, dict):
+            for key in ("silenceId", "id", "uuid"):
+                if data.get(key):
+                    return str(data[key])
+        elif isinstance(data, str) and data:
+            return data
+    return None
+
+
+def _lift_silence(sn, silence_id, timeline: list[dict]) -> None:
+    """Delete a silence once remediation is graded, so the alert watches again."""
+    if not silence_id:
+        return
+    ok = _safe(lambda: (sn.delete_silence(silence_id), True)[1], False)
+    if ok:
+        timeline.append({"step": "SILENCE", "status": "info",
+                         "text": "Lifted the alert silence — the guard is watching again."})
+
+
 def _emit_metrics(ledger: Ledger, fc, dollars_saved: float) -> None:
     """Publish ChronoLens's own gauges to SigNoz (fails open)."""
     try:
@@ -238,7 +311,8 @@ def _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
             verified, final_p99, peak_p99, outcome, cooldown, blast_root="",
             signal="load", why="", confidence=1.0, autonomy_mode="auto",
             proven_saves=0, dollars_saved=0.0, seasonal_hour=None,
-            explanation="", explanation_source="", notified=False):
+            explanation="", explanation_source="", notified=False,
+            extra_evidence=None):
     """RECORD stage: write the rich case file (also LEARN's memory next time).
 
     On a *prevented* incident (managed run, outcome "breach avoided") this also
@@ -246,6 +320,8 @@ def _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
     """
     evidence = {"slope_ms_per_s": fc.slope_ms_per_s, "samples": fc.samples,
                 "blast_root": blast_root, "confidence": confidence}
+    if extra_evidence:
+        evidence.update(extra_evidence)
 
     # --- GUARD: keep a prevented incident watched in SigNoz --------------
     if managed and outcome == "breach avoided" and sn is not None:
@@ -326,10 +402,17 @@ def _install_guard(sn: SigNozClient, cfg: Config, svc: str, loop_id: str,
             dash_res = sn.create_dashboard(dashboard)
             refs["guard_alert"] = _artifact_ref(alert_res, alert["alert"])
             refs["guard_dashboard"] = _artifact_ref(dash_res, dashboard["title"])
+            # A saved Traces-explorer view too, so a human clicking through
+            # lands on the right filter (best-effort — never blocks the guard).
+            view_res = _safe(lambda: sn.create_saved_view(build_guard_saved_view(svc)), None)
+            if view_res is not None:
+                refs["guard_saved_view"] = _artifact_ref(view_res, f"ChronoLens guard - {svc}")
+        view_txt = " + saved view" if "guard_saved_view" in refs else ""
         timeline.append({"step": "GUARD", "status": "done",
-                         "text": f"Filed a guarding SigNoz alert + dashboard on {svc} p99 "
+                         "text": f"Filed a guarding SigNoz alert + dashboard{view_txt} on {svc} p99 "
                                  f"(threshold at the {cfg.p99_slo_ms}ms SLO) — the prevented "
-                                 f"incident stays watched."})
+                                 f"incident stays watched. The dashboard also reads back "
+                                 f"ChronoLens's own prevented-total metric (full-circle)."})
     except SigNozError as exc:
         timeline.append({"step": "GUARD", "status": "info",
                          "text": f"Guard not filed (SigNoz unavailable): {exc}. Loop continues."})

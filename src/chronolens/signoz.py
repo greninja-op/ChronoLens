@@ -172,6 +172,18 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
             }
         ],
     }
+    # Second panel reads back ChronoLens's OWN metric — the full-circle proof
+    # that the agent's saves are visible in SigNoz, not just its ledger.
+    impact_panel = {
+        "title": "ChronoLens impact — incidents prevented",
+        "description": "Reads back chronolens.prevented_total emitted by the loop itself.",
+        "panelTypes": "graph",
+        "yAxisUnit": "short",
+        "query": {
+            "queryType": "builder",
+            "builder": {"queryData": [_metric_builder_query("chronolens.prevented_total")]},
+        },
+    }
     return {
         "title": f"ChronoLens guard - {service}",
         "description": (
@@ -179,7 +191,133 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
             f"Keeps the prevented incident watched."
         ),
         "tags": ["chronolens", "guard", service],
-        "widgets": [panel],
+        "widgets": [panel, impact_panel],
+    }
+
+
+def _metric_builder_query(metric_name: str) -> dict[str, Any]:
+    """A Query Builder metrics query for one of ChronoLens's own gauges."""
+    return {
+        "queryName": "A",
+        "expression": "A",
+        "dataSource": "metrics",
+        "aggregateOperator": "avg",
+        "aggregateAttribute": {"key": metric_name, "dataType": "float64", "type": "Gauge"},
+        "timeAggregation": "avg",
+        "spaceAggregation": "max",
+        "filters": {"op": "AND", "items": []},
+        "groupBy": [],
+        "disabled": False,
+        "stepInterval": 60,
+    }
+
+
+def build_log_query(service: str, *, severity: str = "ERROR",
+                    window_seconds: int = 120) -> dict[str, Any]:
+    """Query Builder v5 LOGS query: count of severity-level logs for a service.
+
+    Used by CLASSIFY to corroborate the 'errors' signal from a second source
+    (logs) instead of trusting the trace/latency signal alone.
+    """
+    end = _now_ms()
+    start = end - window_seconds * 1000
+    expr = f"service.name = '{service}' AND severity_text = '{severity}'"
+    return {
+        "schemaVersion": "v1",
+        "start": start,
+        "end": end,
+        "requestType": "scalar",
+        "compositeQuery": {
+            "queryType": "builder",
+            "queries": [
+                {
+                    "type": "builder_query",
+                    "spec": {
+                        "name": "A",
+                        "signal": "logs",
+                        "stepInterval": 60,
+                        "aggregations": [{"expression": "count()"}],
+                        "filter": {"expression": expr},
+                        "groupBy": [],
+                    },
+                }
+            ],
+        },
+    }
+
+
+def build_span_breakdown_query(service: str, *, window_seconds: int = 300) -> dict[str, Any]:
+    """Query Builder v5 traces query: p99(duration_nano) grouped by span name.
+
+    The slowest span name is the empirical root of the blast path — this is how
+    CASCADE becomes data-driven instead of relying on a hardcoded topology.
+    """
+    end = _now_ms()
+    start = end - window_seconds * 1000
+    return {
+        "schemaVersion": "v1",
+        "start": start,
+        "end": end,
+        "requestType": "scalar",
+        "compositeQuery": {
+            "queryType": "builder",
+            "queries": [
+                {
+                    "type": "builder_query",
+                    "spec": {
+                        "name": "A",
+                        "signal": "traces",
+                        "stepInterval": 60,
+                        "aggregations": [{"expression": "p99(duration_nano)"}],
+                        "filter": {"expression": f"service.name = '{service}'"},
+                        "groupBy": [{"name": "name", "fieldContext": "span"}],
+                    },
+                }
+            ],
+        },
+    }
+
+
+def build_guard_silence(service: str, minutes: int, *, created_by: str = "chronolens") -> dict[str, Any]:
+    """AlertManager-style silence body: mute a service's alert while the loop
+    is actively remediating, so a human isn't paged for something being handled."""
+    start = time.gmtime()
+    start_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", start)
+    end_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + minutes * 60))
+    return {
+        "matchers": [
+            {"name": "service", "value": service, "isRegex": False, "isEqual": True},
+            {"name": "chronolens", "value": "guard", "isRegex": False, "isEqual": True},
+        ],
+        "startsAt": start_iso,
+        "endsAt": end_iso,
+        "createdBy": created_by,
+        "comment": f"ChronoLens is actively remediating {service}; muting during the fix.",
+    }
+
+
+def build_guard_saved_view(service: str) -> dict[str, Any]:
+    """A saved Traces-explorer view pinned to the guarded service, so a human
+    clicking through lands on the right filter."""
+    return {
+        "name": f"ChronoLens guard - {service}",
+        "category": "chronolens",
+        "sourcePage": "traces",
+        "tags": ["chronolens", "guard"],
+        "compositeQuery": {
+            "queryType": "builder",
+            "queries": [
+                {
+                    "type": "builder_query",
+                    "spec": {
+                        "name": "A",
+                        "signal": "traces",
+                        "aggregations": [{"expression": "p99(duration_nano)"}],
+                        "filter": {"expression": f"service.name = '{service}'"},
+                    },
+                }
+            ],
+        },
     }
 
 
@@ -247,11 +385,87 @@ class SigNozClient:
         return self._post("query_range_v5", "/api/v5/query_range", body)
 
     # ---- writes ---------------------------------------------------------
+    def error_log_count(self, service: str, *, severity: str = "ERROR",
+                        window_seconds: int = 120) -> float:
+        """Count of severity-level logs for a service (CLASSIFY corroboration)."""
+        body = self.query_range(build_log_query(service, severity=severity,
+                                                window_seconds=window_seconds))
+        val = _first_scalar(body)
+        return float(val) if val is not None else 0.0
+
+    def span_p99_breakdown(self, service: str, *, window_seconds: int = 300) -> dict[str, float]:
+        """p99 latency (ms) per span name for a service — empirical blast path."""
+        body = self.query_range(build_span_breakdown_query(service, window_seconds=window_seconds))
+        raw = _series_by_group(body)
+        return {k: round(v / 1e6, 1) for k, v in raw.items()}
+
+    def dominant_span(self, service: str, **kw) -> str | None:
+        """The slowest span name for a service (the data-driven root hop)."""
+        breakdown = self.span_p99_breakdown(service, **kw)
+        return max(breakdown, key=breakdown.get) if breakdown else None
+
+    def exemplar_trace_id(self, service: str, window_seconds: int = 300) -> str | None:
+        """A recent trace id for the service, for a deep-link into SigNoz."""
+        q = build_trace_query(
+            f"service.name = '{service}'",
+            [{"expression": "count()"}],
+            window_seconds=window_seconds,
+            group_by=[{"name": "trace_id", "fieldContext": "span"}],
+            request_type="scalar",
+        )
+        body = self.query_range(q)
+        groups = _series_by_group(body)
+        return next(iter(groups), None) if groups else None
+
     def create_alert(self, rule: dict[str, Any]) -> dict[str, Any]:
         return self._post("create_alert", "/api/v2/rules", rule)
 
     def create_dashboard(self, dashboard: dict[str, Any]) -> dict[str, Any]:
         return self._post("create_dashboard", "/api/v1/dashboards", dashboard)
+
+    def create_saved_view(self, view: dict[str, Any]) -> dict[str, Any]:
+        return self._post("create_saved_view", "/api/v1/explorer/views", view)
+
+    def list_rules(self) -> list[dict[str, Any]]:
+        body = self._get("list_rules", "/api/v1/rules")
+        data = body.get("data") if isinstance(body, dict) else body
+        return data or []
+
+    def alert_fired_count(self, service: str) -> int:
+        """How many guard rules for this service are currently in a firing state.
+
+        Best-effort recurrence signal straight from SigNoz's own alert state,
+        used to corroborate the ledger in LEARN. Returns 0 if unavailable.
+        """
+        try:
+            rules = self.list_rules()
+        except SigNozError:
+            return 0
+        fired = 0
+        for r in rules:
+            labels = r.get("labels", {}) if isinstance(r, dict) else {}
+            if labels.get("chronolens") == "guard" and labels.get("service") == service:
+                state = str(r.get("state", "")).lower()
+                if state in ("firing", "alerting"):
+                    fired += 1
+        return fired
+
+    def create_silence(self, service: str, minutes: int = 5) -> dict[str, Any]:
+        """Mute a service's guard alert while the loop remediates (fail-open)."""
+        return self._post("create_silence", "/api/v1/silences",
+                          build_guard_silence(service, minutes))
+
+    def delete_silence(self, silence_id: str) -> dict[str, Any]:
+        try:
+            r = self._client.delete(f"/api/v1/silences/{silence_id}")
+        except httpx.HTTPError as exc:
+            raise SigNozError("delete_silence", f"transport failure: {exc}") from exc
+        if r.status_code >= 400:
+            raise SigNozError("delete_silence", r.text[:200], status=r.status_code)
+        try:
+            return r.json()
+        except ValueError:
+            return {}
 
     def list_channels(self) -> list[dict[str, Any]]:
         body = self._get("list_channels", "/api/v1/channels")
@@ -301,3 +515,52 @@ def _first_scalar(body: Any) -> float | None:
         return None
 
     return _walk(data)
+
+
+def _series_by_group(body: Any) -> dict[str, float]:
+    """Extract ``{group_label: value}`` from a grouped Query Builder v5 response.
+
+    Tolerant of v5's shape variance (series/rows/aggregations nesting). Returns
+    ``{}`` on anything it can't parse, so callers fail open to a static fallback.
+    """
+    out: dict[str, float] = {}
+    if not isinstance(body, dict):
+        return out
+    data = body.get("data", body)
+
+    def _label(node: dict) -> str | None:
+        for key in ("labels", "labelsArray", "groupBy", "metric", "key", "name"):
+            v = node.get(key)
+            if isinstance(v, str) and v:
+                return v
+            if isinstance(v, dict) and v:
+                # take the first meaningful value in a labels map
+                for vv in v.values():
+                    if isinstance(vv, str) and vv:
+                        return vv
+            if isinstance(v, list) and v:
+                first = v[0]
+                if isinstance(first, dict):
+                    return str(first.get("value") or first.get("name") or "")
+                if isinstance(first, str):
+                    return first
+        return None
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            label = _label(node)
+            value = _first_scalar(node) if label else None
+            if label and value is not None:
+                out[label] = value
+                return
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    try:
+        _walk(data)
+    except Exception:
+        return {}
+    return out

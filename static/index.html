@@ -286,8 +286,14 @@ function renderPrev(d,el){
     if(c.dollars_saved) extra.push('$'+Number(c.dollars_saved).toFixed(2)+' saved');
     const tail=extra.length?(' · '+extra.join(' · ')):'';
     const sig=c.signal?`<span class="chip b" style="margin-left:6px">${esc(c.signal)}</span>`:'';
+    const ev=c.evidence||{};
+    const ev2=[];
+    if(ev.cascade_source==='traces') ev2.push('root from traces: '+esc(ev.blast_root||''));
+    if(ev.exemplar_trace_id) ev2.push('trace '+esc(String(ev.exemplar_trace_id).slice(0,10)));
+    if(ev.silence_id) ev2.push('alert silenced during fix');
+    const evLine=ev2.length?`<div class="det" style="opacity:.85">${ev2.join(' · ')}</div>`:'';
     return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b>${sig}<span class="muted" style="margin-left:auto;font-size:11px">${esc(c.at)}</span></div>
-    <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail}</div></div>`;
+    <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail}</div>${evLine}</div>`;
   }).join('');
 }
 async function loadPrevented(){

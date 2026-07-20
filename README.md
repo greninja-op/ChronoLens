@@ -126,11 +126,20 @@ pytest        # property-based (Hypothesis) + unit tests for every stage
 ---
 
 ## SigNoz features used
-- **Query Builder v5** — every p99/RED read is a `queryType:"builder"` traces query (`p99(duration_nano)`), the same shape the SigNoz MCP server executes.
+ChronoLens leans on SigNoz across **reads, writes, and both signals**:
+
+- **Query Builder v5 (traces)** — every p99/RED read is a `queryType:"builder"` traces query (`p99(duration_nano)`), the same shape the SigNoz MCP server executes.
+- **Query Builder v5 (logs)** — CLASSIFY corroborates the `errors` signal with a `count()` logs query (`severity_text='ERROR'`), so classification is cross-checked across two signals.
+- **Grouped traces query → data-driven CASCADE** — p99 grouped by span name finds the *measured* slowest hop, so the blast-path root comes from real traces, not a hardcoded topology.
 - **Services / RED stats** — to pick and score services.
-- **Alerts & dashboards** — ChronoLens can create a guarding SigNoz alert + dashboard for a watched service (`create_alert`, `create_dashboard`).
+- **Alerts** — a guarding threshold alert on the service p99 (`create_alert`).
+- **Dashboards** — a guard dashboard with a p99 latency panel **and** a panel that reads back ChronoLens's own `chronolens.prevented_total` metric (full-circle).
+- **Saved views** — a Traces-explorer view pinned to the guarded service.
+- **Silences** — while the loop actively remediates, it silences that service's alert so nobody's paged for a fix already in flight, then lifts the silence after VERIFY.
+- **Alert history / state** — LEARN reads whether guard alerts are firing to confirm recurrence from SigNoz, not just from the local ledger.
+- **Trace detail (exemplar)** — pulls a recent trace id for the service as evidence / a deep-link.
 - **MCP-compatible** — reads use the MCP query shape; the SigNoz MCP server ships alongside via `casting.yaml`.
-- **Full-circle** — ChronoLens exports its own OTel spans (`chronolens.stage`), so its loop is visible in SigNoz next to the app it protects.
+- **Full-circle self-telemetry** — ChronoLens exports its own OTel **spans** (`chronolens.stage`) **and metrics** (`chronolens.prevented_total`, `cost_saved_usd`, `seconds_to_breach`), so its loop is visible in SigNoz next to the app it protects.
 
 ## Layout
 ```

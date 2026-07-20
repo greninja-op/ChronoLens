@@ -76,3 +76,11 @@ won't it start" issues are already here.
 ### 17. Self-metrics don't appear in SigNoz
 **Cause:** the OTLP metric exporter couldn't reach the collector, or `CHRONOLENS_SELF_OTEL=off`.
 **Fix:** `metrics_self.py` fails open (never crashes the loop). Ensure the collector is up on `OTLP_ENDPOINT` (default `localhost:4317`) and `CHRONOLENS_SELF_OTEL` is not disabled. Metrics export on a 10s cadence and are flushed on CLI exit.
+
+### 18. Deep-SigNoz calls (logs, silences, saved views, alert state) return nothing / 404
+**Cause:** these endpoints vary across SigNoz versions (logs Query Builder, `/api/v1/silences`, `/api/v1/explorer/views`, `/api/v1/rules`). The request shapes here follow the current API but a different SigNoz build may differ.
+**Fix:** by design every one of these is **fail-open** — `loop.py` wraps them in `_safe(...)` so a 404 or shape mismatch just degrades gracefully (CASCADE falls back to the static topology, CLASSIFY skips the log corroboration, the silence is simply not created, LEARN uses only the ledger). The core predict→prevent→verify→record loop never breaks. If you want these live, confirm the endpoints for your SigNoz version and adjust the builders in `signoz.py`; the logic is unit-tested with fakes in `tests/test_signoz_deep.py`.
+
+### 19. Data-driven CASCADE shows the wrong root
+**Cause:** the grouped p99-by-span query returned an unexpected shape, so the empirical root couldn't be parsed.
+**Fix:** `_series_by_group()` returns `{}` on anything it can't parse, and CASCADE falls back to the static topology (`BlastPath.source == "topology"`). If you see `source == "traces"` but a wrong root, log the raw `query_range` body and extend `_series_by_group`.

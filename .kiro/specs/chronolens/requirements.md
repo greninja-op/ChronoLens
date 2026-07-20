@@ -146,3 +146,15 @@ twice — it should adjust so a recurring incident stops happening.
 1. ChronoLens SHALL produce a rule-based NL explanation of every incident, optionally enriched by an LLM (OpenAI/Bedrock/Gemini) and always falling back to rule-based on failure.
 2. ChronoLens SHALL emit its own OpenTelemetry metrics (prevented total, seconds-to-breach, cost saved) to SigNoz, failing open.
 3. The repo SHALL ship a serverless AWS scaffold (Lambda + EventBridge + DynamoDB + Bedrock) expressing the pay-per-use production shape.
+
+### Requirement 18 — Deep SigNoz integration (logs, silences, saved views, data-driven cascade)
+**User story:** As a SigNoz user, I want ChronoLens to use SigNoz broadly and
+idiomatically, not just as a metric endpoint.
+
+#### Acceptance criteria
+1. CLASSIFY SHALL corroborate the `errors` signal with a SigNoz **logs** query (`count()` of `ERROR` logs), in addition to the trace/latency signal.
+2. CASCADE SHALL derive the root hop from a **grouped traces query** (p99 by span name) when available, and fall back to static topology otherwise; the source SHALL be recorded.
+3. WHILE actively remediating THEN ChronoLens SHALL **silence** the service's guard alert, and SHALL lift the silence after verification.
+4. LEARN SHALL read SigNoz **alert state** to confirm recurrence, not only the local ledger.
+5. On a prevented incident ChronoLens SHALL create a **saved Traces view** and a dashboard panel that **reads back its own metric**.
+6. Every one of these SigNoz calls SHALL fail open — an unavailable endpoint SHALL degrade gracefully and never break the loop.
