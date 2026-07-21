@@ -4,6 +4,8 @@
 
 Built for the **Agents of SigNoz** hackathon (Track: AI & Agent Observability).
 
+> **Status:** verified end-to-end against a live SigNoz (reads via Query Builder v5, guard alert + dashboard + saved view writes, alert silences during remediation, self-emitted metrics). A managed run predicts a breach and VERIFY confirms via SigNoz that p99 dropped back under the SLO — "breach avoided". **Mission Control** is a dark control-room UI at `http://localhost:8095` with a live p99 forecast chart, an animated closed-circuit loop, the prevention ledger, cascade topology, and a live SigNoz integration panel. (The UI loads Tailwind/Chart.js/Lucide from CDNs, so it needs internet at runtime.)
+
 ## The closed loop (loop engineering)
 ```
 LEARN    → read past incidents (incl. time-of-day seasonality); for a repeat
