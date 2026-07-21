@@ -454,6 +454,9 @@ class SigNozClient:
     def list_rules(self) -> list[dict[str, Any]]:
         body = self._get("list_rules", "/api/v1/rules")
         data = body.get("data") if isinstance(body, dict) else body
+        # SigNoz wraps rules as {"data": {"rules": [...]}}.
+        if isinstance(data, dict):
+            data = data.get("rules", [])
         return data or []
 
     def alert_fired_count(self, service: str) -> int:

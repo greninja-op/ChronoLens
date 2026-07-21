@@ -1,492 +1,367 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ChronoLens · Mission Control</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChronoLens · Reliability Control</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg0:#f4f7f5; --bg1:#eaf0ec;
-    --card:#ffffff; --card2:#fbfcfb;
-    --line:#e5eae6; --line2:#eef2ef;
-    --ink:#0f1b16; --ink2:#33443c; --mut:#6a7b72; --mut2:#9aa8a0;
-    --emerald:#0f9d63; --emerald2:#16b877; --teal:#0e9488; --forest:#0b7a56;
-    --gold:#c98a1a; --gold2:#e0a43b; --sand:#f5ede0;
-    --red:#e0584e; --slate:#5c7267;
-    --grad:linear-gradient(135deg,#12a56a,#0e9488);
-    --shadow:0 1px 2px rgba(12,32,24,.04), 0 12px 30px -18px rgba(12,32,24,.22);
-    --shadow2:0 2px 6px rgba(12,32,24,.05), 0 20px 44px -22px rgba(12,32,24,.28);
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: {
+        surface: { DEFAULT:'#0e1416', dim:'#0e1416', bright:'#343a3c', lowest:'#090f11', low:'#171d1e', container:'#1b2122', high:'#252b2d', highest:'#303638' },
+        brand: { primary:'#4cd7f6', 'on-primary':'#003640', 'primary-container':'#06b6d4', 'on-primary-container':'#00424f', secondary:'#d0bcff', tertiary:'#bcc7de', error:'#ffb4ab', 'error-container':'#93000a', outline:'#869397', 'outline-variant':'#3d494c' },
+        status: { healthy:'#10b981', warning:'#f59e0b', danger:'#f43f5e', info:'#06b6d4' }
+      },
+      fontFamily: { sans:['Geist','sans-serif'], mono:['JetBrains Mono','monospace'] },
+      boxShadow: { 'glow-primary':'0 0 16px rgba(76,215,246,.35)', 'glow-danger':'0 0 16px rgba(244,63,94,.45)', 'glow-success':'0 0 12px rgba(16,185,129,.35)' }
+    }}
   }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{height:100%;overflow:hidden;}
-  body{font-family:"Inter",system-ui,"Segoe UI",Roboto,Arial;color:var(--ink);font-size:13.5px;line-height:1.5;
-    letter-spacing:-.006em;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;
-    background:
-      radial-gradient(1100px 620px at 100% -15%, rgba(16,184,119,.09), transparent 58%),
-      radial-gradient(820px 520px at -8% 115%, rgba(224,164,59,.08), transparent 55%),
-      linear-gradient(180deg,var(--bg0) 0%, var(--bg1) 100%);}
-  .mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:0;}
-  svg{display:block;}
-  ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:#cdd8d1;border-radius:8px;} ::-webkit-scrollbar-thumb:hover{background:#b7c5bc;}
-
-  /* ---------- header ---------- */
-  header{flex:none;height:58px;display:flex;align-items:center;gap:13px;padding:0 20px;background:rgba(255,255,255,.86);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:10;}
-  .brand{display:flex;align-items:center;gap:11px;}
-  .mark{width:32px;height:32px;border-radius:10px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 18px -8px rgba(15,157,99,.7);}
-  .brand .nm{font-weight:800;font-size:16px;letter-spacing:-.02em;}
-  .brand .sb{color:var(--mut);font-size:12.5px;padding-left:12px;margin-left:2px;border-left:1px solid var(--line);}
-  .hdr-r{margin-left:auto;display:flex;align-items:center;gap:10px;}
-  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink2);
-    background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;}
-  .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 3px rgba(15,157,99,.15);}
-  .pill.warn .dot{background:var(--gold2);box-shadow:0 0 0 3px rgba(224,164,59,.18);}
-  .pill svg{width:14px;height:14px;color:var(--mut);}
-
-  /* ---------- shell ---------- */
-  .shell{flex:1;min-height:0;display:flex;}
-  .side{flex:none;width:210px;background:rgba(255,255,255,.7);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;}
-  .side .grp{font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut2);padding:10px 12px 7px;}
-  .navitem{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;color:var(--mut);font-size:13.5px;font-weight:600;cursor:pointer;transition:.14s;position:relative;}
-  .navitem svg{width:18px;height:18px;stroke-width:1.9;}
-  .navitem:hover{background:#eef4f0;color:var(--ink);}
-  .navitem.active{background:linear-gradient(135deg,rgba(18,165,106,.14),rgba(14,148,136,.1));color:var(--forest);}
-  .navitem.active::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--grad);}
-  .side .foot{margin-top:auto;padding:12px;border-top:1px solid var(--line2);}
-  .side .foot .k{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);}
-  .side .foot .v{font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.6;}
-
-  /* ---------- content ---------- */
-  .wrap{flex:1;min-width:0;min-height:0;padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
-  .view{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;}
-  .view.hidden{display:none;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
-  .card .hd{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--line2);flex:none;}
-  .card .hd .ti{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#5a6b62;}
-  .card .hd .ti svg{width:15px;height:15px;vertical-align:-3px;margin-right:6px;color:var(--teal);}
-  .card .hd .r{margin-left:auto;color:var(--mut);font-size:12px;display:flex;gap:7px;align-items:center;}
-  .card .bd{padding:15px;min-height:0;}
-
-  /* ---------- toolbar ---------- */
-  .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
-  button{font-family:inherit;cursor:pointer;border-radius:11px;font-size:13px;font-weight:600;padding:9px 13px;display:inline-flex;align-items:center;gap:8px;transition:.15s;border:1px solid var(--line);background:var(--card);color:var(--ink2);}
-  button svg{width:16px;height:16px;stroke-width:2;}
-  button:hover{box-shadow:var(--shadow);transform:translateY(-1px);border-color:#d7e0da;}
-  button:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
-  button.primary{background:var(--grad);color:#fff;border:none;box-shadow:0 10px 22px -11px rgba(15,157,99,.75);}
-  button.primary:hover{box-shadow:0 12px 26px -10px rgba(15,157,99,.85);}
-  button.gold{color:var(--gold);} button.gold svg{color:var(--gold);}
-  button.ghost{color:var(--mut);}
-  .sep{flex:1;}
-  .msg{color:var(--mut);font-size:12px;}
-
-  /* ---------- kpi strip ---------- */
-  .kpis{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow);display:flex;align-items:center;gap:13px;}
-  .kpi .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;}
-  .kpi .ic svg{width:19px;height:19px;stroke-width:2;}
-  .kpi .k{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2);}
-  .kpi .v{font-size:22px;font-weight:800;line-height:1.1;letter-spacing:-.02em;margin-top:2px;}
-  .kpi .v small{font-size:12px;font-weight:600;color:var(--mut);}
-  .ic.g{background:rgba(15,157,99,.12);color:var(--emerald);} .ic.gold{background:rgba(224,164,59,.15);color:var(--gold);}
-  .ic.teal{background:rgba(14,148,136,.12);color:var(--teal);} .ic.slate{background:rgba(92,114,103,.13);color:var(--slate);}
-
-  /* ---------- main grid ---------- */
-  .grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 360px;gap:14px;}
-  .col{min-height:0;display:flex;flex-direction:column;gap:14px;}
-
-  /* chart */
-  .chartcard{flex:1;min-height:190px;}
-  .chartcard .bd{flex:1;display:flex;flex-direction:column;min-height:0;}
-  .chart-top{display:flex;align-items:flex-end;gap:12px;}
-  .big{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.03em;} .big small{font-size:13px;color:var(--mut);font-weight:600;margin-left:5px;}
-  .stat{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;}
-  .stat .sd{width:8px;height:8px;border-radius:50%;}
-  .st-healthy{color:var(--emerald);background:rgba(15,157,99,.1);} .st-healthy .sd{background:var(--emerald);}
-  .st-warning{color:var(--gold);background:rgba(224,164,59,.13);} .st-warning .sd{background:var(--gold2);}
-  .st-critical{color:var(--red);background:rgba(224,88,78,.11);} .st-critical .sd{background:var(--red);animation:blink 1s infinite;}
-  @keyframes blink{50%{opacity:.35}}
-  .subline{color:var(--mut);font-size:12px;margin-top:5px;}
-  .chartbox{flex:1;min-height:90px;margin-top:10px;} svg.chart{width:100%;height:100%;} .axis{fill:var(--mut2);font-size:10px;font-family:"JetBrains Mono",monospace;}
-
-  /* loop rail + timeline */
-  .rail{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:11px;flex:none;}
-  .stg{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 9px;border-radius:8px;background:#f0f4f2;color:var(--mut);}
-  .stg svg{width:12px;height:12px;stroke-width:2.2;}
-  .stg.on{color:#fff;background:var(--grad);}
-  .rail .arw{color:var(--mut2);}
-  .tl{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding-right:4px;}
-  .tlrow{border:1px solid var(--line);border-left-width:3px;border-radius:9px;padding:8px 12px;background:var(--card2);}
-  .tlrow .st{font-size:9.5px;font-weight:800;letter-spacing:.8px;display:flex;align-items:center;gap:6px;}
-  .tlrow .st svg{width:12px;height:12px;stroke-width:2.2;}
-  .tlrow .tx{font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.45;}
-  .tlrow.done{border-left-color:var(--emerald);} .tlrow.done .st{color:var(--emerald);}
-  .tlrow.ok{border-left-color:var(--emerald);} .tlrow.ok .st{color:var(--emerald);}
-  .tlrow.info{border-left-color:var(--teal);} .tlrow.info .st{color:var(--teal);}
-  .tlrow.warn{border-left-color:var(--gold2);} .tlrow.warn .st{color:var(--gold);}
-  .tlrow.pending{border-left-color:var(--slate);} .tlrow.pending .st{color:var(--slate);}
-
-  /* incidents */
-  .fill{flex:1;min-height:0;}
-  .fill .bd{flex:1;overflow-y:auto;min-height:0;}
-  .caserow{padding:11px 0;border-bottom:1px solid var(--line2);} .caserow:last-child{border-bottom:none;}
-  .caserow .top{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;}
-  .caserow .det{color:var(--mut);font-size:11.5px;margin-top:4px;}
-  .caserow .ev{color:var(--mut2);font-size:11px;margin-top:3px;}
-  .badge{font-size:10px;font-weight:800;letter-spacing:.3px;padding:3px 9px;border-radius:999px;}
-  .badge.ok{background:rgba(15,157,99,.13);color:var(--emerald);} .badge.esc{background:rgba(224,88,78,.12);color:var(--red);}
-  .badge.watch{background:rgba(92,114,103,.13);color:var(--slate);} .badge.pre{background:rgba(224,164,59,.15);color:var(--gold);}
-  .chip{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;}
-  .chip.g{background:rgba(15,157,99,.12);color:var(--emerald);} .chip.gold{background:rgba(224,164,59,.15);color:var(--gold);}
-  .chip.teal{background:rgba(14,148,136,.12);color:var(--teal);} .chip.slate{background:rgba(92,114,103,.13);color:var(--slate);}
-  .chip.r{background:rgba(224,88,78,.12);color:var(--red);}
-
-  .how{color:var(--mut);font-size:12.5px;line-height:1.75;} .how b{font-weight:700;}
-  .how .row{display:flex;gap:9px;align-items:flex-start;padding:5px 0;}
-  .how .row svg{width:15px;height:15px;flex:none;margin-top:2px;}
-
-  /* tables */
-  .stbl{width:100%;border-collapse:collapse;font-size:13px;}
-  .stbl th{position:sticky;top:0;background:var(--card);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);font-weight:800;padding:9px 10px;border-bottom:1px solid var(--line);}
-  .stbl td{padding:12px 10px;border-bottom:1px solid var(--line2);} .stbl tbody tr:last-child td{border-bottom:none;}
-  .sdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;}
-
-  /* A/B */
-  .abgrid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .abhd .tag{font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:999px;}
-  .abhd .tag.off{background:rgba(224,88,78,.12);color:var(--red);} .abhd .tag.on{background:rgba(15,157,99,.13);color:var(--emerald);}
-  .muted{color:var(--mut);} .center{display:grid;place-items:center;height:100%;text-align:center;color:var(--mut);}
-  .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;} @keyframes s{to{transform:rotate(360deg)}}
+</script>
+<style>
+  body{background-color:#0e1416;color:#dee3e6;font-family:'Geist',sans-serif;}
+  .glass-panel{background:rgba(27,33,34,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(61,73,76,.5);box-shadow:inset 0 1px 0 0 rgba(255,255,255,.05);}
+  .glass-card{background:rgba(23,29,30,.65);backdrop-filter:blur(10px);border:1px solid rgba(61,73,76,.35);transition:all .2s ease-in-out;}
+  .glass-card:hover{background:rgba(37,43,45,.75);border-color:rgba(134,147,151,.5);}
+  ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:#090f11;} ::-webkit-scrollbar-thumb{background:#252b2d;border-radius:3px;} ::-webkit-scrollbar-thumb:hover{background:#3d494c;}
+  @keyframes pulse-slow{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.97);}}
+  .animate-pulse-slow{animation:pulse-slow 3s infinite ease-in-out;}
+  .stg-node{transition:all .3s ease;}
 </style>
 </head>
-<body>
-<header>
-  <div class="brand">
-    <span class="mark">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>
-      </svg>
+<body class="h-screen flex flex-col overflow-hidden selection:bg-brand-primary selection:text-brand-on-primary">
+<header class="h-14 border-b border-brand-outline-variant/40 bg-surface-lowest/90 backdrop-blur-md px-4 flex items-center justify-between shrink-0 z-30">
+  <div class="flex items-center space-x-6">
+    <span class="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+      <i data-lucide="activity" class="w-5 h-5 text-brand-primary"></i>Chrono<span class="text-brand-primary">Lens</span>
     </span>
-    <span class="nm">ChronoLens</span><span class="sb">Mission Control</span>
+    <div class="h-4 w-[1px] bg-brand-outline-variant/50"></div>
+    <div class="flex items-center space-x-3 font-mono text-xs">
+      <div id="sig-pill" class="flex items-center space-x-1.5 bg-surface-low px-2.5 py-1 rounded-full border border-brand-outline-variant/40">
+        <span class="w-2 h-2 rounded-full bg-status-healthy animate-pulse"></span>
+        <span class="text-brand-outline">SigNoz:</span><span id="sig-tx" class="text-status-healthy font-semibold">CONNECTING…</span>
+      </div>
+      <div class="flex items-center space-x-1.5 bg-surface-low px-2.5 py-1 rounded border border-brand-outline-variant/40">
+        <span class="text-brand-outline">Autonomy:</span><span id="node-mode" class="text-white font-medium">—</span>
+      </div>
+    </div>
   </div>
-  <div class="hdr-r">
-    <span class="pill" id="autoPill" title="Autonomy mode">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/></svg>
-      <span id="autoTx">auto</span>
-    </span>
-    <span class="pill" id="sigPill" title="SigNoz connection">
-      <span class="dot"></span><span id="sigTx">SigNoz</span>
-    </span>
-    <span class="pill">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <span class="mono" id="clock">--:--</span>
-    </span>
+  <div class="flex items-center space-x-5">
+    <div class="flex items-center space-x-4 font-mono text-xs">
+      <div class="flex items-center gap-1.5 text-brand-outline"><i data-lucide="clock" class="w-3.5 h-3.5"></i><span id="utc-clock" class="text-white font-medium">--:--:--</span></div>
+      <div class="flex items-center gap-1.5"><span class="text-brand-outline">STATE:</span><span id="sys-health" class="text-brand-primary font-semibold tracking-wider bg-brand-primary/10 px-2 py-0.5 rounded border border-brand-primary/30">MONITORING</span></div>
+    </div>
   </div>
 </header>
 
-<div class="shell">
-  <aside class="side">
-    <div class="grp">Monitor</div>
-    <div class="navitem active" data-view="dashboard" onclick="showView('dashboard')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-      Dashboard
+<div class="flex-1 flex overflow-hidden">
+  <!-- SIDEBAR -->
+  <aside class="w-56 bg-surface-lowest/80 border-r border-brand-outline-variant/30 flex flex-col justify-between shrink-0 z-20">
+    <div class="p-3 space-y-4">
+      <div class="px-2.5 py-1.5 rounded bg-surface-low/70 border border-brand-outline-variant/30">
+        <div class="text-xs font-semibold text-white tracking-wide">Overview</div>
+        <div class="text-[10px] font-mono text-brand-outline uppercase tracking-wider">CHRONOLENS · DEMO STORE</div>
+      </div>
+      <nav class="space-y-1 font-mono text-xs">
+        <a data-scroll="top" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-medium cursor-pointer"><i data-lucide="layout-grid" class="w-4 h-4"></i><span>Overview</span></a>
+        <a data-scroll="chart" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="trending-up" class="w-4 h-4"></i><span>Predictive</span></a>
+        <a data-scroll="loop" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="repeat" class="w-4 h-4"></i><span>Reliability Loop</span></a>
+        <a data-scroll="ledger" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="alert-triangle" class="w-4 h-4"></i><span>Incidents</span></a>
+        <a data-scroll="topo" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="git-fork" class="w-4 h-4"></i><span>Topology</span></a>
+      </nav>
     </div>
-    <div class="navitem" data-view="ab" onclick="showView('ab')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>
-      A / B compare
-    </div>
-    <div class="navitem" data-view="prevented" onclick="showView('prevented')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg>
-      Incidents
-    </div>
-    <div class="navitem" data-view="services" onclick="showView('services')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><path d="M7 9v6"/><path d="M17 9v6"/></svg>
-      Services
-    </div>
-    <div class="foot">
-      <div class="k">Cost model</div>
-      <div class="v" id="footCfg">—</div>
+    <div class="p-3 space-y-3">
+      <div class="glass-card p-2.5 rounded-lg space-y-2">
+        <div class="text-[10px] font-mono font-semibold uppercase tracking-wider text-brand-outline">OPERATIONAL DOCK</div>
+        <button id="btn-run" class="w-full flex items-center justify-center gap-1.5 bg-brand-primary-container hover:bg-brand-primary text-brand-on-primary font-semibold py-2 px-2 rounded text-xs transition-all shadow-glow-primary active:scale-[0.98]"><i data-lucide="play" class="w-3.5 h-3.5"></i><span>Run ChronoLens</span></button>
+        <button id="btn-inject" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="zap" class="w-3.5 h-3.5 text-brand-primary"></i><span>Inject Rising Load</span></button>
+        <button id="btn-cooldown" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5 text-brand-tertiary"></i><span>Release Capacity</span></button>
+        <button id="btn-ab" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="split" class="w-3.5 h-3.5 text-brand-secondary"></i><span>A/B Run</span></button>
+        <button id="btn-reset" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-brand-outline"></i><span>Reset Session</span></button>
+      </div>
+      <div class="pt-2 border-t border-brand-outline-variant/20">
+        <div class="text-[10px] font-mono text-brand-outline" id="footCfg">cost model —</div>
+      </div>
     </div>
   </aside>
 
-  <div class="wrap">
-    <!-- ================= DASHBOARD ================= -->
-    <div id="view-dashboard" class="view">
-      <div class="card">
-        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6"/><path d="M6 20V10"/><path d="M18 20V4"/></svg>Incident Controls</span><span class="r" id="faultMsg"></span></div>
-        <div class="bd toolbar">
-          <button class="gold" onclick="doFault('traffic-ramp',20)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg>Inject rising load</button>
-          <button class="ghost" onclick="doFault('off',0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
-          <button class="ghost" onclick="doCooldown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7l4-4 4 4"/><path d="M5 21h14"/></svg>Release capacity</button>
-          <span class="sep"></span>
-          <button class="ghost" id="baseBtn" onclick="runLoop(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/></svg>Baseline (no fix)</button>
-          <button class="primary" id="runBtn" onclick="runLoop(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l12 7-12 7V5Z"/></svg>Run ChronoLens</button>
+  <!-- MAIN -->
+  <main id="main" class="flex-1 p-4 overflow-y-auto space-y-4">
+    <!-- HERO CHART -->
+    <div id="sec-chart" class="glass-panel rounded-lg p-4 relative">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h2 class="text-lg font-semibold text-white tracking-tight">p99 Latency Prediction</h2>
+          <div class="text-xs font-mono text-brand-outline">Service <span id="svc-name" class="text-white">—</span></div>
+        </div>
+        <div class="flex items-center space-x-5 font-mono text-xs">
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 bg-brand-primary rounded-full"></span><span class="text-brand-outline">Actual</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 border-b border-dashed border-brand-outline"></span><span class="text-brand-outline">Projected</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 bg-status-danger rounded-full"></span><span id="slo-legend" class="text-brand-outline">SLO</span></div>
         </div>
       </div>
-
-      <div class="kpis">
-        <div class="kpi"><span class="ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></span><div><div class="k">Prevented</div><div class="v" id="kPrev">0<small id="kPrevTot"></small></div></div></div>
-        <div class="kpi"><span class="ic gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9a2.5 2.5 0 0 0-5 0c0 3 5 1.5 5 4.5a2.5 2.5 0 0 1-5 0"/><path d="M12 6v1.5M12 16v1.5"/></svg></span><div><div class="k">Cost saved</div><div class="v mono" id="kCost">$0.00</div></div></div>
-        <div class="kpi"><span class="ic teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span><div><div class="k">Current p99</div><div class="v mono" id="kP99">—<small> ms</small></div></div></div>
-        <div class="kpi"><span class="ic slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/></svg></span><div><div class="k">Autonomy</div><div class="v" id="kAuto" style="font-size:18px">auto</div></div></div>
-      </div>
-
-      <div class="grid">
-        <div class="col">
-          <div class="card chartcard">
-            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-6"/></svg>Live Service Health</span><span class="r" id="svcCount"></span></div>
-            <div class="bd">
-              <div class="chart-top">
-                <span class="big"><span id="heroP99" class="mono">—</span><small>ms p99</small></span>
-                <span class="stat st-healthy" id="heroStatus"><span class="sd"></span><span id="heroStatusTx">—</span></span>
-              </div>
-              <div class="subline" id="heroSub">&nbsp;</div>
-              <div class="chartbox"><svg class="chart" id="chart" viewBox="0 0 600 220">
-                <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--emerald)" stop-opacity=".26"/><stop offset="1" stop-color="var(--emerald)" stop-opacity="0"/></linearGradient></defs>
-              </svg></div>
-            </div>
-          </div>
-
-          <div class="card" style="flex:none">
-            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Closed Loop</span></div>
-            <div class="bd" style="display:flex;flex-direction:column;min-height:0;height:238px">
-              <div class="rail" id="rail"></div>
-              <div class="tl" id="loopTL"><div class="center">Inject load, then <b style="color:var(--ink);margin:0 4px">Run ChronoLens</b> to watch the loop execute live.</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card fill">
-            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>Incidents Prevented</span><span class="r" id="prevBadge"></span></div>
-            <div class="bd" id="prevList"><div class="muted">Loading…</div></div>
-          </div>
-          <div class="card" style="flex:none">
-            <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>How it works</span></div>
-            <div class="bd how" id="howBox"></div>
-          </div>
+      <div class="h-60 w-full relative">
+        <canvas id="latencyChart"></canvas>
+        <div id="chart-badge" class="absolute top-2 right-2 flex items-center gap-1.5 text-[11px] font-mono bg-surface-lowest/90 px-2.5 py-1 rounded border border-brand-outline-variant text-white shadow-md">
+          <span class="w-2 h-2 rounded-full bg-status-healthy"></span><span id="chart-badge-tx">Healthy</span>
         </div>
       </div>
     </div>
 
-    <!-- ================= A/B ================= -->
-    <div id="view-ab" class="view hidden">
-      <div class="card" style="flex:none">
-        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>Same fault, two arms</span><span class="r" id="abMsg"></span></div>
-        <div class="bd toolbar">
-          <button class="gold" onclick="doFault('traffic-ramp',20)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg>Inject rising load</button>
-          <button class="primary" id="abBtn" onclick="runAB()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4"/></svg>Run A/B comparison</button>
-          <span class="msg">Baseline forecasts and records but takes no action. Managed runs the full loop.</span>
-        </div>
+    <!-- RELIABILITY LOOP -->
+    <div id="sec-loop" class="glass-panel rounded-lg p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline">RELIABILITY LOOP STATUS</h3>
+        <div class="text-xs font-mono text-brand-outline">OUTCOME: <span id="loop-outcome" class="text-white font-medium">idle</span></div>
       </div>
-      <div class="abgrid">
-        <div class="card">
-          <div class="hd abhd"><span class="tag off">A · BASELINE</span><span class="ti" style="margin-left:2px">ChronoLens OFF</span><span class="r"><span class="badge esc" id="abOutA">—</span></span></div>
-          <div class="bd tl" id="abTLa" style="height:auto;flex:1"><div class="center">Run the comparison to populate.</div></div>
-        </div>
-        <div class="card">
-          <div class="hd abhd"><span class="tag on">B · MANAGED</span><span class="ti" style="margin-left:2px">ChronoLens ON</span><span class="r"><span class="badge ok" id="abOutB">—</span></span></div>
-          <div class="bd tl" id="abTLb" style="height:auto;flex:1"><div class="center">Run the comparison to populate.</div></div>
-        </div>
+      <div id="pipeline" class="relative py-3 px-1 flex items-center justify-between"></div>
+      <div id="insight" class="bg-surface-lowest/90 rounded p-2.5 border-l-4 border-brand-outline-variant flex items-center justify-between text-xs font-mono">
+        <div class="text-brand-outline">Inject load, then <span class="text-white font-semibold">Run ChronoLens</span> to execute the loop against SigNoz.</div>
       </div>
+      <div id="loop-trace" class="max-h-40 overflow-y-auto space-y-1.5 font-mono text-[11px] pr-1"></div>
     </div>
 
-    <!-- ================= INCIDENTS ================= -->
-    <div id="view-prevented" class="view hidden">
-      <div class="kpis" id="prevKpis"></div>
-      <div class="card fill">
-        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>Incident ledger · full history</span><span class="r" id="prevBadge2"></span></div>
-        <div class="bd" id="prevFull"><div class="muted">Loading…</div></div>
-      </div>
-    </div>
+    <!-- STATS + LEDGER + TOPOLOGY + SIGNOZ -->
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Incidents Prevented</div><div class="mt-2 flex items-baseline justify-between"><span class="text-2xl font-mono font-semibold text-white" id="stat-incidents">0</span><span class="text-xs font-mono text-brand-outline" id="stat-inc-tot">/ 0</span></div></div>
+      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Cost Saved</div><div class="mt-2 text-2xl font-mono font-semibold text-status-healthy" id="stat-cost">$0.00</div></div>
+      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Current p99</div><div class="mt-2 flex items-baseline gap-1"><span class="text-2xl font-mono font-semibold text-white" id="stat-p99">—</span><span class="text-[10px] font-mono text-brand-outline" id="stat-slo">(SLO —)</span></div></div>
+      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Forecast Confidence</div><div class="mt-2 text-2xl font-mono font-semibold text-white" id="stat-confidence">—</div></div>
 
-    <!-- ================= SERVICES ================= -->
-    <div id="view-services" class="view hidden">
-      <div class="card fill">
-        <div class="hd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/></svg>All Services</span><span class="r"><span class="chip g" id="svcAll"></span></span></div>
-        <div class="bd" id="servicesList"><div class="muted">Loading…</div></div>
+      <!-- LEDGER -->
+      <div id="sec-ledger" class="col-span-12 lg:col-span-4 glass-panel p-3 rounded-lg space-y-2.5 row-span-2 flex flex-col">
+        <div class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline flex justify-between items-center"><span>PREVENTION LEDGER</span><span id="ledger-count" class="text-[10px] text-brand-primary">—</span></div>
+        <div id="ledger" class="space-y-2 font-mono text-xs overflow-y-auto flex-1 min-h-0"><div class="text-brand-outline">Loading…</div></div>
+      </div>
+
+      <!-- TOPOLOGY -->
+      <div id="sec-topo" class="col-span-12 lg:col-span-5 glass-panel p-3 rounded-lg space-y-3">
+        <div class="flex justify-between items-center">
+          <div class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">CASCADE TOPOLOGY</div>
+          <div class="flex items-center gap-1.5 text-[10px] font-mono text-status-healthy bg-status-healthy/10 px-2 py-0.5 rounded border border-status-healthy/30"><span class="w-1.5 h-1.5 rounded-full bg-status-healthy"></span><span>Traces</span></div>
+        </div>
+        <div id="topo" class="relative p-3 rounded-lg bg-surface-lowest/60 border border-brand-outline-variant/30 min-h-[150px]"></div>
+      </div>
+
+      <!-- SIGNOZ -->
+      <div class="col-span-12 lg:col-span-3 glass-panel p-3 rounded-lg space-y-2">
+        <div class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">SIGNOZ INTEGRATION</div>
+        <div class="space-y-2 font-mono text-xs pt-1">
+          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Guard Alerts</span><span id="sig-guard" class="text-white font-medium">—</span></div>
+          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Firing</span><span id="sig-firing" class="text-white font-medium">—</span></div>
+          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Channels</span><span id="sig-channels" class="text-white font-medium">—</span></div>
+          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Reads</span><span class="text-brand-primary font-medium">Query Builder v5</span></div>
+          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Sync</span><span id="sig-sync" class="text-brand-primary font-medium">—</span></div>
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 <script>
 const $=(id)=>document.getElementById(id);
-const samples={}; let selected=null; let sloMs=500; let curView='dashboard'; const MAX=48;
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function sColor(s){return s==='critical'?'var(--red)':s==='warning'?'var(--gold2)':'var(--emerald)';}
-function sLabel(s){return s==='critical'?'Critical':s==='warning'?'Warning':'Healthy';}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+let sloMs=500, selected=null, samples=[], lastSync=null, running=false;
+const POLL=2500, MAXPTS=40, FUT=5;
 
-/* ---- inline SVG icons (stroke = currentColor) ---- */
-function I(p){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';}
-const ICON={
-  LEARN:I('<path d="M12 3l9 5-9 5-9-5 9-5Z"/><path d="M21 8v5"/><path d="M7 11v4c0 1.5 2.5 3 5 3s5-1.5 5-3v-4"/>'),
-  FORESEE:I('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
-  CLASSIFY:I('<path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/>'),
-  CASCADE:I('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7l8 4M8 17l8-4"/>'),
-  GOVERN:I('<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/><path d="M5 22a7 7 0 0 1 14 0"/>'),
-  SILENCE:I('<path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8l4 8M21 8l-4 8"/>'),
-  PREVENT:I('<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/>'),
-  VERIFY:I('<path d="M20 6L9 17l-5-5"/>'),
-  COOLDOWN:I('<path d="M12 21V3"/><path d="M8 17l4 4 4-4"/><path d="M5 3h14"/>'),
-  EXPLAIN:I('<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>'),
-  NOTIFY:I('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/>'),
-  GUARD:I('<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/>'),
-  RECORD:I('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M13 3v5h5"/>'),
-  ERROR:I('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'),
-};
-function stepIcon(s){return ICON[s]||ICON.CLASSIFY;}
+/* ---------- clock ---------- */
+function tick(){const n=new Date();$('utc-clock').textContent=n.toLocaleTimeString([], {hour12:false});
+  if(lastSync){const s=Math.round((Date.now()-lastSync)/1000);$('sig-sync').textContent=s+'s ago';}}
+setInterval(tick,1000);tick();
 
-const RAIL=['LEARN','FORESEE','CLASSIFY','GOVERN','PREVENT','VERIFY','COOLDOWN','RECORD'];
-function renderRail(active){
-  const set=new Set((active||[]).map(x=>x.toUpperCase()));
-  $('rail').innerHTML=RAIL.map((s,i)=>{
-    const on=set.has(s)?' on':'';
-    return `<span class="stg${on}">${stepIcon(s)}${s}</span>`+(i<RAIL.length-1?'<span class="arw">›</span>':'');
-  }).join('');
+/* ---------- Chart ---------- */
+const ctx=$('latencyChart').getContext('2d');
+const grad=ctx.createLinearGradient(0,0,0,240);
+grad.addColorStop(0,'rgba(6,182,212,.45)');grad.addColorStop(1,'rgba(6,182,212,0)');
+const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[
+  {label:'Actual',data:[],borderColor:'#4cd7f6',borderWidth:2,fill:true,backgroundColor:grad,tension:.25,pointRadius:0,pointHoverRadius:5,spanGaps:false},
+  {label:'Projected',data:[],borderColor:'#869397',borderWidth:1.5,borderDash:[4,4],fill:false,tension:0,pointRadius:0,spanGaps:true},
+  {label:'SLO',data:[],borderColor:'#f43f5e',borderWidth:1,borderDash:[3,3],fill:false,pointRadius:0}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#171d1e',borderColor:'#3d494c',borderWidth:1,
+    titleFont:{family:'JetBrains Mono',size:11},bodyFont:{family:'JetBrains Mono',size:12},
+    callbacks:{label:(c)=>c.raw==null?null:` ${c.dataset.label}: ${Math.round(c.raw)}ms`}}},
+  scales:{x:{grid:{color:'rgba(61,73,76,.22)'},ticks:{color:'#869397',font:{family:'JetBrains Mono',size:10},maxRotation:0,autoSkip:true,maxTicksLimit:7}},
+    y:{min:0,grid:{color:'rgba(61,73,76,.22)'},ticks:{color:'#869397',font:{family:'JetBrains Mono',size:10},callback:(v)=>v+'ms'}}}}});
+
+function slope(vals){const n=vals.length;if(n<2)return 0;const m=Math.min(8,n);const s=vals.slice(n-m);
+  const xs=[...Array(m).keys()];const mx=xs.reduce((a,b)=>a+b,0)/m,my=s.reduce((a,b)=>a+b,0)/m;
+  let num=0,den=0;for(let i=0;i<m;i++){num+=(xs[i]-mx)*(s[i]-my);den+=(xs[i]-mx)**2;}return den?num/den:0;}
+
+function rebuildChart(){
+  const vals=samples.map(s=>s.v);const times=samples.map(s=>s.t);const n=vals.length;
+  const labels=[...times];const actual=[...vals];
+  const sl=slope(vals);const last=n?vals[n-1]:0;
+  const proj=new Array(n).fill(null);if(n)proj[n-1]=last;
+  let etaSec=null;
+  for(let i=1;i<=FUT;i++){labels.push('+'+(i*Math.round(POLL/1000))+'s');actual.push(null);
+    proj.push(Math.max(0,last+sl*i));}
+  if(sl>1 && last<sloMs){const steps=(sloMs-last)/sl; if(steps>0&&steps<=FUT*2) etaSec=steps*(POLL/1000);}
+  const ymax=Math.max(sloMs*1.15, Math.max(...actual.filter(x=>x!=null),0)*1.15, ...proj.filter(x=>x!=null),1);
+  chart.options.scales.y.max=Math.ceil(ymax/50)*50;
+  chart.data.labels=labels;
+  chart.data.datasets[0].data=actual;
+  chart.data.datasets[1].data=sl>1?proj:new Array(labels.length).fill(null);
+  chart.data.datasets[2].data=labels.map(()=>sloMs);
+  chart.update('none');
+  if(!running) setBadge(etaSec, last);
 }
-renderRail([]);
+function setBadge(etaSec,last){
+  const b=$('chart-badge'),tx=$('chart-badge-tx');const dot=b.querySelector('span');
+  if(last>=sloMs){b.className=b.className.replace(/border-\S+/,'')+' ';dot.className='w-2 h-2 rounded-full bg-status-danger animate-ping';tx.textContent='Breaching now';tx.className='text-status-danger';}
+  else if(etaSec!=null){dot.className='w-2 h-2 rounded-full bg-brand-primary animate-ping';tx.textContent='ETA to breach ~'+Math.round(etaSec)+'s';tx.className='text-brand-primary';}
+  else{dot.className='w-2 h-2 rounded-full bg-status-healthy';tx.textContent='Healthy';tx.className='text-status-healthy';}
+}
 
-$('howBox').innerHTML=[
-  ['FORESEE','var(--teal)','Projects a rising p99 trend to a time-to-breach, behind a confidence guard.'],
-  ['CLASSIFY','var(--emerald)','Matches the signal to a reversible fix — scale, circuit-break, rollback…'],
-  ['PREVENT','var(--emerald)','Acts early behind anti-flap guardrails; every action is undoable.'],
-  ['VERIFY','var(--emerald)','Confirms via SigNoz the breach was avoided — else rolls back.'],
-  ['RECORD','var(--slate)','Files the receipt so an invisible save becomes provable.'],
-].map(r=>`<div class="row" style="color:${r[1]}">${stepIcon(r[0])}<div style="color:var(--mut)"><b style="color:${r[1]}">${r[0]}</b> — ${r[2]}</div></div>`).join('');
+/* ---------- pipeline ---------- */
+const STAGES=[['LEARN','brain'],['FORESEE','eye'],['CLASSIFY','filter'],['CASCADE','git-merge'],['GOVERN','shield'],['PREVENT','zap'],['VERIFY','check'],['COOLDOWN','snowflake'],['RECORD','book-open']];
+function renderPipeline(steps){
+  const set=new Set((steps||[]).map(s=>s.toUpperCase()));
+  let reached=-1;STAGES.forEach((s,i)=>{if(set.has(s[0]))reached=i;});
+  const frac= reached<0?0:(reached/(STAGES.length-1));
+  const greenX=(5+frac*90).toFixed(1);
+  let html=`<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index:0"><line x1="5%" y1="26px" x2="95%" y2="26px" stroke="#3d494c" stroke-width="2" stroke-dasharray="4 4"/><line x1="5%" y1="26px" x2="${greenX}%" y2="26px" stroke="#10b981" stroke-width="2.5"/></svg>`;
+  html+=STAGES.map((s,i)=>{
+    const state= reached<0?'pending':(i<reached?'done':(i===reached?'active':'pending'));
+    let cls,icls;
+    if(state==='active'){cls='w-10 h-10 bg-brand-primary-container border-2 border-brand-primary text-brand-on-primary shadow-glow-primary animate-pulse-slow';icls='w-5 h-5';}
+    else if(state==='done'){cls='w-9 h-9 bg-status-healthy/10 border border-status-healthy/60 text-status-healthy shadow-glow-success';icls='w-4 h-4';}
+    else{cls='w-9 h-9 bg-surface-low border border-brand-outline-variant text-brand-outline';icls='w-4 h-4';}
+    const lbl=state==='active'?'text-brand-primary font-bold':'text-brand-outline font-semibold';
+    return `<div class="stg-node relative z-10 flex flex-col items-center gap-1"><div class="rounded-full flex items-center justify-center ${cls}"><i data-lucide="${s[1]}" class="${icls}"></i></div><span class="text-[10px] font-mono uppercase ${lbl}">${s[0]}</span></div>`;
+  }).join('');
+  $('pipeline').innerHTML=html;lucide.createIcons();
+}
+renderPipeline([]);
 
-/* ---------------- live health + chart ---------------- */
+/* ---------- data loaders ---------- */
 async function loadServices(){
-  try{
-    const r=await fetch('/api/services'); const d=await r.json();
-    if(d.error){$('heroSub').textContent='SigNoz error: '+d.error;setSig(false);return;}
-    setSig(true);
-    const svc=d.services||[]; $('svcCount').textContent=svc.length?svc.length+' services':'';
-    if(!svc.length){$('heroSub').textContent='No services in the last 5 min — is the demo store running?';return;}
-    if(svc[0].slo_ms) sloMs=svc[0].slo_ms;
-    svc.forEach(s=>{if(!samples[s.name])samples[s.name]=[s.p99_ms,s.p99_ms];samples[s.name].push(s.p99_ms);if(samples[s.name].length>MAX)samples[s.name].shift();});
-    if(!selected||!svc.find(s=>s.name===selected)) selected=svc[0].name;
+  try{const d=await(await fetch('/api/services')).json();
+    if(d.error){setSig(false);return;}
+    setSig(true);lastSync=Date.now();
+    const svc=d.services||[];if(!svc.length){$('svc-name').textContent='no services yet';return;}
+    if(svc[0].slo_ms){sloMs=svc[0].slo_ms;$('slo-legend').textContent='SLO '+sloMs+'ms';$('stat-slo').textContent='(SLO '+sloMs+')';}
+    if(!selected||!svc.find(s=>s.name===selected))selected=svc[0].name;
     const cur=svc.find(s=>s.name===selected)||svc[0];
-    $('heroP99').textContent=cur.p99_ms; $('kP99').innerHTML=cur.p99_ms+'<small> ms</small>';
-    $('heroStatus').className='stat st-'+cur.state; $('heroStatusTx').textContent=sLabel(cur.state);
-    $('heroSub').innerHTML=`<b style="color:var(--ink)">${esc(cur.name)}</b> · SLO ${cur.slo_ms}ms · ${cur.error_pct}% errors · ${cur.calls} calls`;
-    drawChart(selected);
-    $('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  }catch(e){$('heroSub').textContent=String(e);setSig(false);}
+    $('svc-name').textContent=cur.name;
+    $('stat-p99').textContent=cur.p99_ms+'ms';
+    $('stat-p99').className='text-2xl font-mono font-semibold '+(cur.state==='critical'?'text-status-danger':cur.state==='warning'?'text-status-warning':'text-white');
+    samples.push({t:new Date().toLocaleTimeString([], {hour12:false}).slice(0,8),v:cur.p99_ms});
+    if(samples.length>MAXPTS)samples.shift();
+    rebuildChart();setSysHealth(cur.state);
+  }catch(e){setSig(false);}
 }
-function setSig(ok){const p=$('sigPill');p.classList.toggle('warn',!ok);$('sigTx').textContent=ok?'SigNoz live':'SigNoz down';}
+function setSig(ok){const p=$('sig-pill'),t=$('sig-tx');const dot=p.querySelector('span');
+  if(ok){dot.className='w-2 h-2 rounded-full bg-status-healthy animate-pulse';t.textContent='CONNECTED (Live)';t.className='text-status-healthy font-semibold';}
+  else{dot.className='w-2 h-2 rounded-full bg-status-danger';t.textContent='OFFLINE';t.className='text-status-danger font-semibold';}}
+function setSysHealth(state){const e=$('sys-health');
+  if(running){e.textContent='PREVENTING';e.className='text-brand-primary font-semibold tracking-wider bg-brand-primary/10 px-2 py-0.5 rounded border border-brand-primary/30';return;}
+  const map={critical:['AT RISK','danger'],warning:['DEGRADING','warning'],healthy:['MONITORING','healthy']};
+  const m=map[state]||map.healthy;const c=m[1];
+  e.textContent=m[0];e.className=`text-status-${c} font-semibold tracking-wider bg-status-${c}/10 px-2 py-0.5 rounded border border-status-${c}/30`;}
 
-function drawChart(name){
-  const svg=$('chart'); const arr=samples[name]||[]; const W=Math.max(320,Math.round(svg.clientWidth||600)),H=Math.max(120,Math.round(svg.clientHeight||220));
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); const padL=48,padR=18,padT=14,padB=24; const defs=svg.querySelector('defs').outerHTML;
-  if(arr.length<2){svg.innerHTML=defs+`<text x="${W/2}" y="${H/2}" class="axis" text-anchor="middle">collecting samples…</text>`;return;}
-  let mn=Math.min(...arr),mx=Math.max(...arr),rg=mx-mn; if(rg<mx*0.06||rg<4)rg=Math.max(mx*0.06,4);
-  let yMin=Math.max(0,mn-rg*0.45),yMax=mx+rg*0.55; const showSlo=sloMs>=yMin&&sloMs<=yMax; if(showSlo)yMax=Math.max(yMax,sloMs*1.02);
-  const x=i=>padL+i*((W-padL-padR)/(arr.length-1)); const y=v=>H-padB-((v-yMin)/((yMax-yMin)||1))*(H-padT-padB);
-  const ticks=[yMin,(yMin+yMax)/2,yMax]; const grid=ticks.map(t=>{const yy=y(t).toFixed(1);return `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${padL-8}" y="${+yy+3.5}" class="axis" text-anchor="end">${Math.round(t)}</text>`;}).join('');
-  const now=new Date(); const tl=i=>{const dd=new Date(now-(arr.length-1-i)*2500);return dd.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});};
-  const xl=[0,Math.floor((arr.length-1)/2),arr.length-1].map(i=>`<text x="${x(i).toFixed(1)}" y="${H-7}" class="axis" text-anchor="${i===0?'start':i===arr.length-1?'end':'middle'}">${tl(i)}</text>`).join('');
-  const pts=arr.map((v,i)=>[x(i),y(v)]); const sm=p=>{if(p.length<2)return'';let dd=`M ${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)} `;for(let i=0;i<p.length-1;i++){const p0=p[i-1]||p[i],p1=p[i],p2=p[i+1],p3=p[i+2]||p2;const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;dd+=`C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} `;}return dd;};
-  const line=sm(pts); const area=line+`L ${x(arr.length-1).toFixed(1)} ${H-padB} L ${x(0).toFixed(1)} ${H-padB} Z`;
-  let slo=''; if(showSlo){const sy=y(sloMs).toFixed(1);slo=`<line x1="${padL}" x2="${W-padR}" y1="${sy}" y2="${sy}" stroke="var(--red)" stroke-dasharray="5 5" opacity=".6"/><text x="${W-padR}" y="${sy-5}" class="axis" text-anchor="end" fill="var(--red)">SLO ${sloMs}ms</text>`;}else{slo=`<text x="${W-padR}" y="${padT+9}" class="axis" text-anchor="end" fill="var(--red)">SLO ${sloMs}ms ↑</text>`;}
-  svg.innerHTML=defs+grid+slo+`<path d="${area}" fill="url(#ag)"/><path d="${line}" fill="none" stroke="var(--emerald)" stroke-width="2.4" stroke-linejoin="round"/><circle cx="${x(arr.length-1).toFixed(1)}" cy="${y(arr[arr.length-1]).toFixed(1)}" r="4" fill="var(--emerald)" stroke="#fff" stroke-width="2"/>`+xl;
-}
-window.addEventListener('resize',()=>{if(selected)drawChart(selected);});
-
-/* ---------------- incidents ---------------- */
-function badge(o){const m={'breach avoided':['ok','avoided'],'pre-empted':['pre','pre-empted'],'escalated':['esc','escalated'],'suggested':['watch','suggested'],'held':['watch','held']};const b=m[o]||['watch',o];return `<span class="badge ${b[0]}">${esc(b[1])}</span>`;}
-function renderPrev(d,el){
-  const inc=d.incidents||[]; if(!inc.length){el.innerHTML='<div class="center">No incidents yet. Inject rising load, then Run ChronoLens.</div>';return;}
-  el.innerHTML=inc.map(c=>{
-    const tail=[]; if(c.learning_applied)tail.push('learned pre-provision'); if(c.scaled_down)tail.push('returned '+c.cost_units_returned+'u'); if(c.dollars_saved)tail.push('$'+Number(c.dollars_saved).toFixed(2));
-    const ev=c.evidence||{}; const ev2=[];
-    if(ev.cascade_source==='traces')ev2.push('root from traces: '+esc(ev.blast_root||''));
-    if(ev.exemplar_trace_id)ev2.push('trace '+esc(String(ev.exemplar_trace_id).slice(0,10)));
-    if(ev.silence_id)ev2.push('alert silenced during fix');
-    const sig=c.signal?`<span class="chip teal">${esc(c.signal)}</span>`:'';
-    return `<div class="caserow"><div class="top">${badge(c.outcome)} <b>${esc(c.service)}</b>${sig}<span class="muted" style="margin-left:auto;font-size:11px;font-weight:600">${esc(c.at)}</span></div>
-    <div class="det mono">breach ${c.predicted_breach_in_s!=null?('in ~'+Math.round(c.predicted_breach_in_s)+'s'):'NOW'} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms · ${esc(c.action)}${tail.length?(' · '+tail.join(' · ')):''}</div>
-    ${ev2.length?`<div class="ev">${ev2.join(' · ')}</div>`:''}</div>`;
-  }).join('');
-}
-function kpi(ic,cls,k,v){return `<div class="kpi"><span class="ic ${cls}">${ic}</span><div><div class="k">${k}</div><div class="v mono">${v}</div></div></div>`;}
+function badgeFor(o){const m={'breach avoided':['healthy','avoided'],'pre-empted':['warning','pre-empted'],'escalated':['danger','escalated'],'suggested':['info','suggested'],'held':['info','held'],'healthy':['healthy','healthy']};return m[o]||['info',o];}
 async function loadPrevented(){
   try{const d=await(await fetch('/api/prevented')).json();
     const usd=(d.dollars_saved||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    $('kPrev').textContent=d.prevented||0; $('kPrevTot').textContent=' / '+(d.total||0);
-    $('kCost').textContent='$'+usd;
-    $('prevBadge').innerHTML=`<span class="chip g">${d.prevented||0} avoided</span><span class="chip gold">$${usd}</span>`;
-    $('prevBadge2').innerHTML=`<span class="chip g">${d.prevented||0} / ${d.total||0}</span><span class="chip gold">$${usd}</span>`;
-    renderPrev(d,$('prevList'));
-    if(curView==='prevented'){
-      $('prevKpis').innerHTML=kpi(stepIcon('GUARD'),'g','Prevented',(d.prevented||0))+kpi(stepIcon('RECORD'),'slate','Total incidents',(d.total||0))+kpi(stepIcon('COOLDOWN'),'teal','Units saved',(d.cost_units_saved||0))+kpi(stepIcon('EXPLAIN'),'gold','Cost saved','$'+usd);
-      const tmp=document.createElement('div'); renderPrev(d,tmp); $('prevFull').innerHTML=tmp.innerHTML;
-    }
+    $('stat-incidents').textContent=d.prevented||0;$('stat-inc-tot').textContent='/ '+(d.total||0);
+    $('stat-cost').textContent='$'+usd;$('ledger-count').textContent=(d.total||0)+' filed';
+    const inc=d.incidents||[];
+    $('ledger').innerHTML=inc.length?inc.map(c=>{const b=badgeFor(c.outcome);
+      const money=c.dollars_saved?('+$'+Number(c.dollars_saved).toFixed(0)+' saved'):(c.action||'');
+      return `<div class="flex items-center justify-between p-2 rounded bg-surface-low/80 border border-brand-outline-variant/30 hover:border-brand-outline-variant transition-colors">
+        <div class="min-w-0"><div class="text-white font-medium truncate">${esc(c.service)} <span class="text-brand-outline">· ${esc(c.signal||'')}</span></div>
+        <div class="text-[10px] text-brand-outline">${esc(c.at)} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms</div></div>
+        <span class="text-status-${b[0]} font-semibold bg-status-${b[0]}/10 px-2 py-0.5 rounded border border-status-${b[0]}/30 shrink-0 ml-2 text-[10px]">${esc(b[1])}${c.dollars_saved?(' · +$'+Number(c.dollars_saved).toFixed(0)):''}</span></div>`;
+    }).join(''):'<div class="text-brand-outline text-center py-6">No incidents yet. Inject load, then Run ChronoLens.</div>';
+    renderTopo(inc[0]);
   }catch(e){}
 }
-async function loadServicesView(){
-  try{const d=await(await fetch('/api/services')).json(); const svc=d.services||[]; $('svcAll').textContent=svc.length+' services';
-    if(!svc.length){$('servicesList').innerHTML='<div class="center">No services in the last 5 min.</div>';return;}
-    $('servicesList').innerHTML=`<table class="stbl"><thead><tr><th>Service</th><th>p99</th><th>SLO</th><th>Errors</th><th>Calls</th><th>Status</th></tr></thead><tbody>`+
-      svc.map(s=>`<tr><td><span class="sdot" style="background:${sColor(s.state)}"></span><b>${esc(s.name)}</b></td><td class="mono">${s.p99_ms} ms</td><td class="mono">${s.slo_ms} ms</td><td class="mono">${s.error_pct}%</td><td class="mono">${s.calls}</td><td><span class="chip ${s.state==='critical'?'r':s.state==='warning'?'gold':'g'}">${sLabel(s.state)}</span></td></tr>`).join('')+`</tbody></table>`;
-  }catch(e){$('servicesList').innerHTML=`<div class="center">${esc(e)}</div>`;}
-}
-async function loadConfig(){
-  try{const c=await(await fetch('/api/config')).json();
-    $('autoTx').textContent=c.autonomy; $('kAuto').textContent=c.autonomy;
-    $('footCfg').innerHTML=`$${c.cost_per_unit_hr}/unit·hr<br>LLM: ${esc(c.llm_provider)} · ceiling ${c.max_capacity}`;
-  }catch(e){}
-}
+async function loadConfig(){try{const c=await(await fetch('/api/config')).json();
+  $('node-mode').textContent=(c.autonomy||'—').toUpperCase();
+  $('stat-confidence').textContent='—';
+  $('footCfg').innerHTML=`$${c.cost_per_unit_hr}/unit·hr · LLM ${esc(c.llm_provider)}<br>ceiling ${c.max_capacity} · dwell ${c.min_dwell_s}s`;
+}catch(e){}}
+async function loadSignoz(){try{const s=await(await fetch('/api/signoz')).json();
+  if(!s.connected){$('sig-guard').textContent='—';$('sig-firing').textContent='—';$('sig-channels').textContent='—';return;}
+  $('sig-guard').textContent=s.guard_alerts;
+  $('sig-firing').innerHTML=s.firing>0?`<span class="text-status-danger font-semibold bg-status-danger/10 px-2 py-0.5 rounded border border-status-danger/30 animate-pulse">${s.firing} FIRING</span>`:'0';
+  $('sig-channels').textContent=(s.channels||[]).length;
+}catch(e){}}
 
-/* ---------------- loop runs ---------------- */
-function tlHtml(tl){return (tl||[]).map(e=>`<div class="tlrow ${esc(e.status)}"><div class="st">${stepIcon(e.step)}${esc(e.step)}</div><div class="tx">${esc(e.text)}</div></div>`).join('')||'<div class="center">No activity returned.</div>';}
+/* ---------- topology ---------- */
+const CHAIN=['/order','cart.lookup','inventory.check','payment.charge','payment.db_query','order.db_write'];
+const ICONMAP={'/order':'shopping-bag','cart.lookup':'shopping-cart','inventory.check':'box','payment.charge':'credit-card','payment.db_query':'database','order.db_write':'hard-drive'};
+function renderTopo(lastCase){
+  const root=(lastCase&&lastCase.evidence&&lastCase.evidence.blast_root)||'payment.db_query';
+  $('topo').innerHTML=`<div class="flex flex-wrap items-center gap-y-3">`+CHAIN.map((n,i)=>{
+    const isRoot=n===root;
+    const pill=isRoot
+      ?`<div class="relative flex items-center gap-1.5 bg-brand-primary/10 border-2 border-brand-primary rounded-full px-3 py-1.5 shadow-glow-primary"><div class="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-primary text-brand-on-primary text-[8px] font-mono font-bold px-1.5 rounded-full uppercase">ROOT</div><i data-lucide="${ICONMAP[n]||'circle'}" class="w-3.5 h-3.5 text-brand-primary"></i><span class="text-xs font-mono font-bold text-white">${esc(n)}</span></div>`
+      :`<div class="flex items-center gap-1.5 bg-surface-low/95 border border-brand-outline-variant/50 rounded-full px-3 py-1.5 hover:border-brand-primary transition-all"><i data-lucide="${ICONMAP[n]||'circle'}" class="w-3.5 h-3.5 text-brand-outline"></i><span class="text-xs font-mono text-white">${esc(n)}</span></div>`;
+    const arrow=i<CHAIN.length-1?`<i data-lucide="chevron-right" class="w-4 h-4 text-brand-outline-variant mx-1"></i>`:'';
+    return pill+arrow;
+  }).join('')+`</div><div class="mt-3 text-[10px] font-mono text-brand-outline">Root fixed first — the fix targets the cause, not the /order symptom.</div>`;
+  lucide.createIcons();
+}
+renderTopo(null);
+
+/* ---------- loop runs ---------- */
+function traceRow(e){const cmap={done:'status-healthy',ok:'status-healthy',info:'brand-primary',warn:'status-warning',pending:'brand-outline'};const c=cmap[e.status]||'brand-outline';
+  return `<div class="flex gap-2 p-1.5 rounded bg-surface-low/40"><span class="text-${c} font-semibold shrink-0 w-20">${esc(e.step)}</span><span class="text-brand-tertiary">${esc(e.text)}</span></div>`;}
+function fillInsight(tl,outcome){
+  const f=tl.find(e=>e.step==='FORESEE'&&e.status==='warn');const cl=tl.find(e=>e.step==='CLASSIFY');const b=badgeFor(outcome);
+  const pred=f?f.text:(tl.find(e=>e.step==='FORESEE')||{}).text||'no breach predicted';
+  const act=cl?cl.text:'—';
+  $('insight').className=`bg-surface-lowest/90 rounded p-2.5 border-l-4 border-status-${b[0]} flex items-center justify-between text-xs font-mono gap-3`;
+  $('insight').innerHTML=`<div class="min-w-0"><span class="text-white font-semibold">Prediction:</span> <span class="text-brand-outline">${esc(pred)}</span> <span class="text-white font-semibold ml-2">Action:</span> <span class="text-brand-primary">${esc(act)}</span></div>
+    <div class="flex items-center gap-1 text-status-${b[0]} font-semibold shrink-0"><i data-lucide="shield-check" class="w-4 h-4"></i><span>${esc(b[1])}</span></div>`;
+  $('loop-outcome').textContent=outcome||'—';lucide.createIcons();
+}
 async function runLoop(managed){
-  $('runBtn').disabled=true;$('baseBtn').disabled=true; renderRail([]);
-  $('loopTL').innerHTML='<div class="center"><span class="spin"></span>Running the closed loop against SigNoz…</div>';
+  if(running)return;running=true;setButtons(false);
+  $('loop-trace').innerHTML='<div class="text-brand-primary flex items-center gap-2 p-2"><span class="w-3 h-3 border-2 border-brand-outline-variant border-t-brand-primary rounded-full animate-spin"></span>Running the closed loop against SigNoz…</div>';
+  setSysHealth();
   try{
     const d=await(await fetch('/api/respond?managed='+managed,{method:'POST'})).json();
-    const tl=d.timeline||[]; renderRail(tl.map(e=>e.step));
-    let html=tlHtml(tl); if(d.error) html+=`<div class="tlrow warn"><div class="st">${stepIcon('ERROR')}ERROR</div><div class="tx">${esc(d.error)}</div></div>`;
-    $('loopTL').innerHTML=html;
-  }catch(e){$('loopTL').innerHTML=`<div class="center">${esc(e)}</div>`;}
-  $('runBtn').disabled=false;$('baseBtn').disabled=false;loadServices();loadPrevented();
+    const tl=d.timeline||[];renderPipeline(tl.map(e=>e.step));fillInsight(tl,d.outcome);
+    $('loop-trace').innerHTML=tl.map(traceRow).join('')+(d.error?`<div class="text-status-danger p-1.5">${esc(d.error)}</div>`:'');
+    const bd=$('chart-badge-tx'),dot=$('chart-badge').querySelector('span');
+    if(d.outcome==='breach avoided'){dot.className='w-2 h-2 rounded-full bg-status-healthy';bd.textContent='Verified — breach avoided';bd.className='text-status-healthy';}
+  }catch(e){$('loop-trace').innerHTML=`<div class="text-status-danger p-2">${esc(e)}</div>`;}
+  running=false;setButtons(true);loadServices();loadPrevented();loadSignoz();
 }
 async function runAB(){
-  $('abBtn').disabled=true;
-  $('abTLa').innerHTML='<div class="center"><span class="spin"></span>baseline running…</div>';
-  $('abTLb').innerHTML='<div class="center">waiting for baseline…</div>';
-  try{
-    const d=await(await fetch('/api/ab',{method:'POST'})).json();
-    if(d.error){$('abTLa').innerHTML=`<div class="center">${esc(d.error)}</div>`;$('abBtn').disabled=false;return;}
-    $('abTLa').innerHTML=tlHtml(d.baseline&&d.baseline.timeline);
-    $('abTLb').innerHTML=tlHtml(d.managed&&d.managed.timeline);
-    $('abOutA').textContent=(d.baseline&&d.baseline.outcome)||'watch-only';
-    $('abOutB').textContent=(d.managed&&d.managed.outcome)||'—';
-  }catch(e){$('abTLa').innerHTML=`<div class="center">${esc(e)}</div>`;}
-  $('abBtn').disabled=false;loadServices();loadPrevented();
+  if(running)return;running=true;setButtons(false);
+  $('loop-trace').innerHTML='<div class="text-brand-primary p-2">Running A/B — baseline then managed…</div>';
+  try{const d=await(await fetch('/api/ab',{method:'POST'})).json();
+    const bt=(d.baseline&&d.baseline.timeline)||[],mt=(d.managed&&d.managed.timeline)||[];
+    renderPipeline(mt.map(e=>e.step));fillInsight(mt,d.managed&&d.managed.outcome);
+    $('loop-trace').innerHTML=`<div class="text-brand-outline font-semibold p-1">A · BASELINE (no action) → ${esc((d.baseline&&d.baseline.outcome)||'—')}</div>`+bt.map(traceRow).join('')+
+      `<div class="text-brand-primary font-semibold p-1 mt-1">B · MANAGED (ChronoLens) → ${esc((d.managed&&d.managed.outcome)||'—')}</div>`+mt.map(traceRow).join('');
+  }catch(e){$('loop-trace').innerHTML=`<div class="text-status-danger p-2">${esc(e)}</div>`;}
+  running=false;setButtons(true);loadServices();loadPrevented();loadSignoz();
 }
-async function doFault(mode,level){
-  $('faultMsg').textContent='sending…';
-  try{await fetch(`/api/fault?mode=${encodeURIComponent(mode)}&level=${level}`,{method:'POST'});
-    $('faultMsg').textContent=mode==='off'?'reset → healthy':`fault active → ${mode} · level ${level}`;
-  }catch(e){$('faultMsg').textContent=String(e);}
-  setTimeout(loadServices,1200);
-}
-async function doCooldown(){
-  $('faultMsg').textContent='releasing spare capacity…';
-  try{const d=await(await fetch('/api/cooldown',{method:'POST'})).json();$('faultMsg').textContent=d.error?('⚠ '+d.error):d.note;}
-  catch(e){$('faultMsg').textContent=String(e);}
-  loadServices();loadPrevented();
-}
-function showView(n){curView=n;document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('view-'+n).classList.remove('hidden');
-  document.querySelectorAll('.navitem').forEach(i=>i.classList.toggle('active',i.dataset.view===n));
-  if(n==='prevented')loadPrevented(); if(n==='services')loadServicesView();}
+function setButtons(on){['btn-run','btn-inject','btn-cooldown','btn-ab','btn-reset'].forEach(id=>{$(id).disabled=!on;$(id).style.opacity=on?'':'0.5';});}
+async function doFault(mode,level){try{await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'});}catch(e){}setTimeout(loadServices,800);}
+async function doCooldown(){try{await fetch('/api/cooldown',{method:'POST'});}catch(e){}loadServices();loadPrevented();}
 
-loadServices();loadPrevented();loadConfig();
-setInterval(loadServices,2500);setInterval(loadPrevented,6000);
-setInterval(()=>{if(curView==='services')loadServicesView();},4000);
+$('btn-run').onclick=()=>runLoop(true);
+$('btn-inject').onclick=()=>doFault('traffic-ramp',20);
+$('btn-reset').onclick=()=>doFault('off',0);
+$('btn-ab').onclick=runAB;
+$('btn-cooldown').onclick=doCooldown;
+document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('.nav-a').forEach(x=>{x.className=x.className.replace('text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-medium','text-brand-outline');});});
+
+lucide.createIcons();
+loadServices();loadPrevented();loadConfig();loadSignoz();
+setInterval(loadServices,POLL);setInterval(loadPrevented,6000);setInterval(loadSignoz,8000);
 </script>
 </body>
 </html>

@@ -144,6 +144,25 @@ def config_view():
     }
 
 
+@app.get("/api/signoz")
+def signoz_status():
+    """Live SigNoz integration status for the UI panel: guard alerts + firing
+    count + notification channels. Best-effort; fails soft to disconnected."""
+    try:
+        with SigNozClient(cfg) as sn:
+            rules = sn.list_rules()
+            guard = [r for r in rules if isinstance(r, dict)
+                     and (r.get("labels") or {}).get("chronolens") == "guard"]
+            firing = sum(1 for r in guard
+                         if str(r.get("state", "")).lower() in ("firing", "alerting"))
+            channels = [c.get("name") for c in sn.list_channels()
+                        if isinstance(c, dict) and c.get("name")]
+        return {"connected": True, "guard_alerts": len(guard), "firing": firing,
+                "channels": channels}
+    except Exception as e:
+        return {"connected": False, "error": str(e)}
+
+
 @app.get("/api/prevented")
 def prevented():
     try:
