@@ -10,8 +10,10 @@ from __future__ import annotations
 import os
 import sys
 
+import time
+
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -208,6 +210,27 @@ def signoz_status():
                 "channels": channels}
     except Exception as e:
         return {"connected": False, "error": str(e)}
+
+
+_INBOX: list[dict] = []  # notifications received (from SigNoz channels / the loop)
+
+
+@app.post("/webhook/sink")
+async def webhook_sink(request: Request):
+    """A receiver so SigNoz notification channels (and ChronoLens's own notify)
+    have somewhere to deliver — makes the notification path end-to-end visible."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {"raw": (await request.body()).decode("utf-8", "replace")[:500]}
+    _INBOX.append({"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "body": body})
+    del _INBOX[:-25]
+    return {"ok": True}
+
+
+@app.get("/api/inbox")
+def inbox():
+    return {"count": len(_INBOX), "recent": list(reversed(_INBOX))[:10]}
 
 
 @app.get("/api/prevented")

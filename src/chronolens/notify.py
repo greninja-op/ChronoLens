@@ -43,14 +43,33 @@ def build_message(*, service: str, outcome: str, action: str, eta_s: float | Non
     return "\n".join(lines)
 
 
-def notify(cfg: Config, message: str, *, timeout: float = 6.0) -> NotifyResult:
-    """Post ``message`` to the configured webhook. Never raises."""
-    url = cfg.notify_webhook_url
+def resolve_webhook(cfg: Config, sn=None) -> tuple[str, str]:
+    """Pick where to send: an explicit webhook, else a discovered SigNoz channel.
+
+    Returns ``(url, via)`` where ``via`` is "env" or "signoz-channel" (or "" if
+    nothing is configured). This is how notifications route *through SigNoz
+    channels* — the loop reuses the same endpoint an alert would fire to.
+    """
+    if cfg.notify_webhook_url:
+        return cfg.notify_webhook_url, "env"
+    if sn is not None:
+        try:
+            url = sn.channel_webhook_url()
+            if url:
+                return url, "signoz-channel"
+        except Exception:
+            pass
+    return "", ""
+
+
+def notify(cfg: Config, message: str, *, sn=None, timeout: float = 6.0) -> NotifyResult:
+    """Post ``message`` to the configured webhook or a SigNoz channel. Never raises."""
+    url, via = resolve_webhook(cfg, sn)
     if not url:
-        return NotifyResult(False, "no CHRONOLENS_WEBHOOK_URL configured")
+        return NotifyResult(False, "no webhook and no SigNoz channel to route through")
     try:
-        r = httpx.post(url, json={"text": message}, timeout=timeout)
+        r = httpx.post(url, json={"text": message, "source": "chronolens"}, timeout=timeout)
         r.raise_for_status()
-        return NotifyResult(True, "sent")
+        return NotifyResult(True, f"sent via {via}")
     except Exception as exc:  # fail open
-        return NotifyResult(False, f"webhook post failed: {exc}")
+        return NotifyResult(False, f"post failed ({via}): {exc}")

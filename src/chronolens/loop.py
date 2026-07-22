@@ -246,7 +246,7 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
 
         dollars_saved = units_to_dollars(cd.cost_units_returned, cfg) if cd else 0.0
         notified = _maybe_notify(cfg, svc, outcome, rem.action, fc.seconds_to_breach,
-                                 fc.current_p99_ms, final_p99, dollars_saved, timeline)
+                                 fc.current_p99_ms, final_p99, dollars_saved, timeline, sn=sn)
 
         _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
                 learning_applied, mem, managed, sn=sn,
@@ -269,18 +269,19 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
 
 
 def _maybe_notify(cfg, svc, outcome, action, eta_s, p99_before, p99_after,
-                  dollars_saved, timeline) -> bool:
-    """Post a Slack/webhook message on an actionable outcome. Never raises."""
+                  dollars_saved, timeline, *, sn=None) -> bool:
+    """Post a note on an actionable outcome, routing through a SigNoz channel if
+    no direct webhook is set. Never raises."""
     if outcome not in ("breach avoided", "escalated", "pre-empted"):
         return False
     msg = build_message(service=svc, outcome=outcome, action=action, eta_s=eta_s,
                         p99_before=p99_before, p99_after=p99_after,
                         dollars_saved=dollars_saved)
-    res = notify(cfg, msg)
+    res = notify(cfg, msg, sn=sn)
     if res.sent:
         timeline.append({"step": "NOTIFY", "status": "done",
-                         "text": f"Posted a {outcome} note to the incident webhook."})
-    elif cfg.notify_webhook_url:
+                         "text": f"Posted a {outcome} note ({res.reason})."})
+    else:
         timeline.append({"step": "NOTIFY", "status": "info", "text": f"Notify skipped: {res.reason}"})
     return res.sent
 

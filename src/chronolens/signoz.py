@@ -544,6 +544,25 @@ class SigNozClient:
         body = self._get("list_channels", "/api/v1/channels")
         return (body.get("data") if isinstance(body, dict) else body) or []
 
+    def channel_webhook_url(self) -> str | None:
+        """Discover a notification channel's webhook/Slack URL, so ChronoLens can
+        route its own notifications through the same SigNoz channel an alert uses."""
+        import json
+        for c in self.list_channels():
+            raw = c.get("data")
+            if not raw:
+                continue
+            try:
+                conf = json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:
+                continue
+            for key in ("webhook_configs", "slack_configs", "pagerduty_configs"):
+                for w in conf.get(key) or []:
+                    url = w.get("url") or w.get("api_url")
+                    if url:
+                        return url
+        return None
+
     def create_webhook_channel(self, name: str, url: str) -> dict[str, Any]:
         return self._post(
             "create_webhook_channel", "/api/v1/channels",
