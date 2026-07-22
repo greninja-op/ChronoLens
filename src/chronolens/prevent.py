@@ -87,6 +87,19 @@ def apply(cfg: Config, rem: Remediation, *, guard: FlapGuard | None = None,
         rem.params["value"] = value
         rem.notes.append(verdict.reason)
 
+    svc = rem.params.get("service", "?")
+    backend = getattr(cfg, "adapter", "demo")
+    if backend != "demo":
+        # route to a real remediation backend (kubernetes / shell)
+        from .adapters import get_adapter
+        res = get_adapter(cfg).apply(rem.action, svc, value)
+        rem.applied = res.ok
+        rem.result = {"detail": res.detail}
+        if not res.ok:
+            rem.error = res.detail
+        else:
+            guard.note_action(svc, rem.action)
+        return rem
     try:
         r = httpx.post(
             f"{cfg.demo_store_url}/admin/lever",
@@ -96,7 +109,7 @@ def apply(cfg: Config, rem: Remediation, *, guard: FlapGuard | None = None,
         r.raise_for_status()
         rem.result = r.json()
         rem.applied = True
-        guard.note_action(rem.params.get("service", "?"), rem.action)
+        guard.note_action(svc, rem.action)
     except Exception as exc:
         rem.error = f"could not apply remediation: {exc}"
     return rem
@@ -127,6 +140,10 @@ def rollback(cfg: Config, rem: Remediation, timeout: float = 8.0) -> bool:
     """Undo an applied action with its *precise* inverse (used when verify fails)."""
     if not rem.applied:
         return False
+    if getattr(cfg, "adapter", "demo") != "demo":
+        from .adapters import get_adapter
+        return get_adapter(cfg).rollback(rem.action, rem.params.get("service", "?"),
+                                         float(rem.params.get("value", 0.0) or 0.0))
     inv = _INVERSE.get(rem.action)
     if inv is None:
         return False  # unknown or idempotent action — nothing to reverse

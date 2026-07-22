@@ -161,3 +161,33 @@ def test_kill_switch_observes_only(tmp_path, monkeypatch):
                             ledger=Ledger(root=str(tmp_path)))
     assert res["outcome"] == "disabled"
     assert applied["n"] == 0  # kill switch means PREVENT never fired
+
+
+# --------------------------------------------------------------------------- #
+# remediation adapters (#10)
+# --------------------------------------------------------------------------- #
+def test_adapter_factory_selects_backend():
+    from chronolens.adapters import DemoStoreAdapter, KubernetesAdapter, ShellAdapter, get_adapter
+
+    class C:
+        def __init__(self, a): self.adapter = a; self.demo_store_url = "http://x"
+    assert isinstance(get_adapter(C("demo")), DemoStoreAdapter)
+    assert isinstance(get_adapter(C("kubernetes")), KubernetesAdapter)
+    assert isinstance(get_adapter(C("shell")), ShellAdapter)
+    assert isinstance(get_adapter(C("nonsense")), DemoStoreAdapter)  # safe default
+
+
+def test_shell_adapter_runs_configured_command(monkeypatch):
+    from chronolens.adapters import ShellAdapter
+
+    class C:
+        demo_store_url = "http://x"
+    monkeypatch.setenv("CHRONOLENS_CMD_SCALE", "echo scaled {service} {value}")
+    res = ShellAdapter().apply("scale", "checkout", 2.0)
+    assert res.ok and "scaled" in res.detail
+
+
+def test_shell_adapter_no_command_configured():
+    from chronolens.adapters import ShellAdapter
+    res = ShellAdapter().apply("restart", "svc", 0.0)
+    assert not res.ok and "no CHRONOLENS_CMD_RESTART" in res.detail

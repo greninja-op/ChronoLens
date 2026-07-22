@@ -66,10 +66,18 @@ demo_store (OTel) ──▶ SigNoz + MCP (Foundry)
   slope, sustained-rise fraction) so it won't act on jitter.
 
 - **prevent.py** — `propose` picks the playbook action for the signal; `apply`
-  runs it through **anti-flap guardrails** first; `rollback`/`scale_by` too.
+  runs it through **anti-flap guardrails** then the selected **adapter**;
+  `rollback` uses each action's *precise* inverse.
 
-- **guardrails.py** — `FlapGuard`: file-backed per-service dwell timer + capacity
-  ceiling (clamps or blocks); state persists across runs.
+- **adapters.py** — the remediation backend behind one reversible-action
+  interface: `DemoStoreAdapter` (HTTP levers, default), `KubernetesAdapter`
+  (kubectl scale/rollout), `ShellAdapter` (configured command templates).
+
+- **guardrails.py** — `FlapGuard`: file-backed per-service dwell timer, capacity
+  ceiling, and an **action budget** (max actions/hour); state persists across runs.
+
+- **locking.py** — `LoopLock`: a cross-process file lock (with stale detection)
+  so two overlapping runs can't fight over the same target.
 
 - **governance.py** — the trust ladder. `decide(cfg, service, ledger)` returns
   whether ChronoLens may act (`suggest` / `earn` after N proven saves / `auto`).

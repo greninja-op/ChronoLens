@@ -15,20 +15,26 @@ EventBridge (rate 2m)  ──►  Lambda: run_loop(managed=True)  ──►  Sig
 - `template.yaml` — AWS SAM template (Lambda + EventBridge schedule + on-demand DynamoDB + Bedrock IAM).
 - `lambda/handler.py` — the Lambda entry point; runs one loop tick and mirrors new cases into DynamoDB.
 
-## This is a scaffold
-It deploys the **shape** of the system. Two things to wire before it does real work:
-
-1. **Layer in the package.** Vendor `src/chronolens` into `lambda/chronolens/`
-   (plus `httpx`, `opentelemetry-*`) or attach them as a Lambda layer.
-2. **Real SigNoz creds.** Pass `SigNozUrl` / `SigNozApiKey` at deploy time —
-   prefer an SSM SecureString or Secrets Manager over a plain parameter.
-
-## Deploy (once creds + package are in place)
+## Deploy
 ```bash
+# 1) store the SigNoz API key as an SSM SecureString (never in the template)
+aws ssm put-parameter --name /chronolens/signoz-api-key --type SecureString --value <API_KEY>
+
+# 2) vendor the chronolens package into the Lambda source dir
+bash ../scripts/build-lambda.sh        # (or ../scripts/build-lambda.ps1 on Windows)
+
+# 3) build + deploy (SAM installs lambda/requirements.txt into the package)
 sam build
 sam deploy --guided \
-  --parameter-overrides SigNozUrl=https://signoz.example.com SigNozApiKey=... LlmProvider=bedrock
+  --parameter-overrides SigNozUrl=https://signoz.example.com LlmProvider=bedrock
 ```
+The template reads the key at deploy time via a dynamic reference
+(`{{resolve:ssm-secure:/chronolens/signoz-api-key}}`), so the secret never lands
+in CloudFormation or the repo.
+
+> Not deployed as part of this hackathon (no live AWS account wired). The steps
+> above are complete and standard SAM — the local `casting.yaml` + `docker compose`
+> path is the primary demo; this is the pay-per-use production shape.
 
 ## Notes
 - `CHRONOLENS_AUTONOMY=earn` is set in prod, so the loop only acts autonomously

@@ -18,10 +18,13 @@ Parameters:
   SigNozUrl:
     Type: String
     Description: Base URL of the SigNoz query API (e.g. https://signoz.example.com).
-  SigNozApiKey:
+  SigNozApiKeySsmPath:
     Type: String
-    NoEcho: true
-    Description: SigNoz API key (prefer an SSM SecureString in production).
+    Default: /chronolens/signoz-api-key
+    Description: >
+      SSM Parameter Store path (SecureString) holding the SigNoz API key. Create it
+      once with:  aws ssm put-parameter --name /chronolens/signoz-api-key
+      --type SecureString --value <key>. Never put the key in the template.
   P99SloMs:
     Type: Number
     Default: 500
@@ -54,7 +57,7 @@ Resources:
       Environment:
         Variables:
           SIGNOZ_URL: !Ref SigNozUrl
-          SIGNOZ_API_KEY: !Ref SigNozApiKey
+          SIGNOZ_API_KEY: !Sub "{{resolve:ssm-secure:${SigNozApiKeySsmPath}}}"
           P99_SLO_MS: !Ref P99SloMs
           LLM_PROVIDER: !Ref LlmProvider
           INCIDENTS_TABLE: !Ref IncidentsTable

@@ -1,0 +1,39 @@
+# One-command bring-up of the ChronoLens app tier (demo store + Mission Control).
+#
+# SigNoz + its MCP server come up separately via Foundry (see casting.yaml /
+# scripts/bringup.sh). These two services talk to that SigNoz on the host.
+#
+#   1) bash scripts/bringup.sh                 # SigNoz + MCP (once)
+#   2) export SIGNOZ_API_KEY=...               # from SigNoz Settings -> API Keys
+#   3) docker compose up --build               # store + Mission Control
+#
+# Then open http://localhost:8095
+services:
+  store:
+    build: .
+    command: python -m demo_store.store
+    environment:
+      - OTLP_ENDPOINT=host.docker.internal:4317
+      - STORE_SERVICE_NAME=chronolens-store
+    ports:
+      - "8090:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  mission-control:
+    build: .
+    command: python app.py
+    environment:
+      - SIGNOZ_URL=http://host.docker.internal:8080
+      - SIGNOZ_API_KEY=${SIGNOZ_API_KEY:-}
+      - SIGNOZ_MCP_URL=http://host.docker.internal:8000/mcp
+      - DEMO_STORE_URL=http://store:8090
+      - OTLP_ENDPOINT=host.docker.internal:4317
+      - CHRONOLENS_SELF_OTEL=on
+      - P99_SLO_MS=500
+    ports:
+      - "8095:8095"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - store

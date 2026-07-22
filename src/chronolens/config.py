@@ -49,6 +49,9 @@ class Config:
     trust_min_saves: int       # proven saves before "earn" mode goes autonomous
     max_actions_per_hour: int  # action budget per service (anti-runaway)
 
+    # --- remediation backend ---
+    adapter: str               # demo | kubernetes | shell — where actions actually land
+
     # --- anti-flap guardrails ---
     min_dwell_s: float         # min seconds between actions on the same service
     max_capacity: float        # ceiling ChronoLens will never scale past
@@ -78,6 +81,7 @@ class Config:
             autonomy=os.getenv("CHRONOLENS_AUTONOMY", "auto").lower(),
             trust_min_saves=int(_f("CHRONOLENS_TRUST_MIN_SAVES", 3)),
             max_actions_per_hour=int(_f("CHRONOLENS_MAX_ACTIONS_PER_HOUR", 12)),
+            adapter=os.getenv("CHRONOLENS_ADAPTER", "demo").lower(),
             min_dwell_s=_f("CHRONOLENS_MIN_DWELL_S", 20),
             max_capacity=_f("CHRONOLENS_MAX_CAPACITY", 12),
             min_slope_ms_per_s=_f("CHRONOLENS_MIN_SLOPE", 3.0),

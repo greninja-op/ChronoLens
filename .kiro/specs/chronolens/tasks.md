@@ -34,6 +34,7 @@ full loop against a live SigNoz is pending a fresh Foundry bring-up (deferred).
 - [x] 21. Foundry `casting.yaml` + `scripts/bringup.sh` one-command bring-up — _Req 9_
 - [x] 22. README quickstart + ERROR-AND-FIXES log (clone-and-run) — _Req 9_
 - [x] 23. Deep SigNoz surface — logs corroboration, data-driven cascade, alert silences around remediation, alert-state recurrence in LEARN, saved view + metrics-readback panel, exemplar trace (all fail-open) — _Req 18_
+- [x] 24. Trustworthy-autonomy + reproducibility pass — stronger forecast (EWMA/Holt/confidence interval/multi-signal) + server forecast on the chart, SSE live streaming, event markers + ghost line, pluggable remediation adapters (demo/k8s/shell) + precise rollbacks, kill switch + action budget + loop lock, notify via SigNoz channel + self-metrics readback, offline-vendored UI, `docker compose` one-command + deployable SAM — _Req 19_
 
 ## Task Dependency Graph
 
@@ -48,7 +49,7 @@ Execution waves (each wave depends on the previous):
     { "wave": 4, "tasks": [8, 7, 9], "description": "govern, prevent (guardrails), verify" },
     { "wave": 5, "tasks": [10, 11, 12, 13, 14, 15, 23], "description": "cooldown, record, learn, guard, notify, explain, deep-signoz" },
     { "wave": 6, "tasks": [17, 18, 19], "description": "CLI, UI, tests" },
-    { "wave": 7, "tasks": [20, 21, 22], "description": "AWS scaffold, bring-up, docs" }
+    { "wave": 7, "tasks": [20, 21, 22, 23, 24], "description": "AWS scaffold, bring-up, docs, deep-signoz, autonomy+reproducibility" }
   ]
 }
 ```

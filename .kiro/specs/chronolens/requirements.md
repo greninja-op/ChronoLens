@@ -147,6 +147,20 @@ twice — it should adjust so a recurring incident stops happening.
 2. ChronoLens SHALL emit its own OpenTelemetry metrics (prevented total, seconds-to-breach, cost saved) to SigNoz, failing open.
 3. The repo SHALL ship a serverless AWS scaffold (Lambda + EventBridge + DynamoDB + Bedrock) expressing the pay-per-use production shape.
 
+### Requirement 19 — Trustworthy autonomy, pluggable backends, reproducible run
+**User story:** As an operator, I want the loop to be safe to run unattended, to
+act on real infrastructure, and to be trivial to stand up.
+
+#### Acceptance criteria
+1. FORESEE SHALL smooth the series (EWMA + Holt trend) and report a confidence *interval*, corroborated by a second signal (error rate).
+2. The UI chart SHALL draw the **server-computed** forecast (not a client-only guess), with a projected-breach marker, a warning band, and a "would-be" ghost line after a save.
+3. The loop SHALL stream each stage live (SSE) so execution is visible in real time.
+4. Remediation SHALL be pluggable via an adapter (demo / kubernetes / shell) behind one reversible-action interface, with precise per-action rollbacks.
+5. The loop SHALL be safe unattended: a global kill switch, a per-service action budget, and a cross-process lock preventing overlapping runs.
+6. Notifications SHALL route through a SigNoz notification channel when no direct webhook is set; the UI SHALL read ChronoLens's own metrics back from SigNoz.
+7. The UI SHALL be offline-safe (front-end libraries vendored, no runtime CDN).
+8. The repo SHALL bring the app tier up in one command (`docker compose up`) and ship a deployable AWS SAM scaffold (SSM-secured secret, vendored package).
+
 ### Requirement 18 — Deep SigNoz integration (logs, silences, saved views, data-driven cascade)
 **User story:** As a SigNoz user, I want ChronoLens to use SigNoz broadly and
 idiomatically, not just as a metric endpoint.

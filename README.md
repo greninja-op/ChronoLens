@@ -48,6 +48,15 @@ demo store ──OTel──▶ SigNoz + MCP (Foundry)
 ```
 Production target is serverless AWS (Bedrock + Lambda + EventBridge + DynamoDB + S3).
 
+## One-command app tier
+After SigNoz is up (`bash scripts/bringup.sh`) and `SIGNOZ_API_KEY` is set:
+```bash
+docker compose up --build          # demo store + Mission Control together
+# or, without Docker:
+bash scripts/run-all.sh            # (Windows: scripts\run-all.ps1)
+```
+Then open http://localhost:8095.
+
 ## Prerequisites
 - **Python 3.9+**
 - **Docker** (with Compose v2). On **Windows use WSL2 (Ubuntu)** — Foundry runs on Linux/macOS.
