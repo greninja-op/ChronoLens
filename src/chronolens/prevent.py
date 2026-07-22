@@ -76,6 +76,7 @@ def apply(cfg: Config, rem: Remediation, *, guard: FlapGuard | None = None,
         rem.params.get("service", "?"), rem.action,
         min_dwell_s=cfg.min_dwell_s, current_capacity=cap,
         scale_value=value, max_capacity=cfg.max_capacity,
+        max_per_hour=getattr(cfg, "max_actions_per_hour", 999),
     )
     if not verdict.allowed:
         rem.blocked = True
@@ -112,21 +113,28 @@ def scale_by(cfg: Config, delta: float, timeout: float = 8.0) -> dict:
         return {"error": str(exc)}
 
 
+# Each action's *precise* inverse lever on the demo store (no blunt full reset).
+_INVERSE = {
+    "scale": lambda v: ("scale", -v),
+    "pool-resize": lambda v: ("pool-resize", -v),
+    "circuit-break": lambda v: ("close-circuit", 0.0),
+    "rollback": lambda v: ("redeploy", 0.0),
+    "restart": None,  # a rolling restart is idempotent — nothing to undo
+}
+
+
 def rollback(cfg: Config, rem: Remediation, timeout: float = 8.0) -> bool:
-    """Undo an applied action (used when verification fails)."""
+    """Undo an applied action with its *precise* inverse (used when verify fails)."""
     if not rem.applied:
         return False
+    inv = _INVERSE.get(rem.action)
+    if inv is None:
+        return False  # unknown or idempotent action — nothing to reverse
     value = float(rem.params.get("value", 0.0) or 0.0)
+    action, val = inv(value)
     try:
-        if rem.action in ("scale", "pool-resize"):
-            httpx.post(f"{cfg.demo_store_url}/admin/lever",
-                       params={"action": rem.action, "value": -value}, timeout=timeout)
-            return True
-        # circuit-break / restart / rollback are undone by a full reset here.
-        if rem.action in ("circuit-break", "rollback"):
-            httpx.post(f"{cfg.demo_store_url}/admin/lever",
-                       params={"action": "reset", "value": 0.0}, timeout=timeout)
-            return True
+        httpx.post(f"{cfg.demo_store_url}/admin/lever",
+                   params={"action": action, "value": val}, timeout=timeout)
+        return True
     except Exception:
         return False
-    return False

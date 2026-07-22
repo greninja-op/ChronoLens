@@ -44,8 +44,10 @@ class Config:
     cost_per_unit_hr: float    # $ per capacity unit per hour
 
     # --- governance / trust ladder ---
+    enabled: bool              # global kill switch — off = never act
     autonomy: str              # suggest | auto | earn
     trust_min_saves: int       # proven saves before "earn" mode goes autonomous
+    max_actions_per_hour: int  # action budget per service (anti-runaway)
 
     # --- anti-flap guardrails ---
     min_dwell_s: float         # min seconds between actions on the same service
@@ -72,8 +74,10 @@ class Config:
             bedrock_model=os.getenv("BEDROCK_MODEL", "anthropic.claude-3-haiku-20240307-v1:0"),
             aws_region=os.getenv("AWS_REGION", "us-east-1"),
             cost_per_unit_hr=_f("COST_PER_UNIT_HR", 0.65),
+            enabled=os.getenv("CHRONOLENS_ENABLED", "on").lower() not in ("off", "0", "false", "no"),
             autonomy=os.getenv("CHRONOLENS_AUTONOMY", "auto").lower(),
             trust_min_saves=int(_f("CHRONOLENS_TRUST_MIN_SAVES", 3)),
+            max_actions_per_hour=int(_f("CHRONOLENS_MAX_ACTIONS_PER_HOUR", 12)),
             min_dwell_s=_f("CHRONOLENS_MIN_DWELL_S", 20),
             max_capacity=_f("CHRONOLENS_MAX_CAPACITY", 12),
             min_slope_ms_per_s=_f("CHRONOLENS_MIN_SLOPE", 3.0),

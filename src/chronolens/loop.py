@@ -30,6 +30,7 @@ from .foresee import worst_service
 from .governance import decide
 from .learn import recall
 from .llm import explain
+from .locking import LoopLock
 from .metrics_self import flush as flush_metrics
 from .metrics_self import record_metrics
 from .notify import build_message, notify
@@ -65,6 +66,12 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
     timeline: list[dict] = []
     load_onset_at = _now()
 
+    # --- concurrency lock: only one loop touches the target at a time --------
+    lock = LoopLock(ledger.root)
+    if not lock.acquire():
+        return {"timeline": [{"step": "LOOP", "status": "warn",
+                              "text": "Another ChronoLens loop is already running — skipping this one."}],
+                "managed": managed, "outcome": "skipped"}
     try:
         # --- FORESEE ---------------------------------------------------
         with stage_span("foresee", loop_id):
@@ -161,11 +168,17 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
         outcome = "watch-only"
         silence_id = None
 
-        # --- GOVERN (trust ladder) -------------------------------------
-        gov = decide(cfg, svc, ledger) if managed else None
-        may_act = bool(managed and gov and gov.may_act)
+        # --- GOVERN (trust ladder + global kill switch) ----------------
+        kill = managed and not getattr(cfg, "enabled", True)
+        gov = decide(cfg, svc, ledger) if (managed and not kill) else None
+        may_act = bool(managed and not kill and gov and gov.may_act)
 
-        if managed and gov is not None and not gov.may_act:
+        if kill:
+            timeline.append({"step": "GOVERN", "status": "pending",
+                             "text": "Kill switch ON (CHRONOLENS_ENABLED=off) — observing only, "
+                                     f"would have applied '{rem.action}' ({rem.why})."})
+            outcome = "disabled"
+        elif managed and gov is not None and not gov.may_act:
             timeline.append({"step": "GOVERN", "status": "pending",
                              "text": f"{gov.reason} Suggested action: '{rem.action}' ({rem.why})."})
             outcome = "suggested"
@@ -250,6 +263,7 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
         _emit_metrics(ledger, fc, dollars_saved)
         return {"timeline": timeline, "managed": managed, "outcome": outcome}
     finally:
+        lock.release()
         flush()
         flush_metrics()
 

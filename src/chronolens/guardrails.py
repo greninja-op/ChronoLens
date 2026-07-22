@@ -48,16 +48,29 @@ class FlapGuard:
     def last_action_at(self, service: str) -> float:
         return float(self._load().get(service, {}).get("last_action_at", 0.0))
 
+    def actions_last_hour(self, service: str, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        hist = (self._load().get(service, {}) or {}).get("history") or []
+        return sum(1 for t in hist if now - float(t) < 3600)
+
     def note_action(self, service: str, action: str) -> None:
         data = self._load()
-        data[service] = {"last_action_at": time.time(), "action": action}
+        rec = data.get(service) or {}
+        now = time.time()
+        hist = [t for t in (rec.get("history") or []) if now - float(t) < 7200]
+        hist.append(now)
+        data[service] = {"last_action_at": now, "action": action, "history": hist[-50:]}
         self._save(data)
 
     def check(self, service: str, action: str, *, min_dwell_s: float,
               current_capacity: float, scale_value: float, max_capacity: float,
-              now: float | None = None) -> GuardVerdict:
+              max_per_hour: int = 999, now: float | None = None) -> GuardVerdict:
         """Decide whether ``action`` on ``service`` is allowed right now."""
         now = time.time() if now is None else now
+        # 0) action budget — hard cap on how often we touch one service
+        if self.actions_last_hour(service, now) >= max_per_hour:
+            return GuardVerdict(False,
+                                f"anti-flap: action budget reached ({max_per_hour}/hr) for {service} — holding.")
         # 1) dwell / rate limit
         since = now - self.last_action_at(service)
         if since < min_dwell_s:

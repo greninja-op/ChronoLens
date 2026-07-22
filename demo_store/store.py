@@ -208,6 +208,12 @@ def lever(action: str, value: float = 2.0) -> dict:
     if a == "circuit-break":
         _state["circuit_open"] = True
         return {"action": a, "rollback": "close the circuit breaker"}
+    if a == "close-circuit":
+        _state["circuit_open"] = False
+        return {"action": a, "rollback": "re-open the circuit breaker"}
+    if a == "redeploy":
+        _state["rolled_back"] = False
+        return {"action": a, "rollback": "roll back again"}
     if a == "pool-resize":
         _state["pool_size"] += value
         return {"action": a, "value": value, "pool_size": _state["pool_size"],
