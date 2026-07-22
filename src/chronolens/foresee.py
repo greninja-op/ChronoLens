@@ -1,15 +1,21 @@
 """FORESEE — turn a climbing latency trend into a time-to-breach forecast.
 
-Deliberately boring math: sample the service p99 a few times, fit the rate of
-change, and project it forward to the SLO. Boring wins here because it's
-explainable ("p99 rising ~40ms/s, breach in ~25s") and needs no training data.
+The math stays explainable on purpose ("p99 rising ~40ms/s, breach in ~25s"),
+but it's sturdier than a bare slope now:
 
-A **confidence guard** sits in front of the projection so ChronoLens doesn't act
-on noise: it needs enough samples, a slope above a noise floor, and a *sustained*
-rise (most consecutive steps trending up) before it will call a breach.
+* **EWMA smoothing** damps single-sample jitter before we read the trend.
+* **Holt's linear trend** (double-exponential smoothing) estimates the rate of
+  change, so a noisy series doesn't swing the forecast around.
+* a **confidence interval** (from the residual spread) gives an ETA *range*, not
+  a false-precision point.
+* a **confidence guard** still gates action: enough samples, slope above a noise
+  floor, and a sustained rise.
+* **multi-signal** — an elevated error rate corroborates a latency trend and
+  lifts confidence (a second, independent signal that something's wrong).
 """
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 
@@ -28,12 +34,19 @@ class Forecast:
     confidence: float = 1.0          # 0..1 — how trustworthy this trend is
     confident: bool = True           # passed the confidence guard?
     reason: str = ""                 # why we did/didn't trust it
+    band_ms: float = 0.0             # +/- confidence band on the latest value
+    eta_low_s: float | None = None   # optimistic edge of the breach ETA
+    eta_high_s: float | None = None  # pessimistic edge of the breach ETA
+    error_rate: float = 0.0          # corroborating signal (fraction 0..1)
 
     @property
     def predicted(self) -> bool:
         return self.breaching_now or self.seconds_to_breach is not None
 
 
+# --------------------------------------------------------------------------- #
+# smoothing / trend primitives
+# --------------------------------------------------------------------------- #
 def _slope(samples: list[float], interval_s: float) -> float:
     """Least-squares slope (ms per second) over evenly spaced samples."""
     n = len(samples)
@@ -45,6 +58,38 @@ def _slope(samples: list[float], interval_s: float) -> float:
     num = sum((x - mx) * (y - my) for x, y in zip(xs, samples))
     den = sum((x - mx) ** 2 for x in xs)
     return num / den if den else 0.0
+
+
+def _ewma(xs: list[float], alpha: float = 0.4) -> list[float]:
+    if not xs:
+        return []
+    out = [xs[0]]
+    for x in xs[1:]:
+        out.append(alpha * x + (1 - alpha) * out[-1])
+    return out
+
+
+def _holt(xs: list[float], alpha: float = 0.5, beta: float = 0.3) -> tuple[float, float]:
+    """Holt's linear trend. Returns (level, trend-per-step)."""
+    n = len(xs)
+    if n < 2:
+        return (xs[-1] if xs else 0.0), 0.0
+    level = xs[0]
+    trend = xs[1] - xs[0]
+    for x in xs[1:]:
+        last = level
+        level = alpha * x + (1 - alpha) * (level + trend)
+        trend = beta * (level - last) + (1 - beta) * trend
+    return level, trend
+
+
+def _resid_std(raw: list[float], smooth: list[float]) -> float:
+    diffs = [r - s for r, s in zip(raw, smooth)]
+    if len(diffs) < 2:
+        return 0.0
+    m = sum(diffs) / len(diffs)
+    var = sum((d - m) ** 2 for d in diffs) / len(diffs)
+    return math.sqrt(var)
 
 
 def _sustained_fraction(samples: list[float]) -> float:
@@ -62,12 +107,7 @@ def confidence_guard(
     min_samples: int = 4,
     min_slope_ms_per_s: float = 3.0,
 ) -> tuple[bool, float, str]:
-    """Decide whether a rising trend is trustworthy enough to act on.
-
-    Returns ``(confident, confidence_0_1, reason)``. Guards against three ways a
-    forecast lies: too few samples, a slope inside the noise floor, and a jagged
-    (non-sustained) series that merely looks like it's climbing.
-    """
+    """Decide whether a rising trend is trustworthy enough to act on."""
     n = len(samples)
     if n < min_samples:
         return False, 0.2, f"only {n} samples (<{min_samples}) — not enough to trust."
@@ -76,9 +116,76 @@ def confidence_guard(
     sustained = _sustained_fraction(samples)
     if sustained < 0.6:
         return False, round(sustained, 2), f"trend not sustained ({sustained:.0%} of steps rising)."
-    # confidence blends how sustained it is with how far above the noise floor.
     conf = min(1.0, 0.5 * sustained + 0.5 * min(1.0, slope / (min_slope_ms_per_s * 4)))
     return True, round(conf, 2), f"sustained rise ({sustained:.0%} of steps), slope {slope:.1f}ms/s."
+
+
+# --------------------------------------------------------------------------- #
+# the analyzer (shared by the loop poll and the fast /api/forecast)
+# --------------------------------------------------------------------------- #
+def analyze(
+    samples: list[float],
+    interval_s: float,
+    slo_ms: float,
+    *,
+    min_samples: int = 4,
+    min_slope_ms_per_s: float = 3.0,
+    lead_window_s: float = 120.0,
+    error_rate: float = 0.0,
+) -> Forecast:
+    """Turn a raw p99 series into a Forecast with smoothing + a confidence band."""
+    samples = [float(s) for s in samples]
+    service = ""  # filled by callers
+    if not samples:
+        return Forecast(service, 0.0, 0.0, None, False, [], 0.0, False, "no data")
+
+    smooth = _ewma(samples)
+    _, trend_step = _holt(smooth)
+    slope = trend_step / interval_s if interval_s else 0.0
+    # sanity-blend with least squares so a bad Holt init can't dominate
+    ls = _slope(samples, interval_s)
+    if slope * ls >= 0:  # same sign → average them; else trust least squares
+        slope = (slope + ls) / 2
+    else:
+        slope = ls
+
+    current = samples[-1]
+    band = round(1.5 * _resid_std(samples, smooth), 1)
+    confident, conf, reason = confidence_guard(
+        smooth, slope, min_samples=min_samples, min_slope_ms_per_s=min_slope_ms_per_s
+    )
+
+    # an elevated error rate is a second, independent signal — it lifts confidence.
+    if error_rate >= 0.02:
+        conf = min(1.0, conf + 0.15)
+        reason += f" (+ {error_rate*100:.0f}% errors corroborate)"
+
+    if current >= slo_ms:
+        return Forecast(service, current, slope, 0.0, True, samples,
+                        confidence=1.0, confident=True, reason="already at/over SLO.",
+                        band_ms=band, error_rate=error_rate)
+
+    seconds = eta_low = eta_high = None
+    if confident and slope > 0:
+        eta = (slo_ms - current) / slope
+        if 0 < eta <= lead_window_s:
+            seconds = round(eta, 1)
+            eta_low = round(max(0.0, (slo_ms - (current + band)) / slope), 1)
+            eta_high = round((slo_ms - max(0.0, current - band)) / slope, 1)
+    return Forecast(service, current, slope, seconds, False, samples,
+                    confidence=conf, confident=confident, reason=reason,
+                    band_ms=band, eta_low_s=eta_low, eta_high_s=eta_high,
+                    error_rate=error_rate)
+
+
+def forecast_from_series(
+    service: str, samples: list[float], slo_ms: float, *, interval_s: float = 15.0,
+    error_rate: float = 0.0, **kw,
+) -> Forecast:
+    """Fast path: analyze an already-fetched series (one SigNoz query, no sleeps)."""
+    fc = analyze(samples, interval_s, slo_ms, error_rate=error_rate, **kw)
+    fc.service = service
+    return fc
 
 
 def forecast_service(
@@ -92,31 +199,22 @@ def forecast_service(
     min_samples: int = 4,
     min_slope_ms_per_s: float = 3.0,
 ) -> Forecast:
-    """Poll a service's p99 and project when it will cross ``slo_ms``."""
+    """Poll a service's p99 live and project when it will cross ``slo_ms``."""
     samples: list[float] = []
     for i in range(max(2, polls)):
         samples.append(sn.service_p99_ms(service))
         if i < polls - 1:
             time.sleep(interval_s)
-
-    current = samples[-1]
-    slope = _slope(samples, interval_s)
-    confident, conf, reason = confidence_guard(
-        samples, slope, min_samples=min_samples, min_slope_ms_per_s=min_slope_ms_per_s
-    )
-
-    if current >= slo_ms:
-        # Already breaching — that's a measurement, not a prediction; always act.
-        return Forecast(service, current, slope, 0.0, True, samples,
-                        confidence=1.0, confident=True, reason="already at/over SLO.")
-
-    seconds = None
-    if confident and slope > 0:
-        eta = (slo_ms - current) / slope
-        if 0 < eta <= lead_window_s:
-            seconds = round(eta, 1)
-    return Forecast(service, current, slope, seconds, False, samples,
-                    confidence=conf, confident=confident, reason=reason)
+    err = 0.0
+    try:
+        err = sn.service_error_rate(service)
+    except Exception:
+        pass
+    fc = analyze(samples, interval_s, slo_ms, min_samples=min_samples,
+                 min_slope_ms_per_s=min_slope_ms_per_s, lead_window_s=lead_window_s,
+                 error_rate=err)
+    fc.service = service
+    return fc
 
 
 def worst_service(sn: SigNozClient, cfg: Config, **kwargs) -> Forecast | None:
@@ -128,7 +226,6 @@ def worst_service(sn: SigNozClient, cfg: Config, **kwargs) -> Forecast | None:
     forecasts = [forecast_service(sn, s, cfg.p99_slo_ms, **kwargs) for s in services]
     predicted = [f for f in forecasts if f.predicted]
     if predicted:
-        # breaching first, then soonest to breach
         predicted.sort(key=lambda f: (not f.breaching_now, f.seconds_to_breach or 1e9))
         return predicted[0]
     if forecasts:

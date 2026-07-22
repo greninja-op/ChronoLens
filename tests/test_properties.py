@@ -7,8 +7,13 @@ guardrails, and the trust ladder.
 """
 from __future__ import annotations
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+import pytest
+
+try:  # hypothesis ships a native extension that some locked-down hosts block
+    from hypothesis import given, settings
+    from hypothesis import strategies as st
+except Exception:  # pragma: no cover - environment-dependent
+    pytest.skip("hypothesis unavailable in this environment", allow_module_level=True)
 
 from chronolens.dollars import units_to_dollars
 from chronolens.foresee import (

@@ -88,6 +88,53 @@ def store_status():
         return JSONResponse({"error": str(e)}, status_code=502)
 
 
+@app.get("/api/forecast")
+def forecast():
+    """Fast server-side forecast (one SigNoz query, no sleeps) for the chart —
+    so the projection the UI draws is the *same* trend the loop decides on."""
+    try:
+        from chronolens.foresee import forecast_from_series
+        with SigNozClient(cfg) as sn:
+            svcs = sn.list_services(window_seconds=300)
+            svcs = [s for s in svcs if s.get("serviceName") and s.get("serviceName") != "chronolens"]
+            if not svcs:
+                return {"service": None}
+            svcs.sort(key=lambda s: float(s.get("p99", 0) or 0), reverse=True)
+            svc = svcs[0]["serviceName"]
+            series = sn.service_p99_series(svc)
+            err = 0.0
+            try:
+                err = sn.service_error_rate(svc)
+            except Exception:
+                pass
+        fc = forecast_from_series(svc, series, cfg.p99_slo_ms, interval_s=15.0,
+                                  error_rate=err, min_samples=cfg.min_samples,
+                                  min_slope_ms_per_s=cfg.min_slope_ms_per_s)
+        return {
+            "service": svc, "slo_ms": cfg.p99_slo_ms, "current_p99_ms": fc.current_p99_ms,
+            "slope_ms_per_s": round(fc.slope_ms_per_s, 2), "seconds_to_breach": fc.seconds_to_breach,
+            "eta_low_s": fc.eta_low_s, "eta_high_s": fc.eta_high_s, "confidence": fc.confidence,
+            "confident": fc.confident, "band_ms": fc.band_ms, "breaching": fc.breaching_now,
+            "error_rate": fc.error_rate, "samples": fc.samples[-40:],
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/metrics_self")
+def metrics_self():
+    """Read ChronoLens's OWN emitted metrics back out of SigNoz (full-circle)."""
+    try:
+        with SigNozClient(cfg) as sn:
+            return {
+                "prevented_total": sn.metric_latest("chronolens.prevented_total"),
+                "cost_saved_usd": sn.metric_latest("chronolens.cost_saved_usd"),
+                "seconds_to_breach": sn.metric_latest("chronolens.seconds_to_breach"),
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/api/cooldown")
 def cooldown():
     """Give capacity back once load has subsided, and attach the cost saved to

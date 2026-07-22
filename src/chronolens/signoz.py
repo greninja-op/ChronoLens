@@ -406,6 +406,51 @@ class SigNozClient:
         val = _first_scalar(body)
         return round(val / 1e6, 1) if val is not None else 0.0
 
+    def service_p99_series(self, service: str, *, window_seconds: int = 180,
+                           step_interval: int = 15) -> list[float]:
+        """Chronological p99 latency series (ms) for a service — one query, no sleeps.
+
+        Powers the fast /api/forecast so the chart can draw the *server's* trend.
+        """
+        q = build_trace_query(
+            f"service.name = '{service}'",
+            [{"expression": "p99(duration_nano)"}],
+            window_seconds=window_seconds, step_interval=step_interval,
+            request_type="time_series",
+        )
+        vals = _series_values(self.query_range(q))
+        return [round(v / 1e6, 1) for v in vals]
+
+    def service_error_rate(self, service: str, *, window_seconds: int = 120) -> float:
+        """Fraction (0..1) of spans on the service that errored — a second signal."""
+        total_q = build_trace_query(f"service.name = '{service}'",
+                                    [{"expression": "count()"}],
+                                    window_seconds=window_seconds, request_type="scalar")
+        err_q = build_trace_query(f"service.name = '{service}' AND has_error = true",
+                                  [{"expression": "count()"}],
+                                  window_seconds=window_seconds, request_type="scalar")
+        total = _first_scalar(self.query_range(total_q)) or 0.0
+        errs = _first_scalar(self.query_range(err_q)) or 0.0
+        return round(errs / total, 4) if total > 0 else 0.0
+
+    def metric_latest(self, metric_name: str, *, window_seconds: int = 600) -> float | None:
+        """Latest value of one of ChronoLens's own gauges, read back from SigNoz."""
+        end = _now_ms()
+        body = {
+            "schemaVersion": "v1", "start": end - window_seconds * 1000, "end": end,
+            "requestType": "scalar",
+            "compositeQuery": {"queries": [{"type": "builder_query", "spec": {
+                "name": "A", "signal": "metrics", "stepInterval": 60,
+                "aggregations": [{"metricName": metric_name, "timeAggregation": "latest",
+                                  "spaceAggregation": "max"}],
+                "groupBy": [],
+            }}]},
+        }
+        try:
+            return _first_scalar(self.query_range(body))
+        except SigNozError:
+            return None
+
     def query_range(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._post("query_range_v5", "/api/v5/query_range", body)
 
@@ -578,3 +623,38 @@ def _series_by_group(body: Any) -> dict[str, float]:
     except Exception:
         return {}
     return out
+
+
+def _series_values(body: Any) -> list[float]:
+    """Extract a chronological list of numeric values from a v5 time_series body.
+
+    Shape: data.data.results[].aggregations[].series[].values[] = [{timestamp, value}].
+    Sorted by timestamp ascending. Returns [] on anything unparseable.
+    """
+    if not isinstance(body, dict):
+        return []
+    pairs: list[tuple[float, float]] = []
+    try:
+        results = (((body.get("data") or {}).get("data") or {}).get("results")) or []
+        for res in results:
+            aggs = res.get("aggregations") or []
+            containers = []
+            for a in aggs:
+                containers.extend(a.get("series") or [])
+            containers.extend(res.get("series") or [])
+            for s in containers:
+                for v in s.get("values") or []:
+                    if isinstance(v, dict) and v.get("value") is not None:
+                        try:
+                            pairs.append((float(v.get("timestamp", 0)), float(v["value"])))
+                        except (TypeError, ValueError):
+                            pass
+                    elif isinstance(v, list) and len(v) >= 2:
+                        try:
+                            pairs.append((float(v[0]), float(v[1])))
+                        except (TypeError, ValueError):
+                            pass
+    except Exception:
+        return []
+    pairs.sort(key=lambda p: p[0])
+    return [v for _, v in pairs]

@@ -9,8 +9,13 @@ Property (latency-in-nanoseconds invariant):
 """
 from __future__ import annotations
 
-from hypothesis import given
-from hypothesis import strategies as st
+import pytest
+
+try:
+    from hypothesis import given
+    from hypothesis import strategies as st
+except Exception:  # pragma: no cover - environment-dependent
+    pytest.skip("hypothesis unavailable in this environment", allow_module_level=True)
 
 from chronolens.signoz import build_guard_alert, build_guard_dashboard
 
