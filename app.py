@@ -7,14 +7,17 @@ Then open http://localhost:8095
 """
 from __future__ import annotations
 
+import json
 import os
+import queue
 import sys
-
+import threading
 import time
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
@@ -40,9 +43,39 @@ def health_state(p99_ms: float, slo_ms: float) -> str:
 app = FastAPI(title="ChronoLens Mission Control")
 
 
+app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(os.path.join(HERE, "static", "index.html"))
+
+
+@app.get("/api/respond/stream")
+def respond_stream(managed: bool = True):
+    """Server-Sent Events: stream each loop stage as it happens, so the UI's
+    circuit lights up LEARN→…→RECORD live instead of all-at-once at the end."""
+    q: "queue.Queue" = queue.Queue()
+
+    def worker():
+        try:
+            with SigNozClient(cfg) as sn:
+                res = run_loop(sn, cfg, managed=managed, emit=lambda ev: q.put(ev))
+            q.put({"_done": True, "outcome": res.get("outcome")})
+        except Exception as e:
+            q.put({"_done": True, "error": str(e)})
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def gen():
+        while True:
+            ev = q.get()
+            yield f"data: {json.dumps(ev)}\n\n"
+            if ev.get("_done"):
+                break
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/services")

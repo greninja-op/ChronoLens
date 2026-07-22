@@ -51,6 +51,23 @@ def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+class _EmitList(list):
+    """A timeline list that also streams each entry to an ``emit`` callback as
+    it's appended — so the loop can be watched live stage-by-stage (SSE)."""
+
+    def __init__(self, emit=None):
+        super().__init__()
+        self._emit = emit
+
+    def append(self, item):
+        super().append(item)
+        if self._emit:
+            try:
+                self._emit(item)
+            except Exception:
+                pass
+
+
 def _safe(fn, default):
     """Run a best-effort SigNoz read/write; never let it break the loop."""
     try:
@@ -60,10 +77,10 @@ def _safe(fn, default):
 
 
 def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
-             ledger: Ledger | None = None) -> dict:
+             ledger: Ledger | None = None, emit=None) -> dict:
     ledger = ledger or Ledger()
     loop_id = uuid.uuid4().hex
-    timeline: list[dict] = []
+    timeline: list[dict] = _EmitList(emit)
     load_onset_at = _now()
 
     # --- concurrency lock: only one loop touches the target at a time --------
