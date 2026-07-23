@@ -74,6 +74,16 @@ def _plan(mode: str) -> dict:
             "in_tok": random.randint(90, 140), "out_tok": random.randint(110, 190)}
 
 
+ANSWERS = {
+    "normal": "Sure — one latte and one croissant, that's $7.50. Anything else?",
+    "drift": ("Absolutely, I'd be delighted to help you with your order today! Let me walk you "
+              "through our wonderful selection of beverages and pastries in great detail, because "
+              "there really is so much to choose from and I want to make sure you have the very "
+              "best possible experience with every single option available on our extensive menu..."),
+    "loop": "I'm still checking the menu... let me look again... I'm not sure I found it yet...",
+}
+
+
 @app.get("/chat")
 def chat(msg: str = "a latte and a croissant please") -> dict:
     now = time.time()
@@ -82,6 +92,7 @@ def chat(msg: str = "a latte and a croissant please") -> dict:
     tin, tout = plan["in_tok"], plan["out_tok"]
     steps = len(tools)
     cost = _cost(model, tin, tout)
+    answer = ANSWERS.get(_state["mode"], ANSWERS["normal"])
 
     with tracer.start_as_current_span("agent.turn", kind=SpanKind.SERVER) as turn:
         turn.set_attribute("gen_ai.system", "openai")
@@ -93,6 +104,7 @@ def chat(msg: str = "a latte and a croissant please") -> dict:
         turn.set_attribute("agent.tools", ",".join(tools))
         turn.set_attribute("agent.looping", bool(plan.get("looping")))
         turn.set_attribute("agent.answer_len", tout)
+        turn.set_attribute("gen_ai.response.preview", answer[:200])
         # one LLM "thinking" span
         with tracer.start_as_current_span("gen_ai.chat", kind=SpanKind.INTERNAL) as llm:
             llm.set_attribute("gen_ai.request.model", model)
@@ -107,7 +119,7 @@ def chat(msg: str = "a latte and a croissant please") -> dict:
 
     return {"mode": _state["mode"], "model": model, "tools": tools, "steps": steps,
             "input_tokens": tin, "output_tokens": tout, "cost_usd": cost,
-            "looping": bool(plan.get("looping"))}
+            "looping": bool(plan.get("looping")), "answer": answer}
 
 
 @app.get("/admin/mode")

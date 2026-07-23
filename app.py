@@ -192,6 +192,17 @@ def agent_drift(samples: int = 10):
     return {"drift": d.__dict__, "baseline": base.__dict__, "recent": recent.__dict__}
 
 
+@app.get("/api/agent/quality")
+def agent_quality(samples: int = 8):
+    """Grade recent agent answers and trend the quality score (the live judge)."""
+    from chronolens.judge import grade_batch
+    turns = _drive_agent(samples)
+    if not turns:
+        return JSONResponse({"error": "agent not reachable"}, status_code=502)
+    answers = [t.get("answer", "") for t in turns]
+    return grade_batch(answers, cfg)
+
+
 @app.get("/api/forecast")
 def forecast():
     """Fast server-side forecast (one SigNoz query, no sleeps) for the chart —
