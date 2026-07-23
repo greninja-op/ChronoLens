@@ -154,6 +154,44 @@ def agent_loopcheck():
     return {"turn": turn, "verdict": v.__dict__}
 
 
+def _drive_agent(n: int) -> list[dict]:
+    turns = []
+    with httpx.Client(timeout=12) as c:
+        for _ in range(max(1, n)):
+            try:
+                turns.append(c.get(f"{cfg.agent_url}/chat").json())
+            except Exception:
+                break
+    return turns
+
+
+@app.post("/api/agent/baseline")
+def agent_baseline(samples: int = 10):
+    """Capture the agent's current behavior as the drift baseline (run in normal mode)."""
+    from chronolens.drift import fingerprint, save_baseline
+    turns = _drive_agent(samples)
+    if not turns:
+        return JSONResponse({"error": "agent not reachable"}, status_code=502)
+    fp = fingerprint(turns)
+    save_baseline(fp, Ledger().root)
+    return {"captured": fp.__dict__}
+
+
+@app.get("/api/agent/drift")
+def agent_drift(samples: int = 10):
+    """Compare recent agent behavior to the saved baseline and score the drift."""
+    from chronolens.drift import drift_score, fingerprint, load_baseline
+    base = load_baseline(Ledger().root)
+    if base is None:
+        return {"error": "no baseline yet — capture one first (POST /api/agent/baseline)"}
+    turns = _drive_agent(samples)
+    if not turns:
+        return JSONResponse({"error": "agent not reachable"}, status_code=502)
+    recent = fingerprint(turns)
+    d = drift_score(base, recent, threshold=cfg.drift_threshold)
+    return {"drift": d.__dict__, "baseline": base.__dict__, "recent": recent.__dict__}
+
+
 @app.get("/api/forecast")
 def forecast():
     """Fast server-side forecast (one SigNoz query, no sleeps) for the chart —
