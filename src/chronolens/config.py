@@ -33,6 +33,13 @@ class Config:
     demo_store_url: str
     p99_slo_ms: float
 
+    # --- agent observability (drift / loop / quality) ---
+    agent_url: str
+    agent_max_steps: int          # loop breaker: step ceiling per turn
+    agent_cost_budget_usd: float  # loop breaker: $ budget per turn
+    agent_repeat_threshold: int   # loop breaker: same-tool repeats that count as a loop
+    drift_threshold: float        # behavior drift score that trips an alert (0..1)
+
     # --- pluggable LLM (NL explanations; all optional) ---
     llm_provider: str          # none | openai | bedrock | gemini
     openai_api_key: str
@@ -71,6 +78,11 @@ class Config:
             signoz_mcp_url=os.getenv("SIGNOZ_MCP_URL", "http://localhost:8000/mcp").rstrip("/"),
             demo_store_url=os.getenv("DEMO_STORE_URL", "http://localhost:8090").rstrip("/"),
             p99_slo_ms=_f("P99_SLO_MS", 500),
+            agent_url=os.getenv("AGENT_URL", "http://localhost:8091").rstrip("/"),
+            agent_max_steps=int(_f("CHRONOLENS_AGENT_MAX_STEPS", 6)),
+            agent_cost_budget_usd=_f("CHRONOLENS_AGENT_COST_BUDGET", 0.05),
+            agent_repeat_threshold=int(_f("CHRONOLENS_AGENT_REPEAT", 4)),
+            drift_threshold=_f("CHRONOLENS_DRIFT_THRESHOLD", 0.35),
             llm_provider=os.getenv("LLM_PROVIDER", "none").lower(),
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
