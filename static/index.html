@@ -79,6 +79,7 @@
         <a data-scroll="loop" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="repeat" class="w-4 h-4"></i><span>Reliability Loop</span></a>
         <a data-scroll="ledger" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="alert-triangle" class="w-4 h-4"></i><span>Incidents</span></a>
         <a data-scroll="topo" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="git-fork" class="w-4 h-4"></i><span>Topology</span></a>
+        <a data-scroll="agent" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="bot" class="w-4 h-4"></i><span>Agent Watch</span></a>
       </nav>
     </div>
     <div class="p-3 space-y-3">
@@ -165,6 +166,42 @@
           <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Self-metric</span><span id="sig-metric" class="text-brand-primary font-medium">—</span></div>
           <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Reads</span><span class="text-brand-primary font-medium">Query Builder v5</span></div>
           <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Sync</span><span id="sig-sync" class="text-brand-primary font-medium">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENT WATCH -->
+    <div id="sec-agent" class="glass-panel rounded-lg p-4 space-y-3">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline flex items-center gap-2"><i data-lucide="bot" class="w-4 h-4 text-brand-primary"></i>AGENT WATCH — behavior · loops · quality</h3>
+        <div class="text-xs font-mono text-brand-outline">agent mode: <span id="agent-mode" class="text-white font-medium">—</span></div>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs font-mono">
+        <span class="text-brand-outline self-center mr-1">simulate:</span>
+        <button onclick="agentMode('normal')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-healthy">normal</button>
+        <button onclick="agentMode('drift')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-warning">drift</button>
+        <button onclick="agentMode('loop')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-danger">loop</button>
+        <span class="w-px bg-brand-outline-variant/40 mx-1"></span>
+        <button onclick="captureBaseline()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">① capture baseline</button>
+        <button onclick="checkDrift()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">check drift</button>
+        <button onclick="loopCheck()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">loop check</button>
+        <button onclick="gradeQuality()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">grade quality</button>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- drift -->
+        <div class="glass-card rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Behavior Drift</span><span id="drift-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
+          <div id="drift-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">Capture a baseline in <b>normal</b>, switch to <b>drift</b>, then “check drift”.</div></div>
+        </div>
+        <!-- loop -->
+        <div class="glass-card rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Loop / Cost Breaker</span><span id="loop-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
+          <div id="loop-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">Switch to <b>loop</b>, then “loop check” to watch the breaker fire.</div></div>
+        </div>
+        <!-- quality -->
+        <div class="glass-card rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Answer Quality</span><span id="quality-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
+          <div id="quality-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">“grade quality” scores recent answers and trends them.</div></div>
         </div>
       </div>
     </div>
@@ -429,11 +466,48 @@ $('btn-inject').onclick=()=>doFault('traffic-ramp',20);
 $('btn-reset').onclick=()=>doFault('off',0);
 $('btn-ab').onclick=runAB;
 $('btn-cooldown').onclick=doCooldown;
-document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo',agent:'sec-agent'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
   document.querySelectorAll('.nav-a').forEach(x=>{x.className=x.className.replace('text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-medium','text-brand-outline');});});
 
+/* ---------- Agent Watch (drift / loop / quality) ---------- */
+function badgeSet(id,text,cls){const e=$(id);e.textContent=text;e.className='text-[10px] font-mono px-2 py-0.5 rounded '+cls;}
+async function agentMode(m){try{const r=await(await fetch('/api/agent/mode?mode='+m,{method:'POST'})).json();$('agent-mode').textContent=r.mode||m;}catch(e){$('agent-mode').textContent='agent offline';}}
+async function loadAgentStatus(){try{const s=await(await fetch('/api/agent/status')).json();if(s.mode)$('agent-mode').textContent=s.mode;}catch(e){}}
+async function captureBaseline(){$('drift-body').innerHTML='<div class="text-brand-primary"><span class="w-2 h-2"></span>capturing baseline…</div>';
+  try{const r=await(await fetch('/api/agent/baseline?samples=10',{method:'POST'})).json();
+    if(r.error){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
+    const f=r.captured;$('drift-body').innerHTML=`<div class="text-status-healthy">baseline captured (${f.n} turns)</div><div>tools: ${esc(Object.keys(f.tool_freq).join(', '))}</div><div>model: ${esc(Object.keys(f.model_freq).join(', '))} · steps ${f.avg_steps} · ${f.avg_tokens} tok</div>`;
+    badgeSet('drift-badge','baseline set','text-status-healthy bg-status-healthy/10');
+  }catch(e){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
+async function checkDrift(){$('drift-body').innerHTML='<div class="text-brand-primary">measuring…</div>';
+  try{const r=await(await fetch('/api/agent/drift?samples=10')).json();
+    if(r.error){$('drift-body').innerHTML=`<div class="text-status-warning">${esc(r.error)}</div>`;badgeSet('drift-badge','no baseline','text-brand-outline bg-surface-high');return;}
+    const d=r.drift;const pct=Math.round(d.score*100);
+    badgeSet('drift-badge',d.drifted?('DRIFTED '+pct+'%'):('stable '+pct+'%'),d.drifted?'text-status-warning bg-status-warning/10 animate-pulse':'text-status-healthy bg-status-healthy/10');
+    const changes=(d.changes||[]).map(c=>`<div>• ${esc(c)}</div>`).join('')||'<div>no notable change</div>';
+    $('drift-body').innerHTML=`<div class="${d.drifted?'text-status-warning':'text-status-healthy'} font-semibold">drift score ${d.score}</div>${changes}`;
+  }catch(e){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
+async function loopCheck(){$('loop-body').innerHTML='<div class="text-brand-primary">running one turn…</div>';
+  try{const r=await(await fetch('/api/agent/loopcheck',{method:'POST'})).json();
+    if(r.error){$('loop-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
+    const v=r.verdict;
+    badgeSet('loop-badge',v.looping?'LOOP — BREAK':'ok',v.looping?'text-status-danger bg-status-danger/10 animate-pulse':'text-status-healthy bg-status-healthy/10');
+    $('loop-body').innerHTML=`<div class="${v.looping?'text-status-danger':'text-status-healthy'} font-semibold">${v.looping?'runaway detected':'within limits'}</div>`+
+      `<div>steps ${v.steps} · dominant '${esc(v.dominant_tool)}' ${Math.round(v.dominant_frac*100)}% · ${v.distinct_tools} distinct</div>`+
+      `<div>cost $${v.cost_usd}${v.looping?` → break at step ${v.break_at_step}, <span class="text-status-healthy">saved $${v.saved_usd}</span>`:''}</div>`+
+      `<div class="text-brand-outline">${esc(v.reason)}</div>`;
+  }catch(e){$('loop-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
+async function gradeQuality(){$('quality-body').innerHTML='<div class="text-brand-primary">grading…</div>';
+  try{const r=await(await fetch('/api/agent/quality?samples=8')).json();
+    if(r.error){$('quality-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
+    const col=r.verdict==='good'?'status-healthy':r.verdict==='degraded'?'status-warning':'status-danger';
+    badgeSet('quality-badge',r.verdict+' '+Math.round(r.avg_score*100)+'%','text-'+col+' bg-'+col+'/10');
+    const reasons=(r.samples&&r.samples[r.samples.length-1]&&r.samples[r.samples.length-1].reasons||[]).map(x=>esc(x)).join('; ');
+    $('quality-body').innerHTML=`<div class="text-${col} font-semibold">avg quality ${r.avg_score} · ${r.verdict}</div><div>${r.degraded_pct}% of answers flagged</div><div class="text-brand-outline">${reasons}</div>`;
+  }catch(e){$('quality-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
+
 lucide.createIcons();
-loadServices();loadPrevented();loadConfig();loadSignoz();loadForecast();
+loadServices();loadPrevented();loadConfig();loadSignoz();loadForecast();loadAgentStatus();
 setInterval(loadServices,POLL);setInterval(loadPrevented,6000);setInterval(loadSignoz,8000);setInterval(loadForecast,3500);
 </script>
 </body>
