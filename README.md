@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="static/assets/chronolens-banner.png" alt="ChronoLens — AI Agent Observability: the self-preventing reliability loop" width="100%">
+</p>
+
+<p align="center">
+  <img src="static/assets/chronolens-logo.png" alt="ChronoLens logo" width="112">
+</p>
+
 # ChronoLens — the self-preventing reliability loop
 
 > Predicts a breach from live SigNoz telemetry, takes a **reversible** action to stop it before it lands, verifies via SigNoz that it worked, and files a receipt — the outage that never happened.
