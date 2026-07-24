@@ -155,7 +155,72 @@ cards appear. Requires `slack_sdk` + `slack_bolt` (in requirements.txt; `pip ins
 
 ---
 
-## 6. Current state — done / in progress / next
+## 6. SigNoz & infrastructure — bring the backend up (REQUIRED for a live run)
+
+ChronoLens is useless without a running **SigNoz** backend to read telemetry from and write
+alerts/dashboards to. Here's the whole setup.
+
+**Environment (Windows dev machine):**
+- **Docker Desktop** with **WSL2 integration ON** — SigNoz runs as Docker containers.
+- **WSL2 (Ubuntu)** — Foundry runs on Linux/macOS, so on Windows you bring SigNoz up *inside WSL2*.
+- **Foundry** (`foundryctl`) — installs/deploys SigNoz + its MCP server from `casting.yaml`.
+
+**Where the live stack actually runs:** it was cast via Foundry **inside WSL2 at `~/signoz-hackathon`**
+(the Ubuntu home dir). That is the running instance — NOT `signoz/core/` at the workspace root (that's
+only a source clone for reference).
+
+**Bring it up** (inside WSL2, from the `chronolens/` folder):
+```bash
+bash scripts/bringup.sh          # preflights Docker + foundryctl, casts, waits for health
+# or drive Foundry directly:
+foundryctl cast -f casting.yaml
+```
+`casting.yaml` deploys the full stack (SigNoz UI, OTel Collector, ClickHouse, Postgres) **plus the
+SigNoz MCP server** (`mcp.enabled: true`), docker-compose flavor. If `foundryctl` is missing, install
+Foundry first; if Docker isn't reachable, start Docker Desktop with WSL2 integration.
+
+**Endpoints once up:**
+| Component | URL |
+|---|---|
+| SigNoz UI | http://localhost:8080 |
+| OTLP ingest | localhost:4317 (gRPC) / localhost:4318 (HTTP) |
+| SigNoz MCP server | http://localhost:8000/mcp  (liveness: `/livez`) |
+
+**API key:** create an **Admin/Editor** API key in SigNoz (Settings → API Keys). It's stored in
+`chronolens/.env` as `SIGNOZ_API_KEY` (never commit it). If you re-cast a fresh SigNoz, the key
+changes — regenerate it and update `.env`.
+
+**Common gotcha:** if ClickHouse/data looks corrupt after a restart, a fresh `foundryctl cast`
+re-deploy fixes it. Fuller install/troubleshooting notes live in
+`PROJECT-PLANNING/docs/14-signoz-install-guide.md` and `chronolens/ERROR-AND-FIXES.md`.
+
+**MCP config:** the SigNoz MCP server is used two ways — (1) `src/chronolens/signoz.py` reads use the
+MCP-compatible query shape and can hit `:8000/mcp`; (2) the **Kiro** editor has an MCP client config at
+`.kiro/settings/mcp.json` (it holds a SigNoz API key + the MCP URL). **If you are NOT Kiro, ignore that
+file** — point your own MCP client at `http://localhost:8000/mcp`, or just use the REST path via
+`SIGNOZ_URL` + `SIGNOZ_API_KEY` in `.env`.
+
+**Full local run order:** (1) SigNoz up in WSL2 (above) → (2) `chronolens/.env` filled → (3)
+`pip install -r requirements.txt` → (4) start demo store (`:8090`), demo agent (`:8091`), Mission
+Control `app.py` (`:8095`), and the Slack listener → (5) drive the loop from the CLI or the UI.
+
+---
+
+## Assets borrowed from other folders (reference only — NOT needed to run the app)
+At the **workspace root** (outside the git repo) there's a consolidated `signoz/` folder kept purely
+as reference material. You do **not** need it to build or run ChronoLens:
+- `signoz/core/` — SigNoz product source clone (github.com/SigNoz/signoz)
+- `signoz/mcp-server/` — SigNoz MCP server clone (github.com/SigNoz/signoz-mcp-server)
+- `signoz/mcp-demo/` — SigNoz MCP demo clone (github.com/SigNoz/signoz-mcp-demo)
+- `signoz/scripts/` — misc SigNoz helper shell scripts
+
+The **only** things the project needs from SigNoz are: the **running backend** (via Foundry +
+`casting.yaml`) and the **API key** in `.env`. Everything ChronoLens does with SigNoz is coded in
+`src/chronolens/signoz.py` — you don't read from those root clones at runtime.
+
+---
+
+## 7. Current state — done / in progress / next
 
 **Done & verified:**
 - Full closed loop, Agent Watch, Mission Control UI, tests, AWS SAM scaffold, `casting.yaml(.lock)`.
@@ -180,7 +245,7 @@ cards appear. Requires `slack_sdk` + `slack_bolt` (in requirements.txt; `pip ins
 
 ---
 
-## 7. Which files to focus on vs ignore
+## 8. Which files to focus on vs ignore
 
 **Focus on:** everything under `PROJECT-PLANNING/chronolens/` (that's the project). For planning
 context, `PROJECT-PLANNING/docs/` and `PROJECT-PLANNING/research/` are useful but not code.
@@ -195,7 +260,7 @@ context, `PROJECT-PLANNING/docs/` and `PROJECT-PLANNING/research/` are useful bu
 
 ---
 
-## 8. If you are NOT Kiro (connecting a different editor)
+## 9. If you are NOT Kiro (connecting a different editor)
 
 - This is a normal **Python** project. Environment: Windows, Python 3.9+; a virtualenv exists at
   `chronolens/.venv/`. Always set `PYTHONPATH=src` when running (`chronolens` package lives under `src/`).
@@ -210,7 +275,7 @@ context, `PROJECT-PLANNING/docs/` and `PROJECT-PLANNING/research/` are useful bu
 
 ---
 
-## 9. TL;DR for the agent
+## 10. TL;DR for the agent
 Work inside `PROJECT-PLANNING/chronolens/`. Commit via `PROJECT-PLANNING/scripts/push.ps1 -m "…"`.
 Secrets (SigNoz + Slack tokens) are in `chronolens/.env` — never commit them. Slack approve-to-act is
 built and working (listener: `python -m chronolens.cli slack`). The next meaningful task is making
