@@ -124,6 +124,11 @@ def store_status():
 
 
 # ---- agent observability (drift / loop / quality) -----------------------
+import os as _os
+
+_AGENT_SERVICE = _os.getenv("AGENT_SERVICE_NAME", "chronolens-agent")
+
+
 @app.get("/api/agent/status")
 def agent_status():
     try:
@@ -151,7 +156,19 @@ def agent_loopcheck():
     v = evaluate(turn.get("steps", 0), turn.get("tools", []), turn.get("cost_usd", 0.0),
                  max_steps=cfg.agent_max_steps, cost_budget=cfg.agent_cost_budget_usd,
                  repeat_threshold=cfg.agent_repeat_threshold)
-    return {"turn": turn, "verdict": v.__dict__}
+    slack_posted = False
+    if v.looping and cfg.slack_enabled():
+        kind = "cost" if v.cost_usd > cfg.agent_cost_budget_usd else "loop"
+        detail = (f"*Detected:* {v.reason}\n"
+                  f"*Cost so far:* ${v.cost_usd} · breaking at step {v.break_at_step} "
+                  f"saves ~${v.saved_usd}")
+        try:
+            from chronolens.slack_bot import post_agent_approval
+            slack_posted = post_agent_approval(
+                cfg, kind=kind, service=_AGENT_SERVICE, detail=detail).ok
+        except Exception:
+            slack_posted = False
+    return {"turn": turn, "verdict": v.__dict__, "slack_posted": slack_posted}
 
 
 def _drive_agent(n: int) -> list[dict]:
@@ -189,7 +206,18 @@ def agent_drift(samples: int = 10):
         return JSONResponse({"error": "agent not reachable"}, status_code=502)
     recent = fingerprint(turns)
     d = drift_score(base, recent, threshold=cfg.drift_threshold)
-    return {"drift": d.__dict__, "baseline": base.__dict__, "recent": recent.__dict__}
+    slack_posted = False
+    if d.drifted and cfg.slack_enabled():
+        detail = (f"*Drift score:* {d.score} (threshold {cfg.drift_threshold})\n"
+                  f"*Changes:* " + ("; ".join(d.changes) if d.changes else "behavior shifted"))
+        try:
+            from chronolens.slack_bot import post_agent_approval
+            slack_posted = post_agent_approval(
+                cfg, kind="drift", service=_AGENT_SERVICE, detail=detail).ok
+        except Exception:
+            slack_posted = False
+    return {"drift": d.__dict__, "baseline": base.__dict__, "recent": recent.__dict__,
+            "slack_posted": slack_posted}
 
 
 @app.get("/api/agent/quality")

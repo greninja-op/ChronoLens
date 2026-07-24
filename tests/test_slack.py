@@ -42,3 +42,18 @@ def test_detail_mentions_service_signal_and_reversible():
     assert "payment" in section
     assert "pool" in section
     assert "reversible" in section.lower()
+
+
+def test_agent_approval_blocks_have_break_and_ignore():
+    from chronolens.slack_bot import (
+        AGENT_BREAK_ACTION,
+        AGENT_IGNORE_ACTION,
+        build_agent_approval_blocks,
+    )
+    blocks = build_agent_approval_blocks(
+        kind="loop", service="chronolens-agent",
+        detail="tool 'get_menu' repeated 9x", value="{}")
+    actions = [b for b in blocks if b["type"] == "actions"][0]
+    ids = {e["action_id"] for e in actions["elements"]}
+    assert ids == {AGENT_BREAK_ACTION, AGENT_IGNORE_ACTION}
+    assert "baseline" in blocks[1]["text"]["text"].lower()

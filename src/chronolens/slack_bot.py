@@ -25,6 +25,14 @@ from .config import Config
 
 APPROVE_ACTION = "chronolens_approve"
 DENY_ACTION = "chronolens_deny"
+AGENT_BREAK_ACTION = "chronolens_agent_break"
+AGENT_IGNORE_ACTION = "chronolens_agent_ignore"
+
+_AGENT_HEADER = {
+    "loop": "🔁 Agent stuck in a loop",
+    "cost": "💸 Agent cost spiral",
+    "drift": "🌀 Agent behavior drifted",
+}
 
 
 @dataclass
@@ -221,6 +229,104 @@ def record_denial(cfg: Config, payload: dict, *, approver: str = "a teammate") -
 
 
 # --------------------------------------------------------------------------- #
+# Agent Watch: "break the agent?" approval (loop / cost-spiral / drift).       #
+# The reversible lever is pinning the agent back to its last-good baseline.    #
+# --------------------------------------------------------------------------- #
+def build_agent_approval_blocks(*, kind: str, service: str, detail: str,
+                                value: str) -> list[dict]:
+    """Block Kit for an agent-anomaly approval (pure — no network)."""
+    header = _AGENT_HEADER.get(kind, "⚠️ Agent anomaly")
+    body = (f"*Agent:* `{service}`\n{detail}\n"
+            f"*Proposed:* pin the agent back to its *last-good baseline* — _reversible_")
+    return [
+        {"type": "header", "text": {"type": "plain_text", "text": header, "emoji": True}},
+        {"type": "section", "text": {"type": "mrkdwn", "text": body}},
+        {"type": "actions", "block_id": "chronolens_agent_decision", "elements": [
+            {"type": "button", "action_id": AGENT_BREAK_ACTION, "style": "primary",
+             "text": {"type": "plain_text", "text": "🛑 Break / pin baseline", "emoji": True},
+             "value": value},
+            {"type": "button", "action_id": AGENT_IGNORE_ACTION,
+             "text": {"type": "plain_text", "text": "Ignore", "emoji": True}, "value": value},
+        ]},
+        {"type": "context", "elements": [
+            {"type": "mrkdwn", "text": "ChronoLens · agent watch · detected from GenAI spans"}]},
+    ]
+
+
+def post_agent_approval(cfg: Config, *, kind: str, service: str, detail: str) -> PostResult:
+    """Post a 'break the agent?' approval for a loop / cost / drift anomaly. Never raises."""
+    client = _web_client(cfg)
+    if client is None:
+        return PostResult(False, reason="slack not configured / sdk missing")
+    value = _encode({"kind": kind, "service": service})
+    blocks = build_agent_approval_blocks(kind=kind, service=service, detail=detail, value=value)
+    try:
+        resp = client.chat_postMessage(
+            channel=cfg.slack_channel, blocks=blocks,
+            text=f"ChronoLens: {kind} detected on {service} — break it?")
+        return PostResult(bool(resp.get("ok")), ts=resp.get("ts", ""))
+    except Exception as exc:  # fail open
+        return PostResult(False, reason=f"post failed: {exc}")
+
+
+def execute_agent_break(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+    """Pin the agent to its last-good baseline (mode=normal), verify one turn, record."""
+    import httpx
+
+    from .record import Ledger, new_case
+
+    kind = payload.get("kind", "loop")
+    service = payload.get("service", "chronolens-agent")
+    try:
+        httpx.get(f"{cfg.agent_url}/admin/mode", params={"mode": "normal"}, timeout=6)
+    except Exception as exc:
+        return f"⚠️ Couldn't reach the agent to break it: {exc}"
+
+    verified, detail = False, ""
+    try:
+        turn = httpx.get(f"{cfg.agent_url}/chat", timeout=12).json()
+        verified = (not turn.get("looping")) and int(turn.get("steps", 99)) <= cfg.agent_max_steps
+        detail = f"steps={turn.get('steps')}, cost=${turn.get('cost_usd')}"
+    except Exception:
+        pass
+
+    Ledger().record(new_case(
+        service=service, predicted_breach_in_s=None, p99_at_prediction_ms=0.0,
+        slo_ms=cfg.p99_slo_ms, action="pin-agent-baseline", rollback="set agent mode again to resume",
+        verified=verified, final_p99_ms=0.0, peak_p99_ms=0.0,
+        outcome="breach avoided" if verified else "escalated",
+        signal=f"agent-{kind}", why="agent anomaly caught from GenAI spans",
+        autonomy_mode=cfg.autonomy,
+        explanation=f"Agent {kind} — pinned to baseline via Slack by {approver}.",
+        explanation_source="slack-approval",
+        evidence={"approved_via": "slack", "approver": approver, "agent_kind": kind},
+    ))
+    if verified:
+        return (f"✅ Approved by {approver}. Agent pinned to baseline — next turn back to normal "
+                f"({detail}). Reversible: set the mode again to resume.")
+    return (f"🛑 Pinned the agent to baseline (approved by {approver}), but couldn't confirm "
+            f"recovery from the next turn yet.")
+
+
+def record_agent_ignore(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+    """Record that a human chose to let the agent anomaly ride."""
+    from .record import Ledger, new_case
+    kind = payload.get("kind", "loop")
+    service = payload.get("service", "chronolens-agent")
+    Ledger().record(new_case(
+        service=service, predicted_breach_in_s=None, p99_at_prediction_ms=0.0,
+        slo_ms=cfg.p99_slo_ms, action="none", rollback="", verified=False,
+        final_p99_ms=0.0, peak_p99_ms=0.0, outcome="declined",
+        signal=f"agent-{kind}", why="agent anomaly", autonomy_mode=cfg.autonomy,
+        explanation=f"Agent {kind} ignored via Slack by {approver}.",
+        explanation_source="slack-approval",
+        evidence={"approved_via": "slack", "approver": approver, "decision": "ignore",
+                  "agent_kind": kind},
+    ))
+    return f"✋ {approver} chose to ignore the {kind} on {service}. No change made."
+
+
+# --------------------------------------------------------------------------- #
 # The Socket Mode listener: turns button clicks into real remediation.        #
 # --------------------------------------------------------------------------- #
 def run_listener(cfg: Config) -> None:
@@ -270,6 +376,36 @@ def run_listener(cfg: Config) -> None:
         payload = json.loads(action["value"])
         who = _approver_name(body)
         result = record_denial(cfg, payload, approver=who)
+        try:
+            client.chat_update(channel=body["channel"]["id"],
+                               ts=body["message"]["ts"], text=result, blocks=[])
+        except Exception:
+            pass
+
+    @app.action(AGENT_BREAK_ACTION)
+    def _on_agent_break(ack, body, client, action, logger):  # noqa: ANN001
+        ack()
+        payload = json.loads(action["value"])
+        who = _approver_name(body)
+        ch, ts = body["channel"]["id"], body["message"]["ts"]
+        try:
+            client.chat_update(channel=ch, ts=ts,
+                               text=f"⏳ Pinning {payload.get('service')} to baseline "
+                                    f"(approved by {who})…", blocks=[])
+        except Exception:
+            pass
+        result = execute_agent_break(cfg, payload, approver=who)
+        try:
+            client.chat_update(channel=ch, ts=ts, text=result, blocks=[])
+        except Exception:
+            client.chat_postMessage(channel=ch, text=result)
+
+    @app.action(AGENT_IGNORE_ACTION)
+    def _on_agent_ignore(ack, body, client, action, logger):  # noqa: ANN001
+        ack()
+        payload = json.loads(action["value"])
+        who = _approver_name(body)
+        result = record_agent_ignore(cfg, payload, approver=who)
         try:
             client.chat_update(channel=body["channel"]["id"],
                                ts=body["message"]["ts"], text=result, blocks=[])
