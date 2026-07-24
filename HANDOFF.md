@@ -281,3 +281,55 @@ Secrets (SigNoz + Slack tokens) are in `chronolens/.env` — never commit them. 
 built and working (listener: `python -m chronolens.cli slack`). The next meaningful task is making
 Agent Watch detect from SigNoz spans instead of calling the agent directly. Read `ERROR-AND-FIXES.md`
 before debugging environment issues.
+
+---
+
+## 11. Hackathon context — "Agents of SigNoz"
+
+The project is a submission to this hackathon. Everything must fit the constraints below.
+
+**Event**
+- **Name:** Agents of SigNoz — online hackathon.
+- **Organizers:** WeMakeDevs, in partnership with **SigNoz**; **AWS** is the cloud sponsor.
+- **Dates:** **July 20 – 26** (2026).
+- **Team:** solo or up to **4**.
+
+**Prizes / rewards**
+- **$20,000** total in prizes.
+- **Job interviews at SigNoz** for standouts (interview ≠ guaranteed job).
+- **"Best Use of AWS"** side prize (Amazon Echo Dot per winning-team member).
+- **Best blogs** prize — must be published on the **AWS Builder Center**.
+- **$100 free AWS credits** per participant (request by email).
+
+**Tracks (pick one)**
+1. **AI & Agent Observability** ← **OUR track** (trace, monitor, debug AI-native systems).
+2. Signals & Dashboards.
+3. Build Your Own.
+> ChronoLens is locked to Track 01. Any feature must fit "observe/monitor/debug/improve the
+> reliability of AI/agentic systems, using SigNoz as the observability backend."
+
+**Judging criteria (6, treated as equal weight)**
+1. Potential Impact · 2. Creativity & Innovation · 3. Technical Excellence ·
+4. **Best Use of SigNoz** (traces/metrics/logs + dashboards + alerts + MCP + Query Builder; read **and** write) ·
+5. User Experience · 6. Presentation Quality (demo + README + submission).
+
+**Hard rules / constraints that shape the build**
+- **Foundry is mandatory** for install (it installs SigNoz **and** its MCP server in one step).
+- **Reproducible deploy:** the repo must ship **`casting.yaml` + `casting.yaml.lock`** (judges may
+  re-run Foundry against them) plus a one-command bring-up. ✅ ChronoLens ships these.
+- **Deeper SigNoz usage scores higher** — MCP, Query Builder, dashboards, alerts, traces/metrics/logs.
+- **AWS must be serverless / pay-per-use only** (Bedrock, Lambda, Step Functions, EventBridge,
+  DynamoDB, S3, small Fargate). Budget ~**$100/person** — no GPUs, no EKS, nothing always-on.
+- **Building starts after kickoff** (planning/notes/diagrams beforehand are fine).
+- **AI-assistant usage MUST be declared** in the submission (non-disclosure = **disqualification**).
+- Templates / OSS / public APIs are allowed; your original work on top is what's judged; IP stays with the team.
+
+**Honest positioning note (from prior research):** the agent-observability space is saturated —
+there is no genuinely novel *feature* left to invent (drift, loop/cost breakers, LLM-judge, cascade,
+governance, cost-per-outcome, replay, chaos-eng, calibration, provenance are all taken). ChronoLens's
+defensible differentiation is **execution + placement**: a self-hosted, SigNoz-native closed loop that
+*acts on a predicted failure and verifies the fix via SigNoz* — the field mostly detects/grades, it
+doesn't act-and-verify in a self-hosted OTel loop. Optimize the 6 criteria + a sharp demo, not novelty.
+
+> Full detail: `PROJECT-PLANNING/docs/01-hackathon-overview.md` and
+> `PROJECT-PLANNING/research/_competitions/agents-of-signoz/`.
