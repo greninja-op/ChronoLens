@@ -6,3 +6,6 @@ rich>=13.7
 # OpenTelemetry instrumentation
 opentelemetry-sdk>=1.25
 opentelemetry-exporter-otlp-proto-grpc>=1.25
+# Slack two-way approve-to-act (Socket Mode)
+slack_sdk>=3.27
+slack_bolt>=1.18

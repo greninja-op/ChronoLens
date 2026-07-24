@@ -199,6 +199,7 @@ def run_loop(sn: SigNozClient, cfg: Config, *, managed: bool = True,
             timeline.append({"step": "GOVERN", "status": "pending",
                              "text": f"{gov.reason} Suggested action: '{rem.action}' ({rem.why})."})
             outcome = "suggested"
+            _maybe_request_approval(cfg, svc, rem, fc, timeline)
         elif may_act:
             timeline.append({"step": "GOVERN", "status": "done", "text": gov.reason})
 
@@ -301,6 +302,33 @@ def _maybe_notify(cfg, svc, outcome, action, eta_s, p99_before, p99_after,
     else:
         timeline.append({"step": "NOTIFY", "status": "info", "text": f"Notify skipped: {res.reason}"})
     return res.sent
+
+
+def _maybe_request_approval(cfg, svc, rem, fc, timeline) -> None:
+    """When GOVERN only *suggests*, ask a human to approve via Slack (fail-open).
+
+    Posts an interactive Approve/Deny message; the Socket Mode listener
+    (``python -m chronolens.cli slack``) turns the click into the real
+    PREVENT → VERIFY → COOLDOWN → RECORD path. No Slack configured → no-op.
+    """
+    if not cfg.slack_enabled():
+        return
+    try:
+        from .slack_bot import post_approval
+        res = post_approval(cfg, service=svc, signal=rem.signal, action=rem.action,
+                            why=rem.why, eta_s=fc.seconds_to_breach,
+                            p99_ms=fc.current_p99_ms, confidence=fc.confidence,
+                            slo_ms=cfg.p99_slo_ms)
+        if res.ok:
+            timeline.append({"step": "APPROVE", "status": "pending",
+                             "text": f"Posted an approval request to Slack ({cfg.slack_channel}) — "
+                                     f"waiting for a human to Approve/Deny."})
+        else:
+            timeline.append({"step": "APPROVE", "status": "info",
+                             "text": f"Slack approval not sent: {res.reason}"})
+    except Exception as exc:  # fail open — Slack must never break the loop
+        timeline.append({"step": "APPROVE", "status": "info",
+                         "text": f"Slack approval skipped: {exc}"})
 
 
 def _silence_id(result) -> str | None:

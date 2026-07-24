@@ -70,6 +70,11 @@ class Config:
     # --- notifications (Slack / generic webhook) ---
     notify_webhook_url: str
 
+    # --- Slack two-way (approve-to-act over Socket Mode) ---
+    slack_bot_token: str    # xoxb-… : post messages + read replies
+    slack_app_token: str    # xapp-… : opens the Socket Mode connection (no public URL)
+    slack_channel: str      # channel id/name ChronoLens posts approvals to
+
     @classmethod
     def load(cls) -> "Config":
         return cls(
@@ -99,7 +104,14 @@ class Config:
             min_slope_ms_per_s=_f("CHRONOLENS_MIN_SLOPE", 3.0),
             min_samples=int(_f("CHRONOLENS_MIN_SAMPLES", 4)),
             notify_webhook_url=os.getenv("CHRONOLENS_WEBHOOK_URL", ""),
+            slack_bot_token=os.getenv("SLACK_BOT_TOKEN", ""),
+            slack_app_token=os.getenv("SLACK_APP_TOKEN", ""),
+            slack_channel=os.getenv("SLACK_CHANNEL", "#chronolens"),
         )
+
+    def slack_enabled(self) -> bool:
+        """Slack approve-to-act is live only when both tokens are present."""
+        return bool(self.slack_bot_token and self.slack_app_token)
 
     def require_signoz(self) -> None:
         """Fail fast with a clear message if SigNoz creds are missing."""

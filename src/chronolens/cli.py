@@ -113,19 +113,39 @@ def cmd_config(_: list[str]) -> int:
     print(f"  cost model       : ${cfg.cost_per_unit_hr}/unit/hr")
     print(f"  llm provider     : {cfg.llm_provider}")
     print(f"  notify webhook   : {'set' if cfg.notify_webhook_url else 'not set'}")
+    print(f"  slack approve    : {'enabled (' + cfg.slack_channel + ')' if cfg.slack_enabled() else 'not configured'}")
+    return 0
+
+
+def cmd_slack(args: list[str]) -> int:
+    """Slack approve-to-act. 'test' posts a test message; otherwise runs the listener."""
+    cfg = Config.load()
+    if args and args[0].lower() == "test":
+        from .slack_bot import post_text
+        res = post_text(cfg, ":white_check_mark: ChronoLens Slack integration is live.")
+        print("sent" if res.ok else f"failed: {res.reason}")
+        return 0 if res.ok else 1
+    from .slack_bot import run_listener
+    try:
+        run_listener(cfg)
+    except KeyboardInterrupt:
+        print("\nlistener stopped.")
+    except RuntimeError as exc:
+        print(str(exc))
+        return 1
     return 0
 
 
 def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m chronolens.cli "
-              "<services|foresee|respond [off]|ab|cooldown|prevented|config>")
+              "<services|foresee|respond [off]|ab|cooldown|prevented|config|slack [test]>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     dispatch = {
         "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
         "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
-        "config": cmd_config,
+        "config": cmd_config, "slack": cmd_slack,
     }
     fn = dispatch.get(cmd)
     if fn is None:
