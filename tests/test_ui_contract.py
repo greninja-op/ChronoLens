@@ -81,10 +81,12 @@ def test_dashboard_has_no_references_to_removed_features():
 
 @pytest.mark.parametrize("needle,why", [
     ("chronolens-logo.png", "the real logo asset must be used in the header"),
-    ("--black:#000000", "canvas must be pure black"),
+    ("--bg:#EEF1F5", "light theme: soft grey canvas token must be present"),
+    ("--card:#FFFFFF", "light theme: white card surface token must be present"),
     ("logarithmic", "chart must use a log y-axis so ms and seconds both read"),
     ("scrollbar-gutter", "scrollbars must sit in their own gutter, not over content"),
     ("traffic-ramp", "the inject button must send a fault mode the store understands"),
+    ("data_source", "Agent Watch must surface whether detection came from SigNoz"),
 ])
 def test_dashboard_design_invariants(needle, why):
     assert needle in _read(INDEX), why

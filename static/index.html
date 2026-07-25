@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,141 +8,182 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="/static/vendor/tailwind.js"></script>
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/annotation.js"></script>
 <style>
-  /* ═══ tokens ═══ pure black canvas, neutral greys (no blue cast), one accent */
+  /* ═══ ChronoLens light theme ═══ soft canvas, white cards, navy→blue→sky scale ═══ */
   :root{
-    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
-    --black:#000000; --rule:#1A1A1C; --rule-soft:#121214;
-    --text:#F2F3F5; --text-2:#8E9099; --text-3:#5C5F68;
-    --accent:#4CD7F6; --ok:#3DDC97; --warn:#F5A524; --bad:#FF5C6C; --proj:#FFC01E;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+
+    --bg:#EEF1F5;            /* page canvas */
+    --card:#FFFFFF;
+    --line:#E3E8EF;
+    --line-soft:#EDF1F6;
+
+    --ink:#16233D;           /* primary text — deep navy, not black */
+    --ink-2:#5E6E85;
+    --ink-3:#94A1B2;
+
+    --navy:#1B2A4A;          /* solid chip / strongest accent */
+    --blue:#2E7CD6;          /* primary accent */
+    --sky:#7FB6DD;
+    --pale:#E4EFF9;          /* area fill / soft chip bg */
+
+    --ok:#12996B; --ok-bg:#E4F5EE;
+    --warn:#C4790C; --warn-bg:#FBF0DD;
+    --bad:#D6394A; --bad-bg:#FCE8EA;
+    --proj:#D98A15;          /* projected series */
+
+    --r-lg:18px; --r-md:12px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(22,35,61,.04), 0 6px 20px rgba(22,35,61,.06);
+    --shadow-chip:0 4px 14px rgba(27,42,74,.18);
   }
   *{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; box-sizing:border-box; }
-  html,body{ background:var(--black); }
-  body{ color:var(--text); font-family:'Inter',sans-serif; letter-spacing:-0.011em; margin:0; }
+  html,body{ background:var(--bg); }
+  body{ margin:0; color:var(--ink); font-family:'Inter',sans-serif; letter-spacing:-0.011em; }
 
   /* ═══ type ═══ */
-  .eyebrow{ font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-3); }
-  .h-sec{ font-size:17px; font-weight:600; letter-spacing:-0.02em; margin:0; }
-  .sub{ font-size:12.5px; line-height:1.5; color:var(--text-2); margin:var(--s1) 0 0; }
+  .label{ font-size:11px; font-weight:600; letter-spacing:0.02em; color:var(--ink-3); }
+  .h-card{ font-size:15.5px; font-weight:650; letter-spacing:-0.015em; margin:0; }
+  .sub{ font-size:12.5px; line-height:1.5; color:var(--ink-2); margin:var(--s1) 0 0; }
   .mono{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  .val{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums;
+        font-size:27px; font-weight:600; letter-spacing:-0.03em; line-height:1.05; }
+  .unit{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-3); margin-left:3px; }
 
-  /* ═══ layout: open sections divided by hairlines — no floating boxes ═══ */
-  .wrap{ max-width:1320px; margin:0 auto; padding:0 var(--s6); }
-  .sec{ border-top:1px solid var(--rule); padding:var(--s7) 0; }
-  .sec:first-of-type{ border-top:0; }
-  .sec-hd{ display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s5); margin-bottom:var(--s6); }
+  /* ═══ layout ═══ */
+  .wrap{ max-width:1340px; margin:0 auto; padding:0 var(--s6); }
+  .grid{ display:grid; gap:var(--s5); }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
+         box-shadow:var(--shadow); padding:var(--s5); }
+  .card-hd{ display:flex; align-items:flex-start; justify-content:space-between;
+            gap:var(--s4); margin-bottom:var(--s5); }
 
-  /* metric strip: values divided by vertical hairlines, sitting on the canvas */
-  .strip{ display:grid; gap:0; border-left:1px solid var(--rule-soft); }
-  .strip > div{ padding:0 var(--s5); border-right:1px solid var(--rule-soft); }
-  .m-val{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums;
-          font-size:30px; font-weight:500; letter-spacing:-0.03em; line-height:1.05; }
-  .m-unit{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); margin-left:3px; }
-  .m-note{ font-size:11.5px; color:var(--text-3); margin-top:var(--s2); line-height:1.4; }
+  /* KPI: two solid chips lead, two light cards follow (reference language) */
+  .chip{ border-radius:var(--r-lg); padding:var(--s5); color:#fff; box-shadow:var(--shadow-chip); }
+  .chip-navy{ background:linear-gradient(160deg,#22355C,#16233D); }
+  .chip-blue{ background:linear-gradient(160deg,#3C8BE0,#2569B4); }
+  .chip .label{ color:rgba(255,255,255,.72); }
+  .chip .unit{ color:rgba(255,255,255,.6); }
+  .ico{ width:34px; height:34px; border-radius:11px; display:grid; place-items:center;
+        background:rgba(255,255,255,.16); font-size:15px; }
+  .ico-pale{ background:var(--pale); color:var(--blue); }
 
   /* ═══ controls ═══ */
-  .btn{ display:inline-flex; align-items:center; gap:var(--s2); height:34px; padding:0 var(--s4);
-        border-radius:6px; border:1px solid var(--rule); background:transparent; color:var(--text);
+  .btn{ display:inline-flex; align-items:center; gap:var(--s2); height:36px; padding:0 var(--s4);
+        border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink);
         font-family:inherit; font-size:12.5px; font-weight:550; cursor:pointer;
-        transition:background .14s ease, border-color .14s ease; }
-  .btn:hover:not(:disabled){ background:#0C0C0E; border-color:#2A2A2E; }
-  .btn:disabled{ opacity:.4; cursor:not-allowed; }
-  .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#031F27; font-weight:650; }
-  .btn-primary:hover:not(:disabled){ background:#6FE0FA; border-color:#6FE0FA; }
-  .btn-xs{ height:26px; padding:0 var(--s3); font-size:11px; }
+        transition:background .14s ease, border-color .14s ease, box-shadow .14s ease; }
+  .btn:hover:not(:disabled){ background:#F6F9FC; border-color:#CFD9E5; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+  .btn-primary{ background:var(--navy); border-color:var(--navy); color:#fff; font-weight:600;
+                box-shadow:var(--shadow-chip); }
+  .btn-primary:hover:not(:disabled){ background:#25395F; border-color:#25395F; }
+  .btn-xs{ height:28px; padding:0 var(--s3); font-size:11.5px; }
 
   .tag{ display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace;
-        font-size:10.5px; padding:2px var(--s2); border-radius:4px; color:var(--text-2);
-        border:1px solid var(--rule); }
-  .tag-ok{ color:var(--ok); border-color:rgba(61,220,151,.3); }
-  .tag-warn{ color:var(--warn); border-color:rgba(245,165,36,.3); }
-  .tag-bad{ color:var(--bad); border-color:rgba(255,92,108,.3); }
+        font-size:10.5px; font-weight:500; padding:3px var(--s2); border-radius:999px;
+        background:#F1F5F9; color:var(--ink-2); border:1px solid var(--line); }
+  .tag-ok{ background:var(--ok-bg); color:var(--ok); border-color:#C6E9D9; }
+  .tag-warn{ background:var(--warn-bg); color:var(--warn); border-color:#F0DDB8; }
+  .tag-bad{ background:var(--bad-bg); color:var(--bad); border-color:#F5CDD2; }
   .dot{ width:5px; height:5px; border-radius:50%; }
 
-  /* ═══ lists: hairline rows, scrollbar in its own gutter (never overlaps) ═══ */
-  .scroll{ overflow-y:auto; scrollbar-gutter:stable; padding-right:var(--s4); }
+  /* ═══ rows / lists ═══ */
+  .scroll{ overflow-y:auto; scrollbar-gutter:stable; padding-right:var(--s3); }
   .lrow{ display:flex; align-items:center; justify-content:space-between; gap:var(--s4);
-         padding:var(--s3) 0; border-bottom:1px solid var(--rule-soft); }
+         padding:var(--s3) 0; border-bottom:1px solid var(--line-soft); }
   .lrow:last-child{ border-bottom:0; }
-  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar{ width:9px; }
   ::-webkit-scrollbar-track{ background:transparent; }
-  ::-webkit-scrollbar-thumb{ background:#26262A; border-radius:4px;
-                             border:2px solid var(--black); background-clip:padding-box; }
-  ::-webkit-scrollbar-thumb:hover{ background:#3A3A40; }
+  ::-webkit-scrollbar-thumb{ background:#CBD5E1; border-radius:5px;
+                             border:2px solid var(--card); background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover{ background:#AFBDCD; }
 
-  .split{ display:grid; grid-template-columns:1fr 1px 1fr; gap:var(--s7); align-items:start; }
-  .vrule{ background:var(--rule); align-self:stretch; }
-  @media (max-width:960px){ .split{ grid-template-columns:1fr; gap:var(--s6); } .vrule{ display:none; } }
+  .stat{ padding:0 var(--s4); border-left:1px solid var(--line-soft); }
+  .stat:first-child{ border-left:0; padding-left:0; }
 
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  .spinner{ width:11px; height:11px; border:2px solid rgba(255,255,255,.14);
-            border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+  .spinner{ width:11px; height:11px; border:2px solid rgba(22,35,61,.15);
+            border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; }
   @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
 
 <!-- ═══ HEADER ═══ -->
-<header style="border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:20; background:rgba(0,0,0,.94); backdrop-filter:blur(10px);">
+<header style="background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20;">
   <div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:var(--s5); padding-top:var(--s4); padding-bottom:var(--s4);">
     <div style="display:flex; align-items:center; gap:var(--s3);">
       <img src="/static/assets/chronolens-logo.png" alt="ChronoLens"
-           style="width:30px; height:30px; border-radius:7px; object-fit:cover; display:block;">
+           style="width:34px; height:34px; border-radius:11px; object-fit:cover; display:block; box-shadow:var(--shadow);">
       <div>
-        <div style="font-size:14.5px; font-weight:650; letter-spacing:-0.015em; line-height:1.2;">ChronoLens</div>
-        <div class="eyebrow" style="margin-top:2px;">Predictive SRE · SigNoz closed loop</div>
+        <div style="font-size:15px; font-weight:680; letter-spacing:-0.02em; line-height:1.2;">ChronoLens</div>
+        <div class="label" style="margin-top:2px;">Predictive SRE · SigNoz closed loop</div>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap;">
-      <span id="t-signoz" class="tag"><span class="dot" style="background:var(--text-3)"></span>SigNoz</span>
+      <span id="t-signoz" class="tag"><span class="dot" style="background:var(--ink-3)"></span>SigNoz</span>
       <span id="t-mode" class="tag">MODE —</span>
       <span id="t-slo" class="tag">SLO —</span>
     </div>
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap" style="padding-top:var(--s6); padding-bottom:var(--s7);">
 
-  <!-- ═══ KPI STRIP ═══ -->
-  <section class="sec" style="padding-top:var(--s6);">
-    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));">
-      <div>
-        <div class="eyebrow">Breach avoided</div>
-        <div style="margin-top:var(--s3);"><span class="m-val" id="k-breach" style="color:var(--ok)">—</span><span class="m-unit">s</span></div>
-        <div class="m-note">measured vs projected in SigNoz</div>
+  <!-- ═══ KPI ROW ═══ -->
+  <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(212px,1fr));">
+    <div class="chip chip-navy">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span class="label">Breach avoided</span><span class="ico">✓</span>
       </div>
-      <div>
-        <div class="eyebrow">Incidents prevented</div>
-        <div style="margin-top:var(--s3);"><span class="m-val" id="k-prev">—</span><span class="m-unit" id="k-total"></span></div>
-        <div class="m-note">verified receipts in the ledger</div>
+      <div style="margin-top:var(--s4);"><span class="val" id="k-breach">—</span><span class="unit">s</span></div>
+      <div class="label" style="margin-top:var(--s2);">measured vs projected in SigNoz</div>
+    </div>
+    <div class="chip chip-blue">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span class="label">Incidents prevented</span><span class="ico">⛨</span>
       </div>
-      <div>
-        <div class="eyebrow">Live p99</div>
-        <div style="margin-top:var(--s3);"><span class="m-val" id="k-p99">—</span><span class="m-unit">ms</span></div>
-        <div class="m-note" id="k-svc">worst service</div>
+      <div style="margin-top:var(--s4);"><span class="val" id="k-prev">—</span><span class="unit" id="k-total"></span></div>
+      <div class="label" style="margin-top:var(--s2);">verified receipts in the ledger</div>
+    </div>
+    <div class="card" style="padding:var(--s5);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span class="label">Live p99</span><span class="ico ico-pale">◴</span>
       </div>
-      <div>
-        <div class="eyebrow">Capacity returned</div>
-        <div style="margin-top:var(--s3);"><span class="m-unit" style="margin:0 2px 0 0; font-size:16px;">$</span><span class="m-val" id="k-usd">—</span></div>
-        <div class="m-note">given back on cooldown</div>
+      <div style="margin-top:var(--s4);"><span class="val" id="k-p99">—</span><span class="unit">ms</span></div>
+      <div class="label" id="k-svc" style="margin-top:var(--s2);">worst service</div>
+    </div>
+    <div class="card" style="padding:var(--s5);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span class="label">Capacity returned</span><span class="ico ico-pale">$</span>
       </div>
+      <div style="margin-top:var(--s4);"><span class="unit" style="margin:0 2px 0 0; font-size:15px;">$</span><span class="val" id="k-usd">—</span></div>
+      <div class="label" style="margin-top:var(--s2);">given back on cooldown</div>
     </div>
   </section>
 
+  <!-- ═══ CONTROLS ═══ -->
+  <section style="display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; margin-top:var(--s5);">
+    <span class="label" style="margin-right:var(--s1);">Demo</span>
+    <button class="btn" id="b-inject">Inject rising load</button>
+    <button class="btn btn-primary" id="b-run">Run ChronoLens</button>
+    <button class="btn" id="b-ab">Run baseline (no fix)</button>
+    <button class="btn" id="b-cool">Release capacity</button>
+    <button class="btn" id="b-reset">Reset</button>
+  </section>
+
   <!-- ═══ CHRONO-PROOF ═══ -->
-  <section class="sec">
-    <div class="sec-hd">
+  <section class="card" style="margin-top:var(--s5);">
+    <div class="card-hd">
       <div>
-        <div class="eyebrow">Evidence</div>
-        <h2 class="h-sec" style="margin-top:6px;">Chrono-Proof — the outage that never happened</h2>
+        <h2 class="h-card">Chrono-Proof — the outage that never happened</h2>
         <p class="sub">
-          <span style="color:var(--accent)">Measured</span> is SigNoz telemetry.
-          <span style="color:var(--proj)">Projected</span> extrapolates the pre-action trend — a labelled estimate.
-          Log scale.
+          <span style="color:var(--blue); font-weight:600">Measured</span> is SigNoz telemetry.
+          <span style="color:var(--proj); font-weight:600">Projected</span> extrapolates the pre-action
+          trend — a labelled estimate. Log scale.
         </p>
       </div>
       <div style="display:flex; align-items:center; gap:var(--s2); flex-shrink:0;">
@@ -151,78 +192,52 @@
       </div>
     </div>
 
-    <div style="height:240px; margin:0 0 var(--s5);"><canvas id="chart"></canvas></div>
+    <div style="height:250px;"><canvas id="chart"></canvas></div>
 
-    <!-- inline stat strip: no boxes, hairline dividers -->
-    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); border-top:1px solid var(--rule-soft); padding-top:var(--s4);">
-      <div>
-        <div class="eyebrow">Measured peak</div>
-        <div class="mono" id="pf-mpeak" style="font-size:19px; margin-top:6px; color:var(--accent)">—</div>
-      </div>
-      <div>
-        <div class="eyebrow">Projected peak</div>
-        <div class="mono" id="pf-ppeak" style="font-size:19px; margin-top:6px; color:var(--proj)">—</div>
-      </div>
-      <div>
-        <div class="eyebrow">Breach avoided</div>
-        <div class="mono" id="pf-avoid" style="font-size:19px; margin-top:6px; color:var(--ok)">—</div>
-      </div>
-      <div>
-        <div class="eyebrow">Peak shaved</div>
-        <div class="mono" id="pf-shaved" style="font-size:19px; margin-top:6px;">—</div>
-      </div>
-      <div>
-        <div class="eyebrow">Confidence</div>
-        <div class="mono" id="pf-conf" style="font-size:19px; margin-top:6px;">—</div>
-      </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:0;
+         margin-top:var(--s5); padding-top:var(--s4); border-top:1px solid var(--line-soft);">
+      <div class="stat"><div class="label">Measured peak</div>
+        <div class="mono" id="pf-mpeak" style="font-size:18px; font-weight:600; margin-top:6px; color:var(--blue)">—</div></div>
+      <div class="stat"><div class="label">Projected peak</div>
+        <div class="mono" id="pf-ppeak" style="font-size:18px; font-weight:600; margin-top:6px; color:var(--proj)">—</div></div>
+      <div class="stat"><div class="label">Breach avoided</div>
+        <div class="mono" id="pf-avoid" style="font-size:18px; font-weight:600; margin-top:6px; color:var(--ok)">—</div></div>
+      <div class="stat"><div class="label">Peak shaved</div>
+        <div class="mono" id="pf-shaved" style="font-size:18px; font-weight:600; margin-top:6px;">—</div></div>
+      <div class="stat"><div class="label">Confidence</div>
+        <div class="mono" id="pf-conf" style="font-size:18px; font-weight:600; margin-top:6px;">—</div></div>
     </div>
-    <p class="sub" id="pf-note" style="margin-top:var(--s5); max-width:80ch;">Run the loop, then refresh to build a proof from SigNoz.</p>
-  </section>
-
-  <!-- ═══ CONTROLS ═══ -->
-  <section class="sec" style="padding:var(--s5) 0;">
-    <div style="display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap;">
-      <span class="eyebrow" style="margin-right:var(--s2);">Demo</span>
-      <button class="btn" id="b-inject">Inject rising load</button>
-      <button class="btn btn-primary" id="b-run">Run ChronoLens</button>
-      <button class="btn" id="b-ab">Run baseline (no fix)</button>
-      <button class="btn" id="b-cool">Release capacity</button>
-      <button class="btn" id="b-reset">Reset</button>
-    </div>
+    <p class="sub" id="pf-note" style="margin-top:var(--s4); max-width:88ch;">Run the loop, then refresh to build a proof from SigNoz.</p>
   </section>
 
   <!-- ═══ LOOP + BLAST ═══ -->
-  <section class="sec">
-    <div class="split">
-      <div>
-        <div class="sec-hd" style="margin-bottom:var(--s5);">
-          <div><div class="eyebrow">Live</div><h2 class="h-sec" style="margin-top:6px;">Closed loop</h2></div>
-          <span id="loop-state" class="tag">idle</span>
-        </div>
-        <div id="loop-stages" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:var(--s5);"></div>
-        <div id="loop-log" class="scroll" style="max-height:280px; display:flex; flex-direction:column; gap:var(--s3);">
-          <p class="sub">Run the loop to stream stages live from SigNoz.</p>
-        </div>
+  <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); margin-top:var(--s5);">
+    <div class="card">
+      <div class="card-hd">
+        <div><h2 class="h-card">Closed loop</h2><p class="sub">live stage stream</p></div>
+        <span id="loop-state" class="tag">idle</span>
       </div>
-      <div class="vrule"></div>
-      <div>
-        <div class="sec-hd" style="margin-bottom:var(--s5);">
-          <div><div class="eyebrow">Forecast</div><h2 class="h-sec" style="margin-top:6px;">Blast radius</h2></div>
-          <button class="btn btn-xs" id="b-blast">Forecast</button>
-        </div>
-        <p class="sub" id="blast-root" style="margin-bottom:var(--s4);">Forecast to read SigNoz's dependency map.</p>
-        <div id="blast-body" class="scroll" style="max-height:280px;"></div>
+      <div id="loop-stages" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:var(--s4);"></div>
+      <div id="loop-log" class="scroll" style="max-height:290px; display:flex; flex-direction:column; gap:var(--s3);">
+        <p class="sub">Run the loop to stream stages live from SigNoz.</p>
       </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <div><h2 class="h-card">Blast radius</h2><p class="sub">who falls next, and when</p></div>
+        <button class="btn btn-xs" id="b-blast">Forecast</button>
+      </div>
+      <p class="sub" id="blast-root" style="margin-bottom:var(--s3);">Forecast to read SigNoz's dependency map.</p>
+      <div id="blast-body" class="scroll" style="max-height:290px;"></div>
     </div>
   </section>
 
   <!-- ═══ AGENT WATCH ═══ -->
-  <section class="sec">
-    <div class="sec-hd">
+  <section class="card" style="margin-top:var(--s5);">
+    <div class="card-hd">
       <div>
-        <div class="eyebrow">Track 01</div>
-        <h2 class="h-sec" style="margin-top:6px;">Agent Watch</h2>
-        <p class="sub">behaviour drift · loop &amp; cost breaker · answer quality</p>
+        <h2 class="h-card">Agent Watch</h2>
+        <p class="sub">behaviour drift · loop &amp; cost breaker · answer quality — read from SigNoz GenAI spans</p>
       </div>
       <div style="display:flex; align-items:center; gap:var(--s2); flex-shrink:0;">
         <span id="a-mode" class="tag">—</span>
@@ -231,53 +246,44 @@
         <button class="btn btn-xs" onclick="agentMode('loop')">loop</button>
       </div>
     </div>
-    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));">
-      <div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0;">
+      <div class="stat">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
-          <div class="eyebrow">Behaviour drift</div><button class="btn btn-xs" id="b-drift">Check</button>
+          <span class="label">Behaviour drift</span><button class="btn btn-xs" id="b-drift">Check</button>
         </div>
         <div id="d-drift" class="sub" style="margin-top:var(--s3);">Capture a baseline in normal mode, then check.</div>
       </div>
-      <div>
+      <div class="stat">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
-          <div class="eyebrow">Loop / cost breaker</div><button class="btn btn-xs" id="b-loop">Check</button>
+          <span class="label">Loop / cost breaker</span><button class="btn btn-xs" id="b-loop">Check</button>
         </div>
         <div id="d-loop" class="sub" style="margin-top:var(--s3);">Flip the agent to loop mode, then check.</div>
       </div>
-      <div>
+      <div class="stat">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
-          <div class="eyebrow">Answer quality</div><button class="btn btn-xs" id="b-qual">Grade</button>
+          <span class="label">Answer quality</span><button class="btn btn-xs" id="b-qual">Grade</button>
         </div>
         <div id="d-qual" class="sub" style="margin-top:var(--s3);">Grade recent answers.</div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ LEDGER + SIGNOZ SURFACE ═══ -->
-  <section class="sec" style="padding-bottom:var(--s8);">
-    <div class="split">
-      <div>
-        <div class="sec-hd" style="margin-bottom:var(--s5);">
-          <div><div class="eyebrow">Receipts</div><h2 class="h-sec" style="margin-top:6px;">Prevention ledger</h2></div>
-        </div>
-        <div id="ledger" class="scroll" style="max-height:300px;">
-          <p class="sub">No incidents filed yet.</p>
-        </div>
-      </div>
-      <div class="vrule"></div>
-      <div>
-        <div class="sec-hd" style="margin-bottom:var(--s5);">
-          <div><div class="eyebrow">Depth</div><h2 class="h-sec" style="margin-top:6px;">SigNoz surface used</h2></div>
-        </div>
-        <div class="lrow"><span class="sub" style="margin:0">Guard alerts written</span><span class="mono" id="s-guard" style="font-size:14px">—</span></div>
-        <div class="lrow"><span class="sub" style="margin:0">Currently firing</span><span class="mono" id="s-fire" style="font-size:14px">—</span></div>
-        <div class="lrow"><span class="sub" style="margin:0">Notification channels</span><span class="mono" id="s-chan" style="font-size:14px">—</span></div>
-        <div class="lrow"><span class="sub" style="margin:0">Webhook events received</span><span class="mono" id="s-inbox" style="font-size:14px">—</span></div>
-        <p class="sub" style="margin-top:var(--s4); font-size:11.5px; color:var(--text-3);">
-          Reads: Query Builder v5 traces, logs, metrics read-back, service map, exemplar traces.
-          Writes: threshold alerts, dashboards, saved views, silences, notification channels.
-        </p>
-      </div>
+  <!-- ═══ LEDGER + SIGNOZ ═══ -->
+  <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); margin-top:var(--s5);">
+    <div class="card">
+      <div class="card-hd"><div><h2 class="h-card">Prevention ledger</h2><p class="sub">receipts, newest first</p></div></div>
+      <div id="ledger" class="scroll" style="max-height:300px;"><p class="sub">No incidents filed yet.</p></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div><h2 class="h-card">SigNoz surface used</h2><p class="sub">reads and writes, live</p></div></div>
+      <div class="lrow"><span class="sub" style="margin:0">Guard alerts written</span><span class="mono" id="s-guard" style="font-size:14px;font-weight:600">—</span></div>
+      <div class="lrow"><span class="sub" style="margin:0">Currently firing</span><span class="mono" id="s-fire" style="font-size:14px;font-weight:600">—</span></div>
+      <div class="lrow"><span class="sub" style="margin:0">Notification channels</span><span class="mono" id="s-chan" style="font-size:14px;font-weight:600">—</span></div>
+      <div class="lrow"><span class="sub" style="margin:0">Webhook events received</span><span class="mono" id="s-inbox" style="font-size:14px;font-weight:600">—</span></div>
+      <p class="sub" style="margin-top:var(--s4); font-size:11.5px; color:var(--ink-3);">
+        Reads: Query Builder v5 traces, logs, metrics read-back, service dependency map, exemplar traces.
+        Writes: threshold alerts, dashboards, saved views, silences, notification channels.
+      </p>
     </div>
   </section>
 </main>
@@ -287,36 +293,35 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num = (v,d=0) => (v==null||isNaN(v)) ? '—' : Number(v).toFixed(d);
 
-/* ── chart: log scale so a 45ms measurement and a 13000ms projection both read ── */
+/* ── chart: log scale so 45ms and 13000ms both read on one axis ── */
 let chart;
 function initChart(){
   const ctx = $('chart').getContext('2d');
-  const g = ctx.createLinearGradient(0,0,0,240);
-  g.addColorStop(0,'rgba(76,215,246,.16)'); g.addColorStop(1,'rgba(76,215,246,0)');
+  const g = ctx.createLinearGradient(0,0,0,250);
+  g.addColorStop(0,'rgba(46,124,214,.26)'); g.addColorStop(1,'rgba(46,124,214,.02)');
   chart = new Chart(ctx,{ type:'line',
     data:{ labels:[], datasets:[
-      { label:'Measured', data:[], borderColor:'#4CD7F6', backgroundColor:g,
-        borderWidth:2, fill:true, tension:.3, pointRadius:0, pointHoverRadius:3, spanGaps:true },
-      { label:'Projected', data:[], borderColor:'#FFC01E', borderWidth:1.75,
-        borderDash:[5,4], fill:false, tension:.3, pointRadius:0, pointHoverRadius:3, spanGaps:true }
+      { label:'Measured', data:[], borderColor:'#2E7CD6', backgroundColor:g, borderWidth:2.2,
+        fill:true, tension:.32, pointRadius:0, pointHoverRadius:4, spanGaps:true },
+      { label:'Projected', data:[], borderColor:'#D98A15', borderWidth:1.8, borderDash:[5,4],
+        fill:false, tension:.32, pointRadius:0, pointHoverRadius:4, spanGaps:true }
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
-      layout:{ padding:{ top:4, right:8, bottom:0, left:0 } },
+      layout:{ padding:{ top:6, right:10 } },
       interaction:{ mode:'index', intersect:false },
-      plugins:{
-        legend:{ display:false },
-        tooltip:{ backgroundColor:'#08080A', borderColor:'#1A1A1C', borderWidth:1,
-          titleColor:'#F2F3F5', bodyColor:'#8E9099', padding:9, cornerRadius:6,
+      plugins:{ legend:{ display:false },
+        tooltip:{ backgroundColor:'#16233D', borderColor:'#16233D', borderWidth:0,
+          titleColor:'#fff', bodyColor:'rgba(255,255,255,.82)', padding:10, cornerRadius:9,
+          displayColors:true, boxWidth:8, boxHeight:8,
           titleFont:{size:11,family:'JetBrains Mono'}, bodyFont:{size:11,family:'JetBrains Mono'},
-          callbacks:{ label:c=> ' '+c.dataset.label+': '+(c.parsed.y==null?'—':Math.round(c.parsed.y)+' ms') } }
-      },
+          callbacks:{ label:c=>' '+c.dataset.label+': '+(c.parsed.y==null?'—':Math.round(c.parsed.y)+' ms') } } },
       scales:{
-        x:{ grid:{ display:false }, border:{ color:'#1A1A1C' },
-            ticks:{ color:'#5C5F68', font:{size:10,family:'JetBrains Mono'}, maxTicksLimit:8, padding:6 } },
-        y:{ type:'logarithmic', grid:{ color:'#101012', drawTicks:false }, border:{ display:false },
-            ticks:{ color:'#5C5F68', font:{size:10,family:'JetBrains Mono'}, padding:8,
-                    callback:v=>{ const a=[10,50,100,500,1000,5000,10000];
-                                  return a.includes(v)? (v>=1000? (v/1000)+'k' : v)+'ms' : ''; } } }
+        x:{ grid:{ display:false }, border:{ color:'#E3E8EF' },
+            ticks:{ color:'#94A1B2', font:{size:10,family:'JetBrains Mono'}, maxTicksLimit:8, padding:6 } },
+        y:{ type:'logarithmic', grid:{ color:'#F0F4F8', drawTicks:false }, border:{ display:false },
+            ticks:{ color:'#94A1B2', font:{size:10,family:'JetBrains Mono'}, padding:8,
+              callback:v=>{ const a=[10,50,100,500,1000,5000,10000];
+                            return a.includes(v)? (v>=1000?(v/1000)+'k':v)+'ms' : ''; } } }
       }
     }
   });
@@ -334,9 +339,9 @@ async function loadProof(){
     chart.data.datasets[0].data = p.points.map(pt=>pt.measured_ms);
     chart.data.datasets[1].data = p.points.map(pt=>pt.projected_ms);
     chart.options.plugins.annotation = { annotations:{ slo:{ type:'line', yMin:p.slo_ms, yMax:p.slo_ms,
-      borderColor:'rgba(255,92,108,.55)', borderWidth:1, borderDash:[4,4],
-      label:{ display:true, content:'SLO '+p.slo_ms+'ms', position:'start', color:'#FF5C6C',
-        backgroundColor:'rgba(0,0,0,.8)', font:{size:9.5,family:'JetBrains Mono'}, padding:3 } } } };
+      borderColor:'rgba(214,57,74,.6)', borderWidth:1.4, borderDash:[5,4],
+      label:{ display:true, content:'SLO '+p.slo_ms+'ms', position:'start', color:'#fff',
+        backgroundColor:'#D6394A', font:{size:9.5,family:'JetBrains Mono'}, padding:4, borderRadius:5 } } } };
     chart.update();
     $('pf-mpeak').textContent = num(p.measured_peak_ms)+' ms';
     $('pf-ppeak').textContent = num(p.projected_peak_ms)+' ±'+num(p.projection_band_ms);
@@ -354,14 +359,14 @@ async function loadBlast(){
   try{
     const b = await (await fetch('/api/blast')).json();
     if(!b.ok){ $('blast-root').textContent=(b.notes&&b.notes[0])||b.error||'unavailable'; $('blast-body').innerHTML=''; return; }
-    $('blast-root').innerHTML='Root cause <span class="mono" style="color:var(--bad)">'+esc(b.root_service)+'</span>'
-      +(b.root_span?' · hop <span class="mono" style="color:var(--text-2)">'+esc(b.root_span)+'</span>':'')
+    $('blast-root').innerHTML='Root cause <span class="mono" style="color:var(--bad); font-weight:600">'+esc(b.root_service)+'</span>'
+      +(b.root_span?' · hop <span class="mono">'+esc(b.root_span)+'</span>':'')
       +' <span class="tag" style="margin-left:6px">'+esc(b.topology_source)+'</span>';
     $('blast-body').innerHTML = b.victims.map(v=>{
       const eta = v.breaching_now?'NOW':(v.seconds_to_breach!=null?num(v.seconds_to_breach)+'s':'—');
       const cls = v.breaching_now?'tag-bad':(v.seconds_to_breach!=null?'tag-warn':'');
       return `<div class="lrow"><div style="min-width:0">
-        <div class="mono" style="font-size:12.5px">${esc(v.service)}${v.is_root?' <span style="color:var(--bad)">root</span>':''}</div>
+        <div class="mono" style="font-size:12.5px; font-weight:600">${esc(v.service)}${v.is_root?' <span style="color:var(--bad)">root</span>':''}</div>
         <div class="sub" style="font-size:11px;margin-top:2px">p99 ${num(v.current_p99_ms)}ms · own ${v.slope_ms_per_s>=0?'+':''}${num(v.slope_ms_per_s,1)} · inherited +${num(v.inherited_ms_per_s,1)} ms/s</div>
         </div><span class="tag ${cls}">${eta}</span></div>`;
     }).join('');
@@ -371,8 +376,8 @@ async function loadBlast(){
 /* ── live loop ── */
 const STAGES=['LEARN','FORESEE','CLASSIFY','CASCADE','GOVERN','PREVENT','VERIFY','COOLDOWN','RECORD'];
 const renderStages = seen => $('loop-stages').innerHTML =
-  STAGES.map(s=>`<span class="tag ${seen.includes(s)?'tag-ok':''}" style="font-size:9px">${s}</span>`).join('');
-const SC={done:'var(--ok)',ok:'var(--ok)',warn:'var(--warn)',danger:'var(--bad)',pending:'var(--warn)',info:'var(--accent)'};
+  STAGES.map(s=>`<span class="tag ${seen.includes(s)?'tag-ok':''}" style="font-size:9.5px">${s}</span>`).join('');
+const SC={done:'var(--ok)',ok:'var(--ok)',warn:'var(--warn)',danger:'var(--bad)',pending:'var(--warn)',info:'var(--blue)'};
 function runLoop(managed){
   setButtons(false);
   $('loop-state').innerHTML='<span class="spinner"></span>running'; $('loop-state').className='tag tag-warn';
@@ -385,11 +390,11 @@ function runLoop(managed){
       $('loop-state').className='tag '+(ev.outcome==='breach avoided'?'tag-ok':'');
       loadAll(); loadProof(); return; }
     if(ev.step && !seen.includes(ev.step)){ seen.push(ev.step); renderStages(seen); }
-    const col=SC[ev.status]||'var(--text-2)';
+    const col=SC[ev.status]||'var(--ink-2)';
     const el=document.createElement('div');
-    el.style.cssText='display:flex;gap:var(--s3);padding-left:var(--s3);border-left:2px solid '+col+';';
-    el.innerHTML=`<span class="eyebrow" style="min-width:70px;color:${col};padding-top:2px">${esc(ev.step||'')}</span>
-                  <span class="sub" style="margin:0;color:var(--text)">${esc(ev.text||'')}</span>`;
+    el.style.cssText='display:flex;gap:var(--s3);padding-left:var(--s3);border-left:2.5px solid '+col+';';
+    el.innerHTML=`<span class="label" style="min-width:70px;color:${col};font-weight:650">${esc(ev.step||'')}</span>
+                  <span class="sub" style="margin:0;color:var(--ink)">${esc(ev.text||'')}</span>`;
     $('loop-log').appendChild(el); $('loop-log').scrollTop=$('loop-log').scrollHeight;
   };
   es.onerror=()=>{ es.close(); setButtons(true);
@@ -418,7 +423,7 @@ async function loadPrevented(){
     $('ledger').innerHTML = rows.length ? rows.map(c=>{
       const good=c.outcome==='breach avoided';
       return `<div class="lrow"><div style="min-width:0">
-        <div class="mono" style="font-size:12.5px">${esc(c.service)}</div>
+        <div class="mono" style="font-size:12.5px;font-weight:600">${esc(c.service)}</div>
         <div class="sub" style="font-size:11px;margin-top:2px">${esc(c.action||'—')} · p99 ${num(c.p99_at_prediction_ms)}→${num(c.final_p99_ms)}ms</div>
         </div><span class="tag ${good?'tag-ok':''}">${esc(c.outcome)}</span></div>`;
     }).join('') : '<p class="sub">No incidents filed yet.</p>';
@@ -443,22 +448,23 @@ async function agentMode(m){
   try{ const r=await(await fetch('/api/agent/mode?mode='+m,{method:'POST'})).json();
     $('a-mode').textContent=r.mode||m; }catch(e){ $('a-mode').textContent='offline'; }
 }
+function srcTag(src){ return src ? `<span class="tag ${src==='signoz'?'tag-ok':''}" style="font-size:9.5px;margin-left:6px">${esc(src)}</span>` : ''; }
 async function checkDrift(){
   $('d-drift').textContent='sampling…';
   try{ const r=await(await fetch('/api/agent/drift?samples=10')).json();
     if(r.error){ $('d-drift').textContent=r.error; return; }
     const d=r.drift;
-    $('d-drift').innerHTML=`<span class="mono" style="font-size:19px;color:${d.drifted?'var(--warn)':'var(--ok)'}">${Math.round(d.score*100)}%</span>
-      <span class="sub" style="margin:0"> drift</span>
+    $('d-drift').innerHTML=`<span class="mono" style="font-size:20px;font-weight:600;color:${d.drifted?'var(--warn)':'var(--ok)'}">${Math.round(d.score*100)}%</span>
+      <span class="sub" style="margin:0"> drift</span>${srcTag(r.data_source)}
       <div class="sub" style="font-size:11px;margin-top:var(--s2)">${d.changes&&d.changes.length?esc(d.changes.join(' · ')):'matches baseline'}</div>`;
   }catch(e){ $('d-drift').textContent='agent offline'; }
 }
 async function loopCheck(){
-  $('d-loop').textContent='driving one turn…';
+  $('d-loop').textContent='reading spans…';
   try{ const r=await(await fetch('/api/agent/loopcheck')).json();
     if(r.error){ $('d-loop').textContent=r.error; return; }
     const v=r.verdict;
-    $('d-loop').innerHTML=`<span class="mono" style="font-size:15px;color:${v.looping?'var(--bad)':'var(--ok)'}">${v.looping?'LOOP DETECTED':'within limits'}</span>
+    $('d-loop').innerHTML=`<span class="mono" style="font-size:14px;font-weight:600;color:${v.looping?'var(--bad)':'var(--ok)'}">${v.looping?'LOOP DETECTED':'within limits'}</span>${srcTag(r.data_source)}
       <div class="sub" style="font-size:11px;margin-top:var(--s2)">${esc(v.reason)}</div>
       <div class="sub" style="font-size:11px">cost $${v.cost_usd} · saves $${v.saved_usd} if cut at step ${v.break_at_step??'—'}</div>`;
   }catch(e){ $('d-loop').textContent='agent offline'; }
@@ -467,7 +473,7 @@ async function gradeQuality(){
   $('d-qual').textContent='grading…';
   try{ const r=await(await fetch('/api/agent/quality?samples=8')).json();
     if(r.error){ $('d-qual').textContent=r.error; return; }
-    $('d-qual').innerHTML=`<span class="mono" style="font-size:19px">${r.avg_score}</span>
+    $('d-qual').innerHTML=`<span class="mono" style="font-size:20px;font-weight:600">${r.avg_score}</span>
       <div class="sub" style="font-size:11px;margin-top:var(--s2)">${esc(r.verdict||'')}</div>`;
   }catch(e){ $('d-qual').textContent='agent offline'; }
 }
