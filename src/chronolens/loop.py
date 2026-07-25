@@ -434,14 +434,8 @@ def _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
             evidence=evidence,
         )
         ledger.record(case)
-        if getattr(cfg, "stitch_enabled", lambda: False)():
-            try:
-                from .stitch import stream_event_to_stitch
-                stream_event_to_stitch("incident_prevented", case.to_dict(), cfg)
-            except Exception:
-                pass
-
     saved = ""
+
     if case.scaled_down:
         saved = f" · returned {case.cost_units_returned} units"
         if case.dollars_saved:
