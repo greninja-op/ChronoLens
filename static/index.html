@@ -9,284 +9,273 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="/static/vendor/tailwind.js"></script>
-<script src="/static/vendor/lucide.js"></script>
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/annotation.js"></script>
-<script>
-  tailwind.config = { darkMode:'class', theme:{ extend:{
-    colors:{
-      ink:{ 900:'#08090C', 800:'#0E1116', 700:'#141821', 600:'#1B2029', 500:'#232833' },
-      accent:{ DEFAULT:'#4CD7F6', dim:'#1E9BC4' },
-      ok:'#34D399', warn:'#F5A524', bad:'#F4636B', proj:'#FFC01E'
-    },
-    fontFamily:{ sans:['Inter','system-ui','sans-serif'], mono:['JetBrains Mono','ui-monospace','monospace'] }
-  }}}
-</script>
 <style>
-  /* ---- design tokens: 4pt spacing scale, one accent, neutral near-black ---- */
+  /* ═══ tokens ═══ pure black canvas, neutral greys (no blue cast), one accent */
   :root{
-    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
-    --space-5:24px; --space-6:32px; --space-7:48px;
-    --bg:#08090C; --surface:#0E1116; --raised:#141821; --line:#1E232E; --line-soft:#171B23;
-    --text:#E7EAF0; --text-2:#9BA3B4; --text-3:#6B7382;
-    --accent:#4CD7F6; --ok:#34D399; --warn:#F5A524; --bad:#F4636B; --proj:#FFC01E;
-    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
+    --black:#000000; --rule:#1A1A1C; --rule-soft:#121214;
+    --text:#F2F3F5; --text-2:#8E9099; --text-3:#5C5F68;
+    --accent:#4CD7F6; --ok:#3DDC97; --warn:#F5A524; --bad:#FF5C6C; --proj:#FFC01E;
   }
-  *{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-  body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; letter-spacing:-0.011em; }
+  *{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; box-sizing:border-box; }
+  html,body{ background:var(--black); }
+  body{ color:var(--text); font-family:'Inter',sans-serif; letter-spacing:-0.011em; margin:0; }
 
-  /* type scale */
-  .t-display{ font-size:32px; line-height:1.1; font-weight:600; letter-spacing:-0.02em; }
-  .t-metric{ font-family:'JetBrains Mono',monospace; font-size:26px; line-height:1.1; font-weight:500; font-variant-numeric:tabular-nums; letter-spacing:-0.02em; }
-  .t-h2{ font-size:15px; line-height:1.3; font-weight:600; letter-spacing:-0.01em; }
-  .t-body{ font-size:13px; line-height:1.55; color:var(--text-2); }
-  .t-label{ font-size:10.5px; font-weight:600; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-3); }
-  .t-mono{ font-family:'JetBrains Mono',monospace; font-size:12px; font-variant-numeric:tabular-nums; }
+  /* ═══ type ═══ */
+  .eyebrow{ font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-3); }
+  .h-sec{ font-size:17px; font-weight:600; letter-spacing:-0.02em; margin:0; }
+  .sub{ font-size:12.5px; line-height:1.5; color:var(--text-2); margin:var(--s1) 0 0; }
+  .mono{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
 
-  /* surfaces — flat, one hairline, no glass soup */
-  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); }
-  .card-hd{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
-            padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--line-soft); }
-  .card-bd{ padding:var(--space-5); }
-  .row{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
-        padding:var(--space-3) 0; border-bottom:1px solid var(--line-soft); }
-  .row:last-child{ border-bottom:0; }
+  /* ═══ layout: open sections divided by hairlines — no floating boxes ═══ */
+  .wrap{ max-width:1320px; margin:0 auto; padding:0 var(--s6); }
+  .sec{ border-top:1px solid var(--rule); padding:var(--s7) 0; }
+  .sec:first-of-type{ border-top:0; }
+  .sec-hd{ display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s5); margin-bottom:var(--s6); }
 
-  /* controls */
-  .btn{ display:inline-flex; align-items:center; gap:var(--space-2); height:36px; padding:0 var(--space-4);
-        border-radius:var(--r-sm); border:1px solid var(--line); background:var(--raised);
-        color:var(--text); font-size:12.5px; font-weight:550; cursor:pointer;
-        transition:background .15s ease, border-color .15s ease, transform .1s ease; }
-  .btn:hover:not(:disabled){ background:#1A1F29; border-color:#2A3140; }
-  .btn:active:not(:disabled){ transform:scale(.985); }
-  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  /* metric strip: values divided by vertical hairlines, sitting on the canvas */
+  .strip{ display:grid; gap:0; border-left:1px solid var(--rule-soft); }
+  .strip > div{ padding:0 var(--s5); border-right:1px solid var(--rule-soft); }
+  .m-val{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums;
+          font-size:30px; font-weight:500; letter-spacing:-0.03em; line-height:1.05; }
+  .m-unit{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); margin-left:3px; }
+  .m-note{ font-size:11.5px; color:var(--text-3); margin-top:var(--s2); line-height:1.4; }
+
+  /* ═══ controls ═══ */
+  .btn{ display:inline-flex; align-items:center; gap:var(--s2); height:34px; padding:0 var(--s4);
+        border-radius:6px; border:1px solid var(--rule); background:transparent; color:var(--text);
+        font-family:inherit; font-size:12.5px; font-weight:550; cursor:pointer;
+        transition:background .14s ease, border-color .14s ease; }
+  .btn:hover:not(:disabled){ background:#0C0C0E; border-color:#2A2A2E; }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
   .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#04222C; font-weight:650; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#031F27; font-weight:650; }
   .btn-primary:hover:not(:disabled){ background:#6FE0FA; border-color:#6FE0FA; }
-  .btn-sm{ height:28px; padding:0 var(--space-3); font-size:11.5px; }
+  .btn-xs{ height:26px; padding:0 var(--s3); font-size:11px; }
 
-  .pill{ display:inline-flex; align-items:center; gap:6px; padding:3px var(--space-2); border-radius:999px;
-         font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:500; border:1px solid transparent; }
-  .pill-ok{ color:var(--ok); background:rgba(52,211,153,.09); border-color:rgba(52,211,153,.22); }
-  .pill-warn{ color:var(--warn); background:rgba(245,165,36,.09); border-color:rgba(245,165,36,.22); }
-  .pill-bad{ color:var(--bad); background:rgba(244,99,107,.09); border-color:rgba(244,99,107,.22); }
-  .pill-neutral{ color:var(--text-2); background:#141821; border-color:var(--line); }
-  .dot{ width:6px; height:6px; border-radius:50%; }
+  .tag{ display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace;
+        font-size:10.5px; padding:2px var(--s2); border-radius:4px; color:var(--text-2);
+        border:1px solid var(--rule); }
+  .tag-ok{ color:var(--ok); border-color:rgba(61,220,151,.3); }
+  .tag-warn{ color:var(--warn); border-color:rgba(245,165,36,.3); }
+  .tag-bad{ color:var(--bad); border-color:rgba(255,92,108,.3); }
+  .dot{ width:5px; height:5px; border-radius:50%; }
 
-  .kpi-val{ font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:500;
-            font-variant-numeric:tabular-nums; letter-spacing:-0.025em; line-height:1; }
-
-  ::-webkit-scrollbar{ width:6px; height:6px; }
+  /* ═══ lists: hairline rows, scrollbar in its own gutter (never overlaps) ═══ */
+  .scroll{ overflow-y:auto; scrollbar-gutter:stable; padding-right:var(--s4); }
+  .lrow{ display:flex; align-items:center; justify-content:space-between; gap:var(--s4);
+         padding:var(--s3) 0; border-bottom:1px solid var(--rule-soft); }
+  .lrow:last-child{ border-bottom:0; }
+  ::-webkit-scrollbar{ width:8px; }
   ::-webkit-scrollbar-track{ background:transparent; }
-  ::-webkit-scrollbar-thumb{ background:#232833; border-radius:3px; }
-  ::-webkit-scrollbar-thumb:hover{ background:#2E3646; }
+  ::-webkit-scrollbar-thumb{ background:#26262A; border-radius:4px;
+                             border:2px solid var(--black); background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover{ background:#3A3A40; }
+
+  .split{ display:grid; grid-template-columns:1fr 1px 1fr; gap:var(--s7); align-items:start; }
+  .vrule{ background:var(--rule); align-self:stretch; }
+  @media (max-width:960px){ .split{ grid-template-columns:1fr; gap:var(--s6); } .vrule{ display:none; } }
 
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  .spinner{ width:12px; height:12px; border:2px solid rgba(255,255,255,.15);
+  .spinner{ width:11px; height:11px; border:2px solid rgba(255,255,255,.14);
             border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
-  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.45} }
-  .live{ animation:pulse 2s ease-in-out infinite; }
   @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
 
-<!-- ══ HEADER ══ -->
-<header style="border-bottom:1px solid var(--line); background:rgba(8,9,12,.92); backdrop-filter:blur(8px); position:sticky; top:0; z-index:20;">
-  <div style="max-width:1400px; margin:0 auto; padding:var(--space-4) var(--space-6); display:flex; align-items:center; justify-content:space-between; gap:var(--space-5);">
-    <div style="display:flex; align-items:center; gap:var(--space-3);">
-      <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,#4CD7F6,#1E9BC4);display:grid;place-items:center;">
-        <i data-lucide="aperture" style="width:17px;height:17px;color:#04222C;"></i>
-      </div>
+<!-- ═══ HEADER ═══ -->
+<header style="border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:20; background:rgba(0,0,0,.94); backdrop-filter:blur(10px);">
+  <div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:var(--s5); padding-top:var(--s4); padding-bottom:var(--s4);">
+    <div style="display:flex; align-items:center; gap:var(--s3);">
+      <img src="/static/assets/chronolens-logo.png" alt="ChronoLens"
+           style="width:30px; height:30px; border-radius:7px; object-fit:cover; display:block;">
       <div>
-        <div style="font-size:14.5px; font-weight:650; letter-spacing:-0.01em;">ChronoLens</div>
-        <div class="t-label" style="margin-top:1px;">Predictive SRE · SigNoz closed loop</div>
+        <div style="font-size:14.5px; font-weight:650; letter-spacing:-0.015em; line-height:1.2;">ChronoLens</div>
+        <div class="eyebrow" style="margin-top:2px;">Predictive SRE · SigNoz closed loop</div>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;">
-      <span id="pill-signoz" class="pill pill-neutral"><span class="dot" style="background:var(--text-3)"></span>SigNoz</span>
-      <span id="pill-mode" class="pill pill-neutral">MODE —</span>
-      <span id="pill-slo" class="pill pill-neutral">SLO —</span>
+    <div style="display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap;">
+      <span id="t-signoz" class="tag"><span class="dot" style="background:var(--text-3)"></span>SigNoz</span>
+      <span id="t-mode" class="tag">MODE —</span>
+      <span id="t-slo" class="tag">SLO —</span>
     </div>
   </div>
 </header>
 
-<main style="max-width:1400px; margin:0 auto; padding:var(--space-6);">
+<main class="wrap">
 
-  <!-- ══ KPI ROW ══ -->
-  <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:var(--space-4);">
-    <div class="card" style="padding:var(--space-5);">
-      <div class="t-label">Breach avoided</div>
-      <div style="display:flex; align-items:baseline; gap:6px; margin-top:var(--space-3);">
-        <span class="kpi-val" id="kpi-breach" style="color:var(--ok)">—</span>
-        <span class="t-mono" style="color:var(--text-3)">s</span>
+  <!-- ═══ KPI STRIP ═══ -->
+  <section class="sec" style="padding-top:var(--s6);">
+    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));">
+      <div>
+        <div class="eyebrow">Breach avoided</div>
+        <div style="margin-top:var(--s3);"><span class="m-val" id="k-breach" style="color:var(--ok)">—</span><span class="m-unit">s</span></div>
+        <div class="m-note">measured vs projected in SigNoz</div>
       </div>
-      <div class="t-body" style="margin-top:var(--space-2); font-size:11.5px;">measured vs projected in SigNoz</div>
-    </div>
-    <div class="card" style="padding:var(--space-5);">
-      <div class="t-label">Incidents prevented</div>
-      <div style="display:flex; align-items:baseline; gap:6px; margin-top:var(--space-3);">
-        <span class="kpi-val" id="kpi-prevented">—</span>
-        <span class="t-mono" id="kpi-total" style="color:var(--text-3)"></span>
+      <div>
+        <div class="eyebrow">Incidents prevented</div>
+        <div style="margin-top:var(--s3);"><span class="m-val" id="k-prev">—</span><span class="m-unit" id="k-total"></span></div>
+        <div class="m-note">verified receipts in the ledger</div>
       </div>
-      <div class="t-body" style="margin-top:var(--space-2); font-size:11.5px;">verified receipts in the ledger</div>
-    </div>
-    <div class="card" style="padding:var(--space-5);">
-      <div class="t-label">Live p99</div>
-      <div style="display:flex; align-items:baseline; gap:6px; margin-top:var(--space-3);">
-        <span class="kpi-val" id="kpi-p99">—</span>
-        <span class="t-mono" style="color:var(--text-3)">ms</span>
+      <div>
+        <div class="eyebrow">Live p99</div>
+        <div style="margin-top:var(--s3);"><span class="m-val" id="k-p99">—</span><span class="m-unit">ms</span></div>
+        <div class="m-note" id="k-svc">worst service</div>
       </div>
-      <div class="t-body" id="kpi-p99-svc" style="margin-top:var(--space-2); font-size:11.5px;">worst service</div>
-    </div>
-    <div class="card" style="padding:var(--space-5);">
-      <div class="t-label">Capacity returned</div>
-      <div style="display:flex; align-items:baseline; gap:6px; margin-top:var(--space-3);">
-        <span class="t-mono" style="color:var(--text-3); font-size:18px;">$</span>
-        <span class="kpi-val" id="kpi-usd">—</span>
+      <div>
+        <div class="eyebrow">Capacity returned</div>
+        <div style="margin-top:var(--s3);"><span class="m-unit" style="margin:0 2px 0 0; font-size:16px;">$</span><span class="m-val" id="k-usd">—</span></div>
+        <div class="m-note">given back on cooldown</div>
       </div>
-      <div class="t-body" style="margin-top:var(--space-2); font-size:11.5px;">given back on cooldown</div>
     </div>
   </section>
 
-  <!-- ══ HERO: CHRONO-PROOF ══ -->
-  <section class="card" style="margin-top:var(--space-6);">
-    <div class="card-hd">
+  <!-- ═══ CHRONO-PROOF ═══ -->
+  <section class="sec">
+    <div class="sec-hd">
       <div>
-        <h2 class="t-h2">Chrono-Proof — the outage that never happened</h2>
-        <p class="t-body" style="margin-top:2px; font-size:12px;">
-          Solid line is <span style="color:var(--accent)">measured in SigNoz</span>.
-          Dashed is the <span style="color:var(--proj)">projected unmitigated path</span> fitted on pre-action samples.
+        <div class="eyebrow">Evidence</div>
+        <h2 class="h-sec" style="margin-top:6px;">Chrono-Proof — the outage that never happened</h2>
+        <p class="sub">
+          <span style="color:var(--accent)">Measured</span> is SigNoz telemetry.
+          <span style="color:var(--proj)">Projected</span> extrapolates the pre-action trend — a labelled estimate.
+          Log scale.
         </p>
       </div>
-      <div style="display:flex; align-items:center; gap:var(--space-2);">
-        <span id="proof-src" class="pill pill-neutral">—</span>
-        <button class="btn btn-sm" id="btn-proof"><i data-lucide="refresh-cw" style="width:12px;height:12px"></i>Refresh</button>
+      <div style="display:flex; align-items:center; gap:var(--s2); flex-shrink:0;">
+        <span id="pf-src" class="tag">—</span>
+        <button class="btn btn-xs" id="b-proof">Refresh</button>
       </div>
     </div>
-    <div class="card-bd">
-      <div style="height:290px;"><canvas id="chart"></canvas></div>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--space-4); margin-top:var(--space-5); padding-top:var(--space-5); border-top:1px solid var(--line-soft);">
-        <div><div class="t-label">Measured peak</div><div class="t-mono" id="pf-mpeak" style="font-size:15px;margin-top:6px;color:var(--accent)">—</div></div>
-        <div><div class="t-label">Projected peak</div><div class="t-mono" id="pf-ppeak" style="font-size:15px;margin-top:6px;color:var(--proj)">—</div></div>
-        <div><div class="t-label">Breach avoided</div><div class="t-mono" id="pf-avoid" style="font-size:15px;margin-top:6px;color:var(--ok)">—</div></div>
-        <div><div class="t-label">Confidence</div><div class="t-mono" id="pf-conf" style="font-size:15px;margin-top:6px;">—</div></div>
+
+    <div style="height:240px; margin:0 0 var(--s5);"><canvas id="chart"></canvas></div>
+
+    <!-- inline stat strip: no boxes, hairline dividers -->
+    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); border-top:1px solid var(--rule-soft); padding-top:var(--s4);">
+      <div>
+        <div class="eyebrow">Measured peak</div>
+        <div class="mono" id="pf-mpeak" style="font-size:19px; margin-top:6px; color:var(--accent)">—</div>
       </div>
-      <p class="t-body" id="pf-note" style="margin-top:var(--space-4); font-size:12px;">Run the loop, then refresh to build a proof from SigNoz.</p>
+      <div>
+        <div class="eyebrow">Projected peak</div>
+        <div class="mono" id="pf-ppeak" style="font-size:19px; margin-top:6px; color:var(--proj)">—</div>
+      </div>
+      <div>
+        <div class="eyebrow">Breach avoided</div>
+        <div class="mono" id="pf-avoid" style="font-size:19px; margin-top:6px; color:var(--ok)">—</div>
+      </div>
+      <div>
+        <div class="eyebrow">Peak shaved</div>
+        <div class="mono" id="pf-shaved" style="font-size:19px; margin-top:6px;">—</div>
+      </div>
+      <div>
+        <div class="eyebrow">Confidence</div>
+        <div class="mono" id="pf-conf" style="font-size:19px; margin-top:6px;">—</div>
+      </div>
+    </div>
+    <p class="sub" id="pf-note" style="margin-top:var(--s5); max-width:80ch;">Run the loop, then refresh to build a proof from SigNoz.</p>
+  </section>
+
+  <!-- ═══ CONTROLS ═══ -->
+  <section class="sec" style="padding:var(--s5) 0;">
+    <div style="display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap;">
+      <span class="eyebrow" style="margin-right:var(--s2);">Demo</span>
+      <button class="btn" id="b-inject">Inject rising load</button>
+      <button class="btn btn-primary" id="b-run">Run ChronoLens</button>
+      <button class="btn" id="b-ab">Run baseline (no fix)</button>
+      <button class="btn" id="b-cool">Release capacity</button>
+      <button class="btn" id="b-reset">Reset</button>
     </div>
   </section>
 
-  <!-- ══ CONTROLS ══ -->
-  <section class="card" style="margin-top:var(--space-6);">
-    <div class="card-hd">
-      <h2 class="t-h2">Demo controls</h2>
-      <span class="t-body" style="font-size:11.5px;">inject a fault, then compare baseline vs managed</span>
-    </div>
-    <div class="card-bd" style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
-      <button class="btn" id="btn-inject"><i data-lucide="trending-up" style="width:13px;height:13px"></i>Inject rising load</button>
-      <button class="btn btn-primary" id="btn-run"><i data-lucide="shield-check" style="width:13px;height:13px"></i>Run ChronoLens</button>
-      <button class="btn" id="btn-ab"><i data-lucide="git-compare" style="width:13px;height:13px"></i>Run baseline (no fix)</button>
-      <button class="btn" id="btn-cooldown"><i data-lucide="arrow-down-circle" style="width:13px;height:13px"></i>Release capacity</button>
-      <button class="btn" id="btn-reset"><i data-lucide="rotate-ccw" style="width:13px;height:13px"></i>Reset</button>
-    </div>
-  </section>
-
-  <!-- ══ LOOP + BLAST RADIUS ══ -->
-  <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:var(--space-5); margin-top:var(--space-6);">
-    <div class="card">
-      <div class="card-hd">
-        <h2 class="t-h2">Closed loop</h2>
-        <span id="loop-state" class="pill pill-neutral">idle</span>
-      </div>
-      <div class="card-bd">
-        <div id="loop-stages" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:var(--space-5);"></div>
-        <div id="loop-log" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:var(--space-3);">
-          <p class="t-body" style="font-size:12px;">Run the loop to stream stages live from SigNoz.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <div>
-          <h2 class="t-h2">Blast radius</h2>
-          <p class="t-body" style="margin-top:2px; font-size:12px;">who falls next, and when</p>
-        </div>
-        <button class="btn btn-sm" id="btn-blast"><i data-lucide="network" style="width:12px;height:12px"></i>Forecast</button>
-      </div>
-      <div class="card-bd">
-        <div id="blast-root" class="t-body" style="font-size:12px; margin-bottom:var(--space-4);">Forecast to read SigNoz's dependency map.</div>
-        <div id="blast-body"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ AGENT WATCH ══ -->
-  <section class="card" style="margin-top:var(--space-6);">
-    <div class="card-hd">
+  <!-- ═══ LOOP + BLAST ═══ -->
+  <section class="sec">
+    <div class="split">
       <div>
-        <h2 class="t-h2">Agent Watch</h2>
-        <p class="t-body" style="margin-top:2px; font-size:12px;">behaviour drift · loop &amp; cost breaker · answer quality</p>
-      </div>
-      <div style="display:flex; align-items:center; gap:var(--space-2);">
-        <span class="t-label">agent</span>
-        <span id="agent-mode" class="pill pill-neutral">—</span>
-        <button class="btn btn-sm" onclick="agentMode('normal')">normal</button>
-        <button class="btn btn-sm" onclick="agentMode('drift')">drift</button>
-        <button class="btn btn-sm" onclick="agentMode('loop')">loop</button>
-      </div>
-    </div>
-    <div class="card-bd" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:var(--space-5);">
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="t-label">Behaviour drift</div>
-          <button class="btn btn-sm" id="btn-drift">Check</button>
+        <div class="sec-hd" style="margin-bottom:var(--s5);">
+          <div><div class="eyebrow">Live</div><h2 class="h-sec" style="margin-top:6px;">Closed loop</h2></div>
+          <span id="loop-state" class="tag">idle</span>
         </div>
-        <div id="drift-body" class="t-body" style="margin-top:var(--space-3); font-size:12px;">Capture a baseline in normal mode, then check.</div>
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="t-label">Loop / cost breaker</div>
-          <button class="btn btn-sm" id="btn-loopcheck">Check</button>
+        <div id="loop-stages" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:var(--s5);"></div>
+        <div id="loop-log" class="scroll" style="max-height:280px; display:flex; flex-direction:column; gap:var(--s3);">
+          <p class="sub">Run the loop to stream stages live from SigNoz.</p>
         </div>
-        <div id="loopchk-body" class="t-body" style="margin-top:var(--space-3); font-size:12px;">Flip the agent to loop mode, then check.</div>
       </div>
+      <div class="vrule"></div>
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="t-label">Answer quality</div>
-          <button class="btn btn-sm" id="btn-quality">Grade</button>
+        <div class="sec-hd" style="margin-bottom:var(--s5);">
+          <div><div class="eyebrow">Forecast</div><h2 class="h-sec" style="margin-top:6px;">Blast radius</h2></div>
+          <button class="btn btn-xs" id="b-blast">Forecast</button>
         </div>
-        <div id="quality-body" class="t-body" style="margin-top:var(--space-3); font-size:12px;">Grade recent answers.</div>
+        <p class="sub" id="blast-root" style="margin-bottom:var(--s4);">Forecast to read SigNoz's dependency map.</p>
+        <div id="blast-body" class="scroll" style="max-height:280px;"></div>
       </div>
     </div>
   </section>
 
-  <!-- ══ LEDGER + SIGNOZ ══ -->
-  <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:var(--space-5); margin-top:var(--space-6); margin-bottom:var(--space-7);">
-    <div class="card">
-      <div class="card-hd"><h2 class="t-h2">Prevention ledger</h2><span class="t-body" style="font-size:11.5px;">receipts</span></div>
-      <div class="card-bd" style="padding-top:var(--space-2);">
-        <div id="ledger-body" style="max-height:300px; overflow-y:auto;">
-          <p class="t-body" style="font-size:12px; padding-top:var(--space-3);">No incidents filed yet.</p>
-        </div>
+  <!-- ═══ AGENT WATCH ═══ -->
+  <section class="sec">
+    <div class="sec-hd">
+      <div>
+        <div class="eyebrow">Track 01</div>
+        <h2 class="h-sec" style="margin-top:6px;">Agent Watch</h2>
+        <p class="sub">behaviour drift · loop &amp; cost breaker · answer quality</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:var(--s2); flex-shrink:0;">
+        <span id="a-mode" class="tag">—</span>
+        <button class="btn btn-xs" onclick="agentMode('normal')">normal</button>
+        <button class="btn btn-xs" onclick="agentMode('drift')">drift</button>
+        <button class="btn btn-xs" onclick="agentMode('loop')">loop</button>
       </div>
     </div>
+    <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));">
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
+          <div class="eyebrow">Behaviour drift</div><button class="btn btn-xs" id="b-drift">Check</button>
+        </div>
+        <div id="d-drift" class="sub" style="margin-top:var(--s3);">Capture a baseline in normal mode, then check.</div>
+      </div>
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
+          <div class="eyebrow">Loop / cost breaker</div><button class="btn btn-xs" id="b-loop">Check</button>
+        </div>
+        <div id="d-loop" class="sub" style="margin-top:var(--s3);">Flip the agent to loop mode, then check.</div>
+      </div>
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--s3);">
+          <div class="eyebrow">Answer quality</div><button class="btn btn-xs" id="b-qual">Grade</button>
+        </div>
+        <div id="d-qual" class="sub" style="margin-top:var(--s3);">Grade recent answers.</div>
+      </div>
+    </div>
+  </section>
 
-    <div class="card">
-      <div class="card-hd">
-        <h2 class="t-h2">SigNoz integration</h2>
-        <div style="display:flex; gap:var(--space-2);">
-          <button class="btn btn-sm" id="btn-slack" title="Post a Slack approval test">Slack</button>
-          <button class="btn btn-sm" id="btn-wa" title="Send a WhatsApp approval card">WhatsApp</button>
+  <!-- ═══ LEDGER + SIGNOZ SURFACE ═══ -->
+  <section class="sec" style="padding-bottom:var(--s8);">
+    <div class="split">
+      <div>
+        <div class="sec-hd" style="margin-bottom:var(--s5);">
+          <div><div class="eyebrow">Receipts</div><h2 class="h-sec" style="margin-top:6px;">Prevention ledger</h2></div>
+        </div>
+        <div id="ledger" class="scroll" style="max-height:300px;">
+          <p class="sub">No incidents filed yet.</p>
         </div>
       </div>
-      <div class="card-bd" style="padding-top:var(--space-2);">
-        <div class="row"><span class="t-body" style="font-size:12.5px;">Guard alerts written</span><span class="t-mono" id="sg-guard">—</span></div>
-        <div class="row"><span class="t-body" style="font-size:12.5px;">Currently firing</span><span class="t-mono" id="sg-firing">—</span></div>
-        <div class="row"><span class="t-body" style="font-size:12.5px;">Notification channels</span><span class="t-mono" id="sg-chan">—</span></div>
-        <div class="row"><span class="t-body" style="font-size:12.5px;">Webhook events received</span><span class="t-mono" id="sg-inbox">—</span></div>
-        <p class="t-body" style="font-size:11.5px; margin-top:var(--space-4);">
-          Reads via Query Builder v5 (traces, logs, metrics). Writes alerts, dashboards, saved views and silences.
+      <div class="vrule"></div>
+      <div>
+        <div class="sec-hd" style="margin-bottom:var(--s5);">
+          <div><div class="eyebrow">Depth</div><h2 class="h-sec" style="margin-top:6px;">SigNoz surface used</h2></div>
+        </div>
+        <div class="lrow"><span class="sub" style="margin:0">Guard alerts written</span><span class="mono" id="s-guard" style="font-size:14px">—</span></div>
+        <div class="lrow"><span class="sub" style="margin:0">Currently firing</span><span class="mono" id="s-fire" style="font-size:14px">—</span></div>
+        <div class="lrow"><span class="sub" style="margin:0">Notification channels</span><span class="mono" id="s-chan" style="font-size:14px">—</span></div>
+        <div class="lrow"><span class="sub" style="margin:0">Webhook events received</span><span class="mono" id="s-inbox" style="font-size:14px">—</span></div>
+        <p class="sub" style="margin-top:var(--s4); font-size:11.5px; color:var(--text-3);">
+          Reads: Query Builder v5 traces, logs, metrics read-back, service map, exemplar traces.
+          Writes: threshold alerts, dashboards, saved views, silences, notification channels.
         </p>
       </div>
     </div>
@@ -295,247 +284,213 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num = (v,d=0) => (v==null||isNaN(v)) ? '—' : Number(v).toFixed(d);
 
-/* ── Chrono-Proof chart ─────────────────────────────────────────────── */
+/* ── chart: log scale so a 45ms measurement and a 13000ms projection both read ── */
 let chart;
 function initChart(){
   const ctx = $('chart').getContext('2d');
-  const grad = ctx.createLinearGradient(0,0,0,290);
-  grad.addColorStop(0,'rgba(76,215,246,.20)'); grad.addColorStop(1,'rgba(76,215,246,0)');
-  chart = new Chart(ctx,{
-    type:'line',
+  const g = ctx.createLinearGradient(0,0,0,240);
+  g.addColorStop(0,'rgba(76,215,246,.16)'); g.addColorStop(1,'rgba(76,215,246,0)');
+  chart = new Chart(ctx,{ type:'line',
     data:{ labels:[], datasets:[
-      { label:'Measured (SigNoz)', data:[], borderColor:'#4CD7F6', backgroundColor:grad,
-        borderWidth:2, fill:true, tension:.35, pointRadius:0, pointHoverRadius:4 },
-      { label:'Projected unmitigated', data:[], borderColor:'#FFC01E', borderWidth:2,
-        borderDash:[5,4], fill:false, tension:.35, pointRadius:0, pointHoverRadius:4 }
+      { label:'Measured', data:[], borderColor:'#4CD7F6', backgroundColor:g,
+        borderWidth:2, fill:true, tension:.3, pointRadius:0, pointHoverRadius:3, spanGaps:true },
+      { label:'Projected', data:[], borderColor:'#FFC01E', borderWidth:1.75,
+        borderDash:[5,4], fill:false, tension:.3, pointRadius:0, pointHoverRadius:3, spanGaps:true }
     ]},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    options:{ responsive:true, maintainAspectRatio:false,
+      layout:{ padding:{ top:4, right:8, bottom:0, left:0 } },
+      interaction:{ mode:'index', intersect:false },
       plugins:{
-        legend:{ labels:{ color:'#9BA3B4', boxWidth:10, boxHeight:2, font:{size:11,family:'Inter'}, usePointStyle:false } },
-        tooltip:{ backgroundColor:'#0E1116', borderColor:'#1E232E', borderWidth:1, titleColor:'#E7EAF0',
-                  bodyColor:'#9BA3B4', padding:10, displayColors:true,
-                  callbacks:{ label:c=>` ${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(0)+' ms'}` } }
+        legend:{ display:false },
+        tooltip:{ backgroundColor:'#08080A', borderColor:'#1A1A1C', borderWidth:1,
+          titleColor:'#F2F3F5', bodyColor:'#8E9099', padding:9, cornerRadius:6,
+          titleFont:{size:11,family:'JetBrains Mono'}, bodyFont:{size:11,family:'JetBrains Mono'},
+          callbacks:{ label:c=> ' '+c.dataset.label+': '+(c.parsed.y==null?'—':Math.round(c.parsed.y)+' ms') } }
       },
       scales:{
-        x:{ grid:{color:'#141821'}, ticks:{color:'#6B7382', font:{size:10,family:'JetBrains Mono'}, maxTicksLimit:9} },
-        y:{ grid:{color:'#141821'}, ticks:{color:'#6B7382', font:{size:10,family:'JetBrains Mono'},
-            callback:v=>v+'ms'}, beginAtZero:false }
+        x:{ grid:{ display:false }, border:{ color:'#1A1A1C' },
+            ticks:{ color:'#5C5F68', font:{size:10,family:'JetBrains Mono'}, maxTicksLimit:8, padding:6 } },
+        y:{ type:'logarithmic', grid:{ color:'#101012', drawTicks:false }, border:{ display:false },
+            ticks:{ color:'#5C5F68', font:{size:10,family:'JetBrains Mono'}, padding:8,
+                    callback:v=>{ const a=[10,50,100,500,1000,5000,10000];
+                                  return a.includes(v)? (v>=1000? (v/1000)+'k' : v)+'ms' : ''; } } }
       }
     }
   });
 }
 
 async function loadProof(){
-  $('pf-note').textContent = 'Reading p99 series from SigNoz…';
+  $('pf-note').textContent='Reading p99 series from SigNoz…';
   try{
     const p = await (await fetch('/api/proof')).json();
-    if(!p.ok){
-      $('proof-src').textContent = 'no data';
-      $('pf-note').textContent = (p.notes && p.notes[0]) || p.error || 'Not enough SigNoz samples yet.';
-      return;
-    }
-    $('proof-src').innerHTML = '<span class="dot" style="background:var(--ok)"></span>'+esc(p.source);
-    $('proof-src').className = 'pill pill-ok';
-    chart.data.labels = p.points.map(pt => (pt.t_offset_s>0?'+':'')+pt.t_offset_s+'s');
-    chart.data.datasets[0].data = p.points.map(pt => pt.measured_ms);
-    chart.data.datasets[1].data = p.points.map(pt => pt.projected_ms);
-    // SLO line
+    if(!p.ok){ $('pf-src').textContent='no data'; $('pf-src').className='tag';
+      $('pf-note').textContent=(p.notes&&p.notes[0])||p.error||'Not enough SigNoz samples yet.'; return; }
+    $('pf-src').innerHTML='<span class="dot" style="background:var(--ok)"></span>'+esc(p.source);
+    $('pf-src').className='tag tag-ok';
+    chart.data.labels = p.points.map(pt=>(pt.t_offset_s>0?'+':'')+pt.t_offset_s+'s');
+    chart.data.datasets[0].data = p.points.map(pt=>pt.measured_ms);
+    chart.data.datasets[1].data = p.points.map(pt=>pt.projected_ms);
     chart.options.plugins.annotation = { annotations:{ slo:{ type:'line', yMin:p.slo_ms, yMax:p.slo_ms,
-      borderColor:'#F4636B', borderWidth:1, borderDash:[4,4],
-      label:{ display:true, content:'SLO '+p.slo_ms+'ms', position:'end', color:'#F4636B',
-              backgroundColor:'rgba(8,9,12,.85)', font:{size:10,family:'JetBrains Mono'} } } } };
+      borderColor:'rgba(255,92,108,.55)', borderWidth:1, borderDash:[4,4],
+      label:{ display:true, content:'SLO '+p.slo_ms+'ms', position:'start', color:'#FF5C6C',
+        backgroundColor:'rgba(0,0,0,.8)', font:{size:9.5,family:'JetBrains Mono'}, padding:3 } } } };
     chart.update();
     $('pf-mpeak').textContent = num(p.measured_peak_ms)+' ms';
-    $('pf-ppeak').textContent = num(p.projected_peak_ms)+' ms ±'+num(p.projection_band_ms);
+    $('pf-ppeak').textContent = num(p.projected_peak_ms)+' ±'+num(p.projection_band_ms);
     $('pf-avoid').textContent = num(p.breach_seconds_avoided)+' s';
+    $('pf-shaved').textContent= num(p.peak_ms_avoided)+' ms';
     $('pf-conf').textContent  = Math.round((p.confidence||0)*100)+'%';
-    $('kpi-breach').textContent = num(p.breach_seconds_avoided);
-    $('pf-note').textContent = p.narrative || '';
-  }catch(e){ $('pf-note').textContent = 'Proof unavailable — is SigNoz reachable?'; }
+    $('k-breach').textContent = num(p.breach_seconds_avoided);
+    $('pf-note').textContent  = p.narrative||'';
+  }catch(e){ $('pf-note').textContent='Proof unavailable — is SigNoz reachable?'; }
 }
 
-/* ── Blast radius ───────────────────────────────────────────────────── */
+/* ── blast radius ── */
 async function loadBlast(){
-  $('blast-body').innerHTML = '<p class="t-body" style="font-size:12px">Reading dependency map…</p>';
+  $('blast-body').innerHTML='<p class="sub">Reading dependency map…</p>';
   try{
     const b = await (await fetch('/api/blast')).json();
-    if(!b.ok){
-      $('blast-root').textContent = (b.notes && b.notes[0]) || b.error || 'unavailable';
-      $('blast-body').innerHTML=''; return;
-    }
-    $('blast-root').innerHTML = 'Root cause <span class="t-mono" style="color:var(--bad)">'+esc(b.root_service)+'</span>'
-      + (b.root_span ? ' · hop <span class="t-mono" style="color:var(--text-2)">'+esc(b.root_span)+'</span>' : '')
-      + ' <span class="pill pill-neutral" style="margin-left:6px">'+esc(b.topology_source)+'</span>';
+    if(!b.ok){ $('blast-root').textContent=(b.notes&&b.notes[0])||b.error||'unavailable'; $('blast-body').innerHTML=''; return; }
+    $('blast-root').innerHTML='Root cause <span class="mono" style="color:var(--bad)">'+esc(b.root_service)+'</span>'
+      +(b.root_span?' · hop <span class="mono" style="color:var(--text-2)">'+esc(b.root_span)+'</span>':'')
+      +' <span class="tag" style="margin-left:6px">'+esc(b.topology_source)+'</span>';
     $('blast-body').innerHTML = b.victims.map(v=>{
-      const eta = v.breaching_now ? 'NOW' : (v.seconds_to_breach!=null ? num(v.seconds_to_breach)+'s' : '—');
-      const cls = v.breaching_now ? 'pill-bad' : (v.seconds_to_breach!=null ? 'pill-warn' : 'pill-neutral');
-      return `<div class="row">
-        <div style="min-width:0">
-          <div class="t-mono" style="font-size:12.5px;color:var(--text)">${esc(v.service)}${v.is_root?' <span style="color:var(--bad)">•root</span>':''}</div>
-          <div class="t-body" style="font-size:11px">p99 ${num(v.current_p99_ms)}ms · own ${v.slope_ms_per_s>=0?'+':''}${num(v.slope_ms_per_s,1)} · inherited +${num(v.inherited_ms_per_s,1)} ms/s</div>
-        </div>
-        <span class="pill ${cls}">${eta}</span></div>`;
+      const eta = v.breaching_now?'NOW':(v.seconds_to_breach!=null?num(v.seconds_to_breach)+'s':'—');
+      const cls = v.breaching_now?'tag-bad':(v.seconds_to_breach!=null?'tag-warn':'');
+      return `<div class="lrow"><div style="min-width:0">
+        <div class="mono" style="font-size:12.5px">${esc(v.service)}${v.is_root?' <span style="color:var(--bad)">root</span>':''}</div>
+        <div class="sub" style="font-size:11px;margin-top:2px">p99 ${num(v.current_p99_ms)}ms · own ${v.slope_ms_per_s>=0?'+':''}${num(v.slope_ms_per_s,1)} · inherited +${num(v.inherited_ms_per_s,1)} ms/s</div>
+        </div><span class="tag ${cls}">${eta}</span></div>`;
     }).join('');
-  }catch(e){ $('blast-body').innerHTML = '<p class="t-body" style="font-size:12px">Blast radius unavailable.</p>'; }
+  }catch(e){ $('blast-body').innerHTML='<p class="sub">Blast radius unavailable.</p>'; }
 }
 
-/* ── Live loop (SSE) ────────────────────────────────────────────────── */
-const STAGES = ['LEARN','FORESEE','CLASSIFY','CASCADE','GOVERN','PREVENT','VERIFY','COOLDOWN','RECORD'];
-function renderStages(seen){
-  $('loop-stages').innerHTML = STAGES.map(s=>{
-    const on = seen.includes(s);
-    return `<span class="pill ${on?'pill-ok':'pill-neutral'}" style="font-size:9.5px">${s}</span>`;
-  }).join('');
-}
-const STATUS_COLOR = {done:'var(--ok)', ok:'var(--ok)', warn:'var(--warn)', danger:'var(--bad)',
-                     pending:'var(--warn)', info:'var(--accent)'};
+/* ── live loop ── */
+const STAGES=['LEARN','FORESEE','CLASSIFY','CASCADE','GOVERN','PREVENT','VERIFY','COOLDOWN','RECORD'];
+const renderStages = seen => $('loop-stages').innerHTML =
+  STAGES.map(s=>`<span class="tag ${seen.includes(s)?'tag-ok':''}" style="font-size:9px">${s}</span>`).join('');
+const SC={done:'var(--ok)',ok:'var(--ok)',warn:'var(--warn)',danger:'var(--bad)',pending:'var(--warn)',info:'var(--accent)'};
 function runLoop(managed){
   setButtons(false);
-  $('loop-state').innerHTML = '<span class="spinner"></span>running';
-  $('loop-state').className = 'pill pill-warn';
-  $('loop-log').innerHTML = '';
-  const seen = []; renderStages(seen);
-  const es = new EventSource('/api/respond/stream?managed='+managed);
-  es.onmessage = m => {
-    let ev; try{ ev = JSON.parse(m.data); }catch(_){ return; }
-    if(ev.done){
-      es.close(); setButtons(true);
-      $('loop-state').textContent = ev.outcome || 'done';
-      $('loop-state').className = 'pill ' + (ev.outcome==='breach avoided' ? 'pill-ok' : 'pill-neutral');
-      loadAll(); return;
-    }
+  $('loop-state').innerHTML='<span class="spinner"></span>running'; $('loop-state').className='tag tag-warn';
+  $('loop-log').innerHTML=''; const seen=[]; renderStages(seen);
+  const es=new EventSource('/api/respond/stream?managed='+managed);
+  es.onmessage=m=>{
+    let ev; try{ ev=JSON.parse(m.data); }catch(_){ return; }
+    if(ev.done){ es.close(); setButtons(true);
+      $('loop-state').textContent=ev.outcome||'done';
+      $('loop-state').className='tag '+(ev.outcome==='breach avoided'?'tag-ok':'');
+      loadAll(); loadProof(); return; }
     if(ev.step && !seen.includes(ev.step)){ seen.push(ev.step); renderStages(seen); }
-    const col = STATUS_COLOR[ev.status] || 'var(--text-2)';
-    const el = document.createElement('div');
-    el.style.cssText = 'display:flex; gap:var(--space-3); padding-left:var(--space-3); border-left:2px solid '+col+';';
-    el.innerHTML = `<span class="t-label" style="min-width:74px;color:${col}">${esc(ev.step||'')}</span>
-                    <span class="t-body" style="font-size:12px;color:var(--text)">${esc(ev.text||'')}</span>`;
-    $('loop-log').appendChild(el);
-    $('loop-log').scrollTop = $('loop-log').scrollHeight;
+    const col=SC[ev.status]||'var(--text-2)';
+    const el=document.createElement('div');
+    el.style.cssText='display:flex;gap:var(--s3);padding-left:var(--s3);border-left:2px solid '+col+';';
+    el.innerHTML=`<span class="eyebrow" style="min-width:70px;color:${col};padding-top:2px">${esc(ev.step||'')}</span>
+                  <span class="sub" style="margin:0;color:var(--text)">${esc(ev.text||'')}</span>`;
+    $('loop-log').appendChild(el); $('loop-log').scrollTop=$('loop-log').scrollHeight;
   };
-  es.onerror = () => { es.close(); setButtons(true);
-    $('loop-state').textContent='stream lost'; $('loop-state').className='pill pill-bad'; };
+  es.onerror=()=>{ es.close(); setButtons(true);
+    $('loop-state').textContent='stream lost'; $('loop-state').className='tag tag-bad'; };
 }
-const setButtons = on => ['btn-run','btn-inject','btn-cooldown','btn-ab','btn-reset']
-  .forEach(id => { $(id).disabled = !on; });
+const setButtons = on => ['b-run','b-inject','b-cool','b-ab','b-reset'].forEach(i=>{ $(i).disabled=!on; });
 
-/* ── Panels ─────────────────────────────────────────────────────────── */
+/* ── panels ── */
 async function loadServices(){
   try{
-    const d = await (await fetch('/api/services')).json();
-    const ok = !d.error && d.services && d.services.length;
-    $('pill-signoz').innerHTML = `<span class="dot" style="background:${ok?'var(--ok)':'var(--bad)'}"></span>SigNoz`;
-    $('pill-signoz').className = 'pill ' + (ok?'pill-ok':'pill-bad');
+    const d=await(await fetch('/api/services')).json();
+    const ok=!d.error && d.services && d.services.length;
+    $('t-signoz').innerHTML=`<span class="dot" style="background:${ok?'var(--ok)':'var(--bad)'}"></span>SigNoz`;
+    $('t-signoz').className='tag '+(ok?'tag-ok':'tag-bad');
     if(!ok) return;
-    const worst = d.services.reduce((a,b)=> (b.p99_ms>(a?.p99_ms??-1)?b:a), null);
-    if(worst){ $('kpi-p99').textContent = num(worst.p99_ms); $('kpi-p99-svc').textContent = worst.name || 'worst service'; }
+    const w=d.services.reduce((a,b)=>(b.p99_ms>(a?.p99_ms??-1)?b:a),null);
+    if(w){ $('k-p99').textContent=num(w.p99_ms); $('k-svc').textContent=w.name||'worst service'; }
   }catch(e){}
 }
 async function loadPrevented(){
   try{
-    const d = await (await fetch('/api/prevented')).json();
-    $('kpi-prevented').textContent = d.prevented ?? 0;
-    $('kpi-total').textContent = '/ ' + (d.total ?? 0);
-    $('kpi-usd').textContent = (d.dollars_saved ?? 0).toFixed(2);
-    const rows = (d.incidents || []).slice(0,12);
-    $('ledger-body').innerHTML = rows.length ? rows.map(c=>{
-      const good = c.outcome === 'breach avoided';
-      return `<div class="row">
-        <div style="min-width:0">
-          <div class="t-mono" style="font-size:12px">${esc(c.service)}</div>
-          <div class="t-body" style="font-size:11px">${esc(c.action||'—')} · p99 ${num(c.p99_at_prediction_ms)}→${num(c.final_p99_ms)}ms</div>
-        </div>
-        <span class="pill ${good?'pill-ok':'pill-neutral'}">${esc(c.outcome)}</span></div>`;
-    }).join('') : '<p class="t-body" style="font-size:12px;padding-top:var(--space-3)">No incidents filed yet.</p>';
+    const d=await(await fetch('/api/prevented')).json();
+    $('k-prev').textContent=d.prevented??0; $('k-total').textContent='/ '+(d.total??0);
+    $('k-usd').textContent=(d.dollars_saved??0).toFixed(2);
+    const rows=(d.incidents||[]).slice(0,12);
+    $('ledger').innerHTML = rows.length ? rows.map(c=>{
+      const good=c.outcome==='breach avoided';
+      return `<div class="lrow"><div style="min-width:0">
+        <div class="mono" style="font-size:12.5px">${esc(c.service)}</div>
+        <div class="sub" style="font-size:11px;margin-top:2px">${esc(c.action||'—')} · p99 ${num(c.p99_at_prediction_ms)}→${num(c.final_p99_ms)}ms</div>
+        </div><span class="tag ${good?'tag-ok':''}">${esc(c.outcome)}</span></div>`;
+    }).join('') : '<p class="sub">No incidents filed yet.</p>';
   }catch(e){}
 }
 async function loadConfig(){
-  try{
-    const c = await (await fetch('/api/config')).json();
-    $('pill-mode').textContent = 'MODE ' + String(c.autonomy||'—').toUpperCase();
-    $('pill-slo').textContent  = 'SLO ' + (c.p99_slo_ms ?? '—') + 'ms';
+  try{ const c=await(await fetch('/api/config')).json();
+    $('t-mode').textContent='MODE '+String(c.autonomy||'—').toUpperCase();
+    $('t-slo').textContent='SLO '+(c.p99_slo_ms??'—')+'ms';
   }catch(e){}
 }
 async function loadSignoz(){
-  try{
-    const s = await (await fetch('/api/signoz')).json();
-    if(s.connected){
-      $('sg-guard').textContent = s.guard_alerts ?? '—';
-      $('sg-firing').textContent = s.firing ?? s.firing_alerts ?? '0';
-      $('sg-chan').textContent = (s.channels||[]).length;
-    }
+  try{ const s=await(await fetch('/api/signoz')).json();
+    if(s.connected){ $('s-guard').textContent=s.guard_alerts??'—';
+      $('s-fire').textContent=s.firing??0; $('s-chan').textContent=(s.channels||[]).length; }
   }catch(e){}
-  try{ const ib = await (await fetch('/api/inbox')).json(); $('sg-inbox').textContent = ib.count ?? 0; }catch(e){}
+  try{ const ib=await(await fetch('/api/inbox')).json(); $('s-inbox').textContent=ib.count??0; }catch(e){}
 }
 
-/* ── Agent Watch ────────────────────────────────────────────────────── */
+/* ── agent watch ── */
 async function agentMode(m){
-  try{ const r = await (await fetch('/api/agent/mode?mode='+m,{method:'POST'})).json();
-       $('agent-mode').textContent = r.mode || m; }
-  catch(e){ $('agent-mode').textContent = 'offline'; }
+  try{ const r=await(await fetch('/api/agent/mode?mode='+m,{method:'POST'})).json();
+    $('a-mode').textContent=r.mode||m; }catch(e){ $('a-mode').textContent='offline'; }
 }
 async function checkDrift(){
-  $('drift-body').textContent = 'sampling…';
-  try{
-    const r = await (await fetch('/api/agent/drift?samples=10')).json();
-    if(r.error){ $('drift-body').textContent = r.error; return; }
-    const d = r.drift, pct = Math.round(d.score*100);
-    $('drift-body').innerHTML = `<div class="t-mono" style="font-size:15px;color:${d.drifted?'var(--warn)':'var(--ok)'}">${pct}% drift</div>`
-      + `<div class="t-body" style="font-size:11.5px;margin-top:4px">${d.changes&&d.changes.length?esc(d.changes.join(' · ')):'behaviour matches baseline'}</div>`
-      + (r.slack_posted?'<div class="pill pill-ok" style="margin-top:8px">approval sent</div>':'');
-  }catch(e){ $('drift-body').textContent='agent offline'; }
+  $('d-drift').textContent='sampling…';
+  try{ const r=await(await fetch('/api/agent/drift?samples=10')).json();
+    if(r.error){ $('d-drift').textContent=r.error; return; }
+    const d=r.drift;
+    $('d-drift').innerHTML=`<span class="mono" style="font-size:19px;color:${d.drifted?'var(--warn)':'var(--ok)'}">${Math.round(d.score*100)}%</span>
+      <span class="sub" style="margin:0"> drift</span>
+      <div class="sub" style="font-size:11px;margin-top:var(--s2)">${d.changes&&d.changes.length?esc(d.changes.join(' · ')):'matches baseline'}</div>`;
+  }catch(e){ $('d-drift').textContent='agent offline'; }
 }
 async function loopCheck(){
-  $('loopchk-body').textContent = 'driving one turn…';
-  try{
-    const r = await (await fetch('/api/agent/loopcheck',{method:'POST'})).json();
-    if(r.error){ $('loopchk-body').textContent = r.error; return; }
-    const v = r.verdict;
-    $('loopchk-body').innerHTML = `<div class="t-mono" style="font-size:15px;color:${v.looping?'var(--bad)':'var(--ok)'}">${v.looping?'LOOP DETECTED':'within limits'}</div>`
-      + `<div class="t-body" style="font-size:11.5px;margin-top:4px">${esc(v.reason)}</div>`
-      + `<div class="t-body" style="font-size:11.5px">cost $${v.cost_usd} · saves $${v.saved_usd} if cut at step ${v.break_at_step??'—'}</div>`
-      + (r.slack_posted?'<div class="pill pill-ok" style="margin-top:8px">approval sent</div>':'');
-  }catch(e){ $('loopchk-body').textContent='agent offline'; }
+  $('d-loop').textContent='driving one turn…';
+  try{ const r=await(await fetch('/api/agent/loopcheck',{method:'POST'})).json();
+    if(r.error){ $('d-loop').textContent=r.error; return; }
+    const v=r.verdict;
+    $('d-loop').innerHTML=`<span class="mono" style="font-size:15px;color:${v.looping?'var(--bad)':'var(--ok)'}">${v.looping?'LOOP DETECTED':'within limits'}</span>
+      <div class="sub" style="font-size:11px;margin-top:var(--s2)">${esc(v.reason)}</div>
+      <div class="sub" style="font-size:11px">cost $${v.cost_usd} · saves $${v.saved_usd} if cut at step ${v.break_at_step??'—'}</div>`;
+  }catch(e){ $('d-loop').textContent='agent offline'; }
 }
 async function gradeQuality(){
-  $('quality-body').textContent = 'grading…';
-  try{
-    const r = await (await fetch('/api/agent/quality?samples=8')).json();
-    if(r.error){ $('quality-body').textContent = r.error; return; }
-    $('quality-body').innerHTML = `<div class="t-mono" style="font-size:15px">${r.avg_score}</div>`
-      + `<div class="t-body" style="font-size:11.5px;margin-top:4px">${esc(r.verdict||'')}</div>`;
-  }catch(e){ $('quality-body').textContent='agent offline'; }
+  $('d-qual').textContent='grading…';
+  try{ const r=await(await fetch('/api/agent/quality?samples=8')).json();
+    if(r.error){ $('d-qual').textContent=r.error; return; }
+    $('d-qual').innerHTML=`<span class="mono" style="font-size:19px">${r.avg_score}</span>
+      <div class="sub" style="font-size:11px;margin-top:var(--s2)">${esc(r.verdict||'')}</div>`;
+  }catch(e){ $('d-qual').textContent='agent offline'; }
 }
 
-/* ── Wiring ─────────────────────────────────────────────────────────── */
-const doFault = async (mode,level) => {
-  try{ await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'}); }catch(e){}
-  setTimeout(loadServices, 800);
-};
-$('btn-run').onclick      = () => runLoop(true);
-$('btn-ab').onclick       = () => runLoop(false);
-$('btn-inject').onclick   = () => doFault('load',4);
-$('btn-reset').onclick    = () => doFault('load',0);
-$('btn-cooldown').onclick = async () => { try{ await fetch('/api/cooldown',{method:'POST'}); }catch(e){}
-                                         setTimeout(()=>{loadServices();loadPrevented();},500); };
-$('btn-proof').onclick    = loadProof;
-$('btn-blast').onclick    = loadBlast;
-$('btn-drift').onclick    = checkDrift;
-$('btn-loopcheck').onclick= loopCheck;
-$('btn-quality').onclick  = gradeQuality;
-$('btn-slack').onclick    = async () => { try{ const r=await(await fetch('/api/slack/test',{method:'POST'})).json();
-  alert(r.ok?'Approval card posted to Slack.':'Slack not configured.'); }catch(e){ alert('Slack not configured.'); } };
-$('btn-wa').onclick       = async () => { try{ const r=await(await fetch('/api/whatsapp/test',{method:'POST'})).json();
-  alert(r.ok?'WhatsApp approval card sent.':'WhatsApp not configured.'); }catch(e){ alert('WhatsApp not configured.'); } };
+/* ── wiring ── */
+const doFault=async(mode,level)=>{ try{ await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'}); }catch(e){}
+  setTimeout(loadServices,800); };
+$('b-run').onclick   = ()=>runLoop(true);
+$('b-ab').onclick    = ()=>runLoop(false);
+$('b-inject').onclick= ()=>doFault('traffic-ramp',12);
+$('b-reset').onclick = ()=>doFault('off',0);
+$('b-cool').onclick  = async()=>{ try{ await fetch('/api/cooldown',{method:'POST'}); }catch(e){}
+  setTimeout(()=>{loadServices();loadPrevented();},500); };
+$('b-proof').onclick = loadProof;
+$('b-blast').onclick = loadBlast;
+$('b-drift').onclick = checkDrift;
+$('b-loop').onclick  = loopCheck;
+$('b-qual').onclick  = gradeQuality;
 
 function loadAll(){ loadServices(); loadPrevented(); loadConfig(); loadSignoz(); }
 initChart(); loadAll(); loadProof();
-if(window.lucide) lucide.createIcons();
-setInterval(loadServices, 6000);
-setInterval(loadPrevented, 10000);
+setInterval(loadServices,6000);
+setInterval(loadPrevented,10000);
 </script>
 </body>
 </html>
