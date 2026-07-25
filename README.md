@@ -181,7 +181,13 @@ ChronoLens leans on SigNoz across **reads, writes, and both signals**:
 - **Silences** — while the loop actively remediates, it silences that service's alert so nobody's paged for a fix already in flight, then lifts the silence after VERIFY.
 - **Alert history / state** — LEARN reads whether guard alerts are firing to confirm recurrence from SigNoz, not just from the local ledger.
 - **Trace detail (exemplar)** — pulls a recent trace id for the service as evidence / a deep-link.
-- **MCP-compatible** — reads use the MCP query shape; the SigNoz MCP server ships alongside via `casting.yaml`.
+- **MCP server — actually called, not just "compatible"** — `src/chronolens/mcp.py` is a real JSON-RPC
+  MCP client (`initialize` → `tools/list` → `tools/call`) against the SigNoz MCP server Foundry installs.
+  Live: `SigNozMCP`, protocol `2024-11-05`, **41 tools**. The **co-pilot** (`/api/mcp/chat`,
+  `python -m chronolens.cli mcp "<question>"`) routes a plain-English question to real MCP tools —
+  `signoz_list_services`, `signoz_list_alert_rules`, `signoz_search_logs`,
+  `signoz_get_service_top_operations` — and shows every tool call it made. `/api/mcp/status` reports the
+  live tool count. Verify it yourself: `python scripts/verify_mcp.py`.
 - **Full-circle self-telemetry** — ChronoLens exports its own OTel **spans** (`chronolens.stage`) **and metrics** (`chronolens.prevented_total`, `cost_saved_usd`, `seconds_to_breach`), so its loop is visible in SigNoz next to the app it protects.
 
 ## Layout

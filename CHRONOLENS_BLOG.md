@@ -317,7 +317,45 @@ everything it concludes is written back to SigNoz.
 | **Silences** | Muted while the loop actively remediates, lifted after VERIFY — nobody is paged for a fix already in flight |
 | **Notification channels** | Discovered and reused, so ChronoLens routes its notes through the same channel an alert would |
 
-The **SigNoz MCP server** ships alongside via Foundry, and reads use the MCP-compatible query shape.
+### MCP: calling the server, not just resembling it
+
+Foundry installs the **SigNoz MCP server** alongside SigNoz, and it's tempting to call your queries
+"MCP-compatible" because they have the same shape. We did exactly that for a while — then admitted it
+was a claim about resemblance, not usage, and wrote a real client.
+
+`src/chronolens/mcp.py` is a dependency-free JSON-RPC client: it performs the `initialize` handshake,
+sends `notifications/initialized`, lists the server's tools, and invokes them with `tools/call`.
+Against the live server it reports `SigNozMCP`, protocol `2024-11-05`, and **41 tools**.
+
+Four things the protocol taught us, none of them in our first guess:
+
+- Auth is mandatory — no `SIGNOZ-API-KEY` header gets you `401 Authorization or SIGNOZ-API-KEY header required`.
+- The `Accept` header must allow **both** `application/json` *and* `text/event-stream`, or the
+  Streamable-HTTP transport refuses the request.
+- A reply may arrive as an SSE frame (`data: {...}`) instead of a JSON body, so the parser handles both.
+- Tool results are **JSON nested inside a text block** (`result.content[].text`) — a second decode.
+
+The co-pilot then routes a plain-English question to real tool calls, and the UI lists every call with
+its arguments and row count, so the answer is auditable rather than asserted:
+
+```text
+Q: which services are slowest right now?      → signoz_list_services            (5 rows)
+Q: are any alerts firing?                     → signoz_list_alert_rules         (10 rows)
+Q: any error logs in the last hour?           → signoz_search_logs              (1 row)
+Q: top operations for chronolens-store        → signoz_get_service_top_operations (4 rows)
+```
+
+Routing is rule-based on purpose: intent here is a small closed set, an LLM would add latency and a
+failure mode for no accuracy gain, and a reviewer can read the table and check it. We also removed an
+LLM "phrasing" pass that had been rewriting correct answers into generic remediation prose — it turned
+a true answer into a plausible-sounding wrong one, which is the exact failure this project exists to catch.
+
+<!-- IMAGE: the MCP co-pilot panel showing an answer plus the tool calls it made.
+     File: docs/images/mcp_copilot.png -->
+
+The reads above still go through the REST Query Builder on the hot path, because the control loop
+needs tight latency and deterministic shapes; MCP is how ChronoLens *answers questions*, and both
+paths hit the same SigNoz.
 
 ---
 
