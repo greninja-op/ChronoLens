@@ -67,15 +67,24 @@ PROJECT-PLANNING/                     # git repo (origin)
 │   │   ├── learn.py governance.py guardrails.py dollars.py record.py notify.py llm.py
 │   │   ├── drift.py loopguard.py judge.py   # Agent Watch analyzers
 │   │   ├── slack_bot.py              # ★ Slack two-way approve-to-act (see §5)
+│   │   ├── whatsapp_bot.py           # ★ WhatsApp (Meta Cloud API) approve-to-act (see §5b)
+│   │   ├── copilot.py                # NL incident co-pilot over SigNoz (see §5b)
+│   │   ├── steerage.py               # agent tool circuit-breaker + prompt steerage (see §5b)
+│   │   ├── stress.py                 # "Chrono-Stress" guardrail auto-tuning (see §5b)
+│   │   ├── sarvam.py                 # Sarvam AI translate / TTS / STT (Hindi) (see §5b)
 │   │   ├── otel_self.py metrics_self.py locking.py adapters.py
 │   │   └── cli.py                    # `python -m chronolens.cli <cmd>`
 │   ├── static/index.html             # dark control-room UI (Tailwind/Chart.js/Lucide)
 │   ├── infra/                        # AWS serverless scaffold (SAM: Lambda+EventBridge+DynamoDB+Bedrock)
-│   ├── tests/                        # pytest (unit + property-based)
+│   ├── tests/                        # pytest (14 test files, unit + property-based)
+│   ├── docs/images/                  # screenshots used by README/blog (no .md files here)
 │   ├── scripts/bringup.sh            # one-command SigNoz + MCP via Foundry
 │   ├── casting.yaml (+ .lock)        # reproducible Foundry install (hackathon requirement)
+│   ├── Dockerfile, docker-compose.yml# app tier: store (8090) + mission-control (8095)
+│   ├── SUBMISSION.md                 # hackathon submission worksheet (form fields + checklist)
+│   ├── CHRONOLENS_BLOG.md            # long-form technical blog draft
 │   ├── requirements.txt requirements-dev.txt pytest.ini
-│   ├── .env  (git-ignored)           # SECRETS live here — SigNoz + Slack tokens
+│   ├── .env  (git-ignored)           # SECRETS live here — SigNoz + Slack + WhatsApp + Sarvam
 │   ├── .env.example                  # template
 │   └── ERROR-AND-FIXES.md            # every gotcha already hit + fix — READ IF SOMETHING BREAKS
 └── docs/, research/, assets/         # planning docs, research archive, blog drafts
@@ -153,6 +162,52 @@ cards appear. Requires `slack_sdk` + `slack_bolt` (in requirements.txt; `pip ins
 > Deps note: `slack_sdk` and `slack_bolt` must be installed in the venv. The venv is at
 > `chronolens/.venv/` (use `.venv\Scripts\python.exe` on Windows).
 
+**Other secrets in `.env`** (all optional — each feature no-ops when unset; see `.env.example`):
+`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`,
+`WHATSAPP_API_VERSION`, `WHATSAPP_RECIPIENT_NUMBER`, `SARVAM_API_KEY` (+ `SARVAM_STT_MODEL`,
+`SARVAM_TTS_MODEL`, `SARVAM_TTS_SPEAKER`), `OPENAI_API_KEY`, `BEDROCK_MODEL`, `AWS_REGION`,
+`AZURE_AI_ENDPOINT`/`AZURE_AI_KEY`/`AZURE_AI_API_VERSION`/`AZURE_CHAT_MODEL`, `LLM_PROVIDER`
+(`none|openai|bedrock|gemini|azure`). Config helpers: `slack_enabled()`, `whatsapp_enabled()`,
+`sarvam_enabled()`.
+
+---
+
+## 5b. Other features already built (from an earlier session) — READ THIS
+
+These exist in the code and are wired to `app.py` endpoints. **Several have docstrings that
+over-claim what they actually do — the honest status is noted per item. Verify before demoing or
+describing any of these.**
+
+| Module | Endpoint(s) | What it really does | Reads SigNoz? |
+|---|---|---|---|
+| `whatsapp_bot.py` | `GET/POST /webhook/whatsapp`, `POST /api/whatsapp/test`, `GET /api/whatsapp/status` | Meta WhatsApp Cloud API approve-to-act: HMAC-SHA256 webhook verification, interactive button cards (approve/deny + agent break/ignore), button tap → runs the real `run_loop()`. Optional Hindi via Sarvam. Also fired from `loop.py` when `whatsapp_enabled()`. | **Yes** (indirectly — approve path runs the full loop) |
+| `copilot.py` | `POST /api/mcp/chat` | NL "incident co-pilot": lists services + reads p99 per service from SigNoz, picks the worst, explains via the LLM layer, returns a SigNoz deep link. | **Yes** (real `list_services` + `service_p99_ms`) |
+| `steerage.py` | `POST /api/agent/circuit-break`, `POST /api/agent/steer` | In-memory tool circuit breaker (open/half-open/cooldown) + a system-prompt "steerage" string telling the agent to stop calling a tool. | **No** — docstring claims SigNoz span metrics; there is no SigNoz code in it |
+| `stress.py` | `POST /api/stress/run` | Runs a forecast over a hardcoded synthetic series, then mutates `cfg.min_slope_ms_per_s` / `cfg.min_dwell_s` at runtime ("auto-tuning"). | **No** — accepts an `sn` param but never uses it |
+| `sarvam.py` | `POST /api/sarvam/translate` | Sarvam AI `translate` / `text-to-speech` / `speech-to-text` HTTP calls; no-ops when no API key. TTS/STT are **not** wired to any endpoint. | **No** |
+| `foresee.generate_counterfactual_projection` | `GET /api/counterfactual` | Dual-timeline chart data (breach path vs defused path). **Fully synthetic** — takes no SigNoz input. | **No** |
+| `loopguard.apply_dynamic_throttle` | `POST /api/agent/throttle`, `GET /api/agent/throttle/status` | Module-level throttle state (token cap); also best-effort pings the agent. Note: uses a **hardcoded** `localhost:8091`, not `cfg.agent_url`. | **No** |
+| `dollars.build_executive_cfo_report` | `GET /api/cfo/report` | Executive ROI report from the ledger + **hardcoded assumptions** (SLA $/min, avg outage minutes) and asserts "100% verification rate" / "0 flap oscillations" as literals. | **No** |
+
+### ⚠️ Known issues found in an audit of the above — fix before submitting/demoing
+1. **Over-claiming docstrings.** `steerage.py` and `stress.py` say they use "real-time OpenTelemetry
+   span metrics from SigNoz" — they don't. Either wire them to SigNoz or reword the docstrings. A judge
+   reading the code will notice.
+2. **Synthetic data presented as results.** `/api/counterfactual` is fully generated; the CFO report
+   hardcodes SLA assumptions and asserts perfect verification. Label these as projections/estimates in
+   the UI and docs, don't present them as measured.
+3. **Security — WhatsApp:** `verify_whatsapp_signature` **returns True when the app secret or signature
+   header is missing** (dev soft-bypass). That means an unsigned request is accepted if the secret is
+   unset. Also `GET /api/whatsapp/status` **returns the `verify_token` in its response body** — remove that.
+4. **Committed non-placeholder defaults in `config.py`:** `WHATSAPP_VERIFY_TOKEN` and
+   `WHATSAPP_RECIPIENT_NUMBER` default to a real-looking token and phone number in source. Replace with
+   empty defaults.
+5. **`copilot.py` ignores the user's question** — `query_clean` is computed and never used; the answer is
+   built from the worst-p99 service regardless of what was asked. `mcp_query_type` is a static string
+   (no actual MCP call). Either implement intent handling or describe it accurately.
+6. **`/api/agent/circuit-break` builds a fresh breaker per request**, so circuit state never persists
+   between calls, and it feeds a hardcoded `latency_ms=4000.0`.
+
 ---
 
 ## 6. SigNoz & infrastructure — bring the backend up (REQUIRED for a live run)
@@ -223,25 +278,33 @@ The **only** things the project needs from SigNoz are: the **running backend** (
 ## 7. Current state — done / in progress / next
 
 **Done & verified:**
-- Full closed loop, Agent Watch, Mission Control UI, tests, AWS SAM scaffold, `casting.yaml(.lock)`.
+- Full closed loop, Agent Watch, Mission Control UI, 14 test files, AWS SAM scaffold, `casting.yaml(.lock)`,
+  Dockerfile + docker-compose app tier.
 - Verified live against a running SigNoz (breach predicted → reversible action → SigNoz-confirmed).
-- **Slack approve-to-act — DONE for both the infra loop AND Agent Watch.** Tested: cards post to the
-  channel, the listener runs, clicking a button drives the real path and rewrites the message.
+- **Slack approve-to-act — DONE for both the infra loop AND Agent Watch.** Tested live: cards post to
+  the channel, the listener connects, clicking a button drives the real path and rewrites the message.
+- **WhatsApp approve-to-act, NL co-pilot, tool circuit-breaker/steerage, stress auto-tuning, Sarvam
+  multilingual, counterfactual chart, agent throttle, CFO report** — all built and wired (see §5b,
+  including the honest caveats on each).
+- `SUBMISSION.md` (submission worksheet) and `CHRONOLENS_BLOG.md` (blog draft) exist.
 
-**Where we left off (a live demo was running):**
-- The demo agent (`:8091`) was started in **loop mode** and the Slack **listener** was running; a real
-  agent-loop card was posted to the channel for a click-through demo. Those were local background
-  processes and will have stopped when the IDE/terminals closed — just restart them (see §5 and §4).
+**Where we left off:**
+- A live Slack click-through demo was running (demo agent on `:8091` in **loop mode** + the Slack
+  listener). Those were local background processes and have since been stopped — just restart them
+  (see §5 / §4).
 
 **Next up (highest value first):**
-1. **Make Agent Watch read from SigNoz (the one honest gap).** Today `loopcheck`/`drift` call the
-   agent's `/chat` directly. Change them to query the agent's GenAI spans **from SigNoz** (the
-   `agent.turn` spans carry `gen_ai.usage.*`, `llm.step_count`, `llm.cost_usd`, `agent.tools`,
-   `agent.looping`). This makes "deep SigNoz usage" true across the whole product. Extend `signoz.py`
-   as needed.
-2. Prove the whole thing end-to-end live (SigNoz + demo store + agent + Slack listener), fix any wiring.
-3. Wire the loopcheck/drift/quality + agent-mode controls into Mission Control UI buttons (click-driven demo).
-4. (Optional) Real Bedrock LLM mode for EXPLAIN + the demo agent; make the SAM scaffold a real deploy.
+1. **Fix the 6 audit issues in §5b** — the over-claiming docstrings, synthetic-data labelling, the
+   WhatsApp signature soft-bypass + leaked `verify_token`, and the committed non-placeholder defaults.
+   These are correctness/credibility/security problems, so they outrank new features.
+2. **Make Agent Watch detect from SigNoz spans.** `/api/agent/loopcheck` and `/api/agent/drift` still
+   call the agent's `/chat` directly. Query the `agent.turn` GenAI spans **from SigNoz** instead (they
+   carry `gen_ai.usage.*`, `llm.step_count`, `llm.cost_usd`, `agent.tools`, `agent.looping`). Extend
+   `signoz.py` as needed. (Note: `copilot.py` already does real SigNoz reads — use it as the pattern.)
+3. Prove the whole thing end-to-end live (SigNoz + demo store + agent + Slack listener) and fix any wiring.
+4. Wire the loopcheck/drift/quality + agent-mode controls into Mission Control UI buttons (click-driven demo).
+5. Record the ≤3-min demo video and finish `SUBMISSION.md` (incl. **declaring AI-assistant usage** — see §11).
+6. (Optional) Real Bedrock LLM mode for EXPLAIN + the demo agent; make the SAM scaffold a real deploy.
 
 ---
 
