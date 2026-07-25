@@ -91,6 +91,8 @@ Only after SigNoz confirms stabilization does ChronoLens mark the incident as **
 
 Alert fatigue is real. SREs receive hundreds of unactionable Slack/email pings daily. ChronoLens changes this by making alerts **interactive and actionable**:
 
+![WhatsApp Approve-to-Act Interactive Card](docs/images/whatsapp_approval.png)
+
 1. **Card Delivery**: When a breach is forecasted, ChronoLens posts an interactive WhatsApp card containing:
    - Affected Service & Current P99
    - Predicted ETA to SLO breach
@@ -103,11 +105,17 @@ Alert fatigue is real. SREs receive hundreds of unactionable Slack/email pings d
 
 ## 🌐 Mission Control Dashboard
 
+![ChronoLens Mission Control Dashboard](docs/images/dashboard.png)
+
 The ChronoLens web dashboard (`http://localhost:8095`) provides complete real-time visibility:
 - **Top 4 Scorecards**: Incidents Prevented, Total Cost Saved, Current P99 Latency vs. SLO, and Agent Watch Circuit Status.
 - **Dark Emerald P99 Latency Graph**: Live Chart.js visualization comparing actual latency against the predicted slope and 500ms SLO threshold.
 - **Vertical Cascade Topology**: Service dependency graph (`/order` → `cart.lookup` → `inventory.check` → `payment.charge` → `payment.db_query`) highlighting root-cause spans.
+
+![Vertical Cascade Topology](docs/images/cascade_topology.png)
+
 - **Prevention Ledger**: Real-time log of every prevented incident, action taken, and dollar savings.
+
 
 ---
 
