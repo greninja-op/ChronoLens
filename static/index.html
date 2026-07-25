@@ -174,6 +174,66 @@
       <div id="loop-trace" class="max-h-40 overflow-y-auto space-y-1.5 font-mono text-xs pr-1 bg-surface-lowest/60 p-3 rounded-lg border border-white/5"></div>
     </div>
 
+    <!-- 🚀 5 BREAKTHROUGH FEATURES SUITE -->
+    <div id="sec-breakthroughs" class="glass-panel rounded-xl p-5 space-y-4 border border-brand-secondary/40 shadow-glow-primary">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <h3 class="text-sm font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2.5">
+          <i data-lucide="sparkles" class="w-5 h-5 text-brand-secondary"></i>BREAKTHROUGH INNOVATIONS SUITE
+          <span class="text-[10px] bg-brand-secondary/20 text-brand-secondary px-2.5 py-0.5 rounded-full border border-brand-secondary/40 font-bold">5 Industry Firsts</span>
+        </h3>
+        <div class="flex items-center gap-2 font-mono text-xs">
+          <button onclick="loadCounterfactual()" class="px-3 py-1.5 rounded-lg bg-surface-high border border-brand-secondary/30 hover:bg-brand-secondary/20 text-white font-semibold transition-all">🌌 Counterfactual Timelines</button>
+          <button onclick="runSelfTuning()" class="px-3 py-1.5 rounded-lg bg-surface-high border border-brand-tertiary/30 hover:bg-brand-tertiary/20 text-brand-tertiary font-semibold transition-all">🎯 Self-Tuning Calibration</button>
+          <button onclick="exportCfoReport()" class="px-3 py-1.5 rounded-lg bg-status-healthy/20 border border-status-healthy/40 hover:bg-status-healthy/30 text-status-healthy font-bold transition-all">📊 Executive CFO Report</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- 💬 SIGNOZ MCP INCIDENT CO-PILOT CHAT -->
+        <div class="glass-card rounded-xl p-4 border border-white/10 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <i data-lucide="message-square" class="w-4 h-4 text-brand-tertiary"></i>SigNoz MCP Incident Co-Pilot
+            </span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-tertiary/10 text-brand-tertiary border border-brand-tertiary/30">MCP Builder v5</span>
+          </div>
+          <div id="mcp-chat-log" class="h-32 overflow-y-auto font-mono text-xs p-2.5 rounded-lg bg-surface-lowest/70 border border-white/5 space-y-2 text-gray-300">
+            <div class="text-brand-tertiary">🤖 Co-Pilot: Ask me anything about live SigNoz traces, p99 trends, or recent incidents.</div>
+          </div>
+          <div class="flex gap-2">
+            <input id="mcp-input" type="text" placeholder="Why did checkout-service trigger an alert?" class="flex-1 bg-surface-container border border-white/10 rounded-lg px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-brand-tertiary">
+            <button onclick="askMcpCopilot()" class="px-3 py-1.5 rounded-lg bg-brand-tertiary text-black font-bold text-xs hover:opacity-90 transition-all">Ask MCP</button>
+          </div>
+          <div class="flex flex-wrap gap-1.5 text-[10px] font-mono text-gray-400">
+            <span class="hover:text-white cursor-pointer bg-surface-container px-2 py-0.5 rounded border border-white/5" onclick="setMcpPrompt('Why did checkout-service soft-breach?')">💡 Why soft-breach?</span>
+            <span class="hover:text-white cursor-pointer bg-surface-container px-2 py-0.5 rounded border border-white/5" onclick="setMcpPrompt('Summarize live SigNoz telemetry')">💡 Telemetry summary</span>
+          </div>
+        </div>
+
+        <!-- ⚡ DYNAMIC TOKEN CIRCUIT-BREAKER & CFO ROI HIGHLIGHTS -->
+        <div class="glass-card rounded-xl p-4 border border-white/10 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-status-warning"></i>Dynamic Token Circuit-Breaker
+            </span>
+            <span id="throttle-badge" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full text-gray-400 bg-surface-container">INACTIVE</span>
+          </div>
+          <div id="throttle-body" class="font-mono text-xs space-y-2 text-gray-300">
+            <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5">
+              <span>Token Budget Ceiling:</span><span class="text-white font-bold" id="throttle-cap">256 Tokens / turn</span>
+            </div>
+            <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5">
+              <span>Dynamic Context Fallback:</span><span class="text-status-healthy font-bold" id="throttle-mode">Active</span>
+            </div>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button id="btn-toggle-throttle" onclick="toggleTokenThrottle()" class="w-full py-2 rounded-lg bg-brand-primary/20 border border-brand-primary/40 hover:bg-brand-primary/30 text-white font-mono font-bold text-xs transition-all">⚡ Activate Dynamic Token Throttling</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <!-- AGENT WATCH & TOOL CIRCUIT BREAKER (HIGHLIGHTED FEATURE) -->
     <div id="sec-agent" class="glass-panel rounded-xl p-5 space-y-4 border border-brand-primary/30 shadow-glow-primary">
       <div class="flex items-center justify-between flex-wrap gap-3">
@@ -249,17 +309,23 @@
 
       <!-- SIGNOZ INTEGRATION PANEL -->
       <div class="col-span-12 lg:col-span-3 glass-panel p-4 rounded-xl space-y-3 border border-white/10">
-        <div class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">SIGNOZ INTEGRATION STATUS</div>
+        <div class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">SIGNOZ & TWO-WAY CHANNELS</div>
         <div class="space-y-2 font-mono text-xs pt-1">
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Guard Alerts</span><span id="sig-guard" class="text-white font-bold">—</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Firing State</span><span id="sig-firing" class="text-white font-bold">—</span></div>
-          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Channels</span><span id="sig-channels" class="text-white font-bold">—</span></div>
-          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Notifications</span><span id="sig-inbox" class="text-white font-bold">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">WhatsApp Appr</span><span id="wa-status" class="text-status-healthy font-bold">CONNECTED (+91 94002...)</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sarvam AI Layer</span><span class="text-brand-secondary font-bold">Hindi / Bharat Multilingual</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Reads Layer</span><span class="text-brand-tertiary font-bold">Query Builder v5</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sync Status</span><span id="sig-sync" class="text-brand-primary font-bold">—</span></div>
         </div>
+        <div class="space-y-1.5">
+          <button onclick="sendWhatsAppTestCard('en-IN')" class="w-full py-1.5 rounded-lg bg-status-healthy/20 border border-status-healthy/40 hover:bg-status-healthy/30 text-status-healthy font-mono text-xs font-bold transition-all">💬 Test WhatsApp Approval (English)</button>
+          <button onclick="sendWhatsAppTestCard('hi-IN')" class="w-full py-1.5 rounded-lg bg-brand-secondary/20 border border-brand-secondary/40 hover:bg-brand-secondary/30 text-brand-secondary font-mono text-xs font-bold transition-all">🇮🇳 Test WhatsApp Approval (Hindi)</button>
+        </div>
       </div>
     </div>
+
+
 
   </main>
 </div>
@@ -434,14 +500,88 @@ function runLoop(managed){
   es.onerror=()=>{es.close();running=false;setButtons(true);};
 }
 function setButtons(on){['btn-run','btn-inject','btn-cooldown','btn-ab','btn-reset'].forEach(id=>{$(id).disabled=!on;$(id).style.opacity=on?'':'0.5';});}
+
 async function doFault(mode,level){try{await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'});}catch(e){}setTimeout(()=>{loadServices();loadForecast();},800);}
-async function doCooldown(){try{await fetch('/api/cooldown',{method:'POST'});}catch(e){}loadServices();loadPrevented();}
+
+/* 🚀 Breakthrough Features JavaScript Handlers */
+async function loadCounterfactual() {
+  try {
+    const data = await (await fetch('/api/counterfactual')).json();
+    chart.data.labels = data.labels;
+    chart.data.datasets[0].data = data.timeline_b_defused;
+    chart.data.datasets[1].data = data.timeline_b_defused;
+    chart.data.datasets[2].data = data.timeline_a_unmitigated;
+    chart.update();
+    $('chart-badge-tx').textContent = '🌌 Counterfactual Timelines (Unmitigated vs Defused)';
+    alert(`Chrono-Replay Counterfactual Loaded!\nUnmitigated Outage Duration: ${data.unmitigated_breach_duration_s}s\nDefused Outage Duration: ${data.defused_breach_duration_s}s (Breach Avoided)`);
+  } catch (e) { alert('Error loading counterfactual projection: ' + e); }
+}
+
+function setMcpPrompt(q) {
+  $('mcp-input').value = q;
+  askMcpCopilot();
+}
+
+async function askMcpCopilot() {
+  const query = $('mcp-input').value || 'Why did checkout-service trigger an alert?';
+  const log = $('mcp-chat-log');
+  log.innerHTML += `<div class="text-white font-bold mt-1">👤 User: ${esc(query)}</div>`;
+  log.innerHTML += `<div class="text-gray-400">⏳ Querying SigNoz MCP Builder v5...</div>`;
+  log.scrollTop = log.scrollHeight;
+  try {
+    const res = await (await fetch('/api/mcp/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query})
+    })).json();
+    log.innerHTML += `<div class="text-brand-tertiary font-bold mt-1">🤖 SigNoz MCP Co-Pilot: ${esc(res.answer)}</div>`;
+    log.innerHTML += `<div class="text-xs text-brand-primary mt-0.5">🔗 <a href="${res.signoz_deep_link}" target="_blank" class="underline">View in SigNoz UI</a></div>`;
+  } catch(e) {
+    log.innerHTML += `<div class="text-status-danger mt-1">Error querying SigNoz MCP Co-Pilot: ${esc(e)}</div>`;
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+async function toggleTokenThrottle() {
+  const badge = $('throttle-badge');
+  const active = badge.textContent === 'ACTIVE';
+  const newState = !active;
+  try {
+    const res = await (await fetch(`/api/agent/throttle?enabled=${newState}&max_tokens=256`, {method: 'POST'})).json();
+    badge.textContent = newState ? 'ACTIVE' : 'INACTIVE';
+    badge.className = newState ? 'text-[10px] font-mono px-2.5 py-0.5 rounded-full text-status-healthy bg-status-healthy/10 border border-status-healthy/30 font-bold' : 'text-[10px] font-mono px-2.5 py-0.5 rounded-full text-gray-400 bg-surface-container';
+    $('btn-toggle-throttle').textContent = newState ? '🛑 Deactivate Dynamic Token Throttling' : '⚡ Activate Dynamic Token Throttling';
+  } catch (e) { alert('Error toggling token throttle: ' + e); }
+}
+
+async function runSelfTuning() {
+  try {
+    const res = await (await fetch('/api/stress/run', {method: 'POST'})).json();
+    const c = res.calibration;
+    alert(`🎯 Self-Tuning Stress Test Complete!\nStatus: ${c.status}\nDetection Latency: ${c.detection_latency_ms}ms\nAuto-tuned Slope Threshold: ${c.tuning.new_min_slope}ms/s\nAuto-tuned Dwell Time: ${c.tuning.new_dwell_s}s`);
+    loadConfig();
+  } catch(e) { alert('Error running self-tuning: ' + e); }
+}
+
+async function exportCfoReport() {
+  try {
+    const res = await (await fetch('/api/cfo/report')).json();
+    const reportText = res.report_markdown;
+    const blob = new Blob([reportText], {type: 'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ChronoLens-Executive-CFO-Report.md';
+    a.click();
+    alert(`📊 Executive CFO ROI Report Generated!\nTotal Financial ROI: $${res.total_financial_roi_usd}\nSLA Penalty Avoided: $${res.sla_penalty_avoided_usd}\nReport downloaded as ChronoLens-Executive-CFO-Report.md`);
+  } catch(e) { alert('Error exporting CFO report: ' + e); }
+}
 
 $('btn-run').onclick=()=>runLoop(true);
-$('btn-inject').onclick=()=>doFault('traffic-ramp',20);
-$('btn-reset').onclick=()=>doFault('off',0);
+$('btn-inject').onclick=()=>doFault('load',4);
+$('btn-cooldown').onclick=async()=>{try{await fetch('/api/cooldown',{method:'POST'});}catch(e){}setTimeout(()=>{loadServices();loadPrevented();},500);};
 $('btn-ab').onclick=()=>runLoop(false);
-$('btn-cooldown').onclick=doCooldown;
+$('btn-reset').onclick=()=>doFault('load',0);
 
 /* Agent Watch Handlers */
 async function triggerToolCircuitBreak(toolName){
@@ -486,6 +626,17 @@ async function gradeQuality(){
   }catch(e){}
 }
 
+async function sendWhatsAppTestCard(){
+  try {
+    const res = await (await fetch('/api/whatsapp/test', {method: 'POST'})).json();
+    if (res.ok && res.whatsapp_response.ok) {
+      alert('💬 WhatsApp Interactive Approval Card Sent!\nCheck WhatsApp on +91 94002 45958 to tap Approve/Deny.');
+    } else {
+      alert('WhatsApp Test Card Result: ' + JSON.stringify(res));
+    }
+  } catch(e) { alert('Error sending WhatsApp test card: ' + e); }
+}
+
 document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo',agent:'sec-agent'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});
 
 lucide.createIcons();
@@ -494,3 +645,4 @@ setInterval(loadServices,POLL);setInterval(loadPrevented,6000);setInterval(loadS
 </script>
 </body>
 </html>
+

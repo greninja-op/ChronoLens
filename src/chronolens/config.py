@@ -79,6 +79,20 @@ class Config:
     slack_app_token: str    # xapp-… : opens the Socket Mode connection (no public URL)
     slack_channel: str      # channel id/name ChronoLens posts approvals to
 
+    # --- WhatsApp Business Cloud API (Meta) approve-to-act ---
+    whatsapp_token: str
+    whatsapp_phone_number_id: str
+    whatsapp_app_secret: str
+    whatsapp_verify_token: str
+    whatsapp_api_version: str
+    whatsapp_recipient_number: str
+
+    # --- Sarvam AI (Bharat & Multilingual Layer) ---
+    sarvam_api_key: str
+    sarvam_stt_model: str
+    sarvam_tts_model: str
+    sarvam_tts_speaker: str
+
     @classmethod
     def load(cls) -> "Config":
         return cls(
@@ -115,11 +129,30 @@ class Config:
             slack_bot_token=os.getenv("SLACK_BOT_TOKEN", ""),
             slack_app_token=os.getenv("SLACK_APP_TOKEN", ""),
             slack_channel=os.getenv("SLACK_CHANNEL", "#chronolens"),
+            whatsapp_token=os.getenv("WHATSAPP_TOKEN", ""),
+            whatsapp_phone_number_id=os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""),
+            whatsapp_app_secret=os.getenv("WHATSAPP_APP_SECRET", ""),
+            whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", "versifine-verify-2348"),
+            whatsapp_api_version=os.getenv("WHATSAPP_API_VERSION", "v23.0"),
+            whatsapp_recipient_number=os.getenv("WHATSAPP_RECIPIENT_NUMBER", "919400245958"),
+            sarvam_api_key=os.getenv("SARVAM_API_KEY", ""),
+            sarvam_stt_model=os.getenv("SARVAM_STT_MODEL", "saaras:v3"),
+            sarvam_tts_model=os.getenv("SARVAM_TTS_MODEL", "bulbul:v3"),
+            sarvam_tts_speaker=os.getenv("SARVAM_TTS_SPEAKER", "ritu"),
         )
 
     def slack_enabled(self) -> bool:
         """Slack approve-to-act is live only when both tokens are present."""
         return bool(self.slack_bot_token and self.slack_app_token)
+
+    def whatsapp_enabled(self) -> bool:
+        """WhatsApp Cloud API integration is live when token and phone_number_id are present."""
+        return bool(self.whatsapp_token and self.whatsapp_phone_number_id)
+
+    def sarvam_enabled(self) -> bool:
+        """Sarvam AI translation & speech layer is active when API key is present."""
+        return bool(self.sarvam_api_key)
+
 
     def require_signoz(self) -> None:
         """Fail fast with a clear message if SigNoz creds are missing."""
@@ -127,6 +160,7 @@ class Config:
             raise RuntimeError(
                 "SIGNOZ_URL and SIGNOZ_API_KEY must be set (copy .env.example to .env)."
             )
+
 
 
 # SLO in nanoseconds (SigNoz stores span durations as duration_nano).

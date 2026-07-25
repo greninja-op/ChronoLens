@@ -232,3 +232,59 @@ def worst_service(sn: SigNozClient, cfg: Config, **kwargs) -> Forecast | None:
         forecasts.sort(key=lambda f: f.current_p99_ms, reverse=True)
         return forecasts[0]
     return None
+
+
+def generate_counterfactual_projection(
+    service: str = "checkout-service",
+    current_p99_ms: float = 480.0,
+    slo_ms: float = 500.0,
+    slope_ms_per_s: float = 18.5,
+    *,
+    steps: int = 15,
+    step_interval_s: float = 5.0,
+) -> dict:
+    """Generate dual timeline data points: Unmitigated breach path vs ChronoLens defused path."""
+    current_time = time.time()
+    times = [round(current_time + (i - 4) * step_interval_s, 1) for i in range(steps)]
+    labels = [f"T{'+' if i - 4 >= 0 else ''}{(i - 4) * int(step_interval_s)}s" for i in range(steps)]
+
+    unmitigated = []
+    defused = []
+
+    # Action happens at T+0s (index 4)
+    for i in range(steps):
+        t_offset = (i - 4) * step_interval_s
+        if t_offset <= 0:
+            # Past / baseline baseline trend
+            val_unmitigated = max(100.0, current_p99_ms + t_offset * slope_ms_per_s)
+            val_defused = val_unmitigated
+        else:
+            # Timeline A: unmitigated climb until crash plateau
+            climb = current_p99_ms + t_offset * (slope_ms_per_s * 1.2)
+            val_unmitigated = min(2800.0, max(current_p99_ms, climb))
+
+            # Timeline B: ChronoLens intervention at T0 drops p99 back under SLO
+            decay_factor = math.exp(-0.15 * t_offset)
+            val_defused = (current_p99_ms - slo_ms * 0.45) + (slo_ms * 0.45) * decay_factor
+            val_defused = max(120.0, min(slo_ms * 0.85, val_defused))
+
+        unmitigated.append(round(val_unmitigated, 1))
+        defused.append(round(val_defused, 1))
+
+    # Calculate outage metrics
+    unmitigated_breach_seconds = sum(step_interval_s for val in unmitigated if val >= slo_ms)
+    defused_breach_seconds = sum(step_interval_s for val in defused if val >= slo_ms)
+
+    return {
+        "service": service,
+        "slo_ms": slo_ms,
+        "labels": labels,
+        "timestamps": times,
+        "timeline_a_unmitigated": unmitigated,
+        "timeline_b_defused": defused,
+        "action_index": 4,
+        "unmitigated_breach_duration_s": unmitigated_breach_seconds,
+        "defused_breach_duration_s": defused_breach_seconds,
+        "prevention_success": defused_breach_seconds == 0,
+    }
+

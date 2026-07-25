@@ -305,30 +305,41 @@ def _maybe_notify(cfg, svc, outcome, action, eta_s, p99_before, p99_after,
 
 
 def _maybe_request_approval(cfg, svc, rem, fc, timeline) -> None:
-    """When GOVERN only *suggests*, ask a human to approve via Slack (fail-open).
-
-    Posts an interactive Approve/Deny message; the Socket Mode listener
-    (``python -m chronolens.cli slack``) turns the click into the real
-    PREVENT → VERIFY → COOLDOWN → RECORD path. No Slack configured → no-op.
-    """
-    if not cfg.slack_enabled():
-        return
-    try:
-        from .slack_bot import post_approval
-        res = post_approval(cfg, service=svc, signal=rem.signal, action=rem.action,
-                            why=rem.why, eta_s=fc.seconds_to_breach,
-                            p99_ms=fc.current_p99_ms, confidence=fc.confidence,
-                            slo_ms=cfg.p99_slo_ms)
-        if res.ok:
-            timeline.append({"step": "APPROVE", "status": "pending",
-                             "text": f"Posted an approval request to Slack ({cfg.slack_channel}) — "
-                                     f"waiting for a human to Approve/Deny."})
-        else:
+    """When GOVERN only *suggests*, ask a human to approve via Slack or WhatsApp (fail-open)."""
+    if cfg.slack_enabled():
+        try:
+            from .slack_bot import post_approval
+            res = post_approval(cfg, service=svc, signal=rem.signal, action=rem.action,
+                                why=rem.why, eta_s=fc.seconds_to_breach,
+                                p99_ms=fc.current_p99_ms, confidence=fc.confidence,
+                                slo_ms=cfg.p99_slo_ms)
+            if res.ok:
+                timeline.append({"step": "APPROVE", "status": "pending",
+                                 "text": f"Posted an approval request to Slack ({cfg.slack_channel}) — "
+                                         f"waiting for a human to Approve/Deny."})
+            else:
+                timeline.append({"step": "APPROVE", "status": "info",
+                                 "text": f"Slack approval not sent: {res.reason}"})
+        except Exception as exc:  # fail open — Slack must never break the loop
             timeline.append({"step": "APPROVE", "status": "info",
-                             "text": f"Slack approval not sent: {res.reason}"})
-    except Exception as exc:  # fail open — Slack must never break the loop
-        timeline.append({"step": "APPROVE", "status": "info",
-                         "text": f"Slack approval skipped: {exc}"})
+                             "text": f"Slack approval skipped: {exc}"})
+
+    if cfg.whatsapp_enabled():
+        try:
+            from .whatsapp_bot import post_whatsapp_approval
+            plan = {"action": rem.action, "capacity_delta": 1}
+            wa_res = post_whatsapp_approval(fc, plan, cfg)
+            if wa_res.get("ok"):
+                timeline.append({"step": "APPROVE", "status": "pending",
+                                 "text": f"Posted interactive approval card to WhatsApp ({cfg.whatsapp_recipient_number}) — "
+                                         f"waiting for Approve/Deny."})
+            else:
+                timeline.append({"step": "APPROVE", "status": "info",
+                                 "text": f"WhatsApp approval not sent: {wa_res.get('error', 'unknown')}"})
+        except Exception as exc:  # fail open
+            timeline.append({"step": "APPROVE", "status": "info",
+                             "text": f"WhatsApp approval skipped: {exc}"})
+
 
 
 def _silence_id(result) -> str | None:

@@ -85,14 +85,26 @@ ANSWERS = {
 
 
 @app.get("/chat")
-def chat(msg: str = "a latte and a croissant please") -> dict:
+def chat(msg: str = "a latte and a croissant please", max_tokens_override: int | None = None) -> dict:
     now = time.time()
     plan = _plan(_state["mode"])
     model, tools = plan["model"], plan["tools"]
     tin, tout = plan["in_tok"], plan["out_tok"]
+
+    is_throttled = _state.get("throttled", False) or bool(max_tokens_override)
+    if is_throttled:
+        max_tok = max_tokens_override or _state.get("max_tokens", 256)
+        tout = min(tout, max_tok // 2)
+        tin = min(tin, max_tok // 2)
+        model = "gpt-4o-mini"
+        if len(tools) > 2:
+            tools = tools[:2]
+
     steps = len(tools)
     cost = _cost(model, tin, tout)
     answer = ANSWERS.get(_state["mode"], ANSWERS["normal"])
+    if is_throttled:
+        answer = f"[THROTTLED BY CHRONOLENS] {answer[:120]}..."
 
     with tracer.start_as_current_span("agent.turn", kind=SpanKind.SERVER) as turn:
         turn.set_attribute("gen_ai.system", "openai")
@@ -102,8 +114,9 @@ def chat(msg: str = "a latte and a croissant please") -> dict:
         turn.set_attribute("llm.step_count", steps)
         turn.set_attribute("llm.cost_usd", cost)
         turn.set_attribute("agent.tools", ",".join(tools))
-        turn.set_attribute("agent.looping", bool(plan.get("looping")))
+        turn.set_attribute("agent.looping", bool(plan.get("looping")) and not is_throttled)
         turn.set_attribute("agent.answer_len", tout)
+        turn.set_attribute("chronolens.throttled", is_throttled)
         turn.set_attribute("gen_ai.response.preview", answer[:200])
         # one LLM "thinking" span
         with tracer.start_as_current_span("gen_ai.chat", kind=SpanKind.INTERNAL) as llm:
@@ -119,7 +132,8 @@ def chat(msg: str = "a latte and a croissant please") -> dict:
 
     return {"mode": _state["mode"], "model": model, "tools": tools, "steps": steps,
             "input_tokens": tin, "output_tokens": tout, "cost_usd": cost,
-            "looping": bool(plan.get("looping")), "answer": answer}
+            "looping": bool(plan.get("looping")) and not is_throttled,
+            "throttled": is_throttled, "answer": answer}
 
 
 @app.get("/admin/mode")
@@ -130,11 +144,19 @@ def set_mode(mode: str = "normal") -> dict:
     return {"mode": mode}
 
 
+@app.get("/admin/throttle")
+def set_throttle(enabled: bool = True, max_tokens: int = 256) -> dict:
+    _state["throttled"] = enabled
+    _state["max_tokens"] = max_tokens
+    return {"throttled": enabled, "max_tokens": max_tokens}
+
+
 @app.get("/admin/status")
 def status() -> dict:
-    return {"mode": _state["mode"], "service": SERVICE_NAME,
+    return {"mode": _state["mode"], "service": SERVICE_NAME, "throttled": _state.get("throttled", False),
             "baseline": {"model": "gpt-4o-mini", "tools": BASELINE_TOOLS,
                          "typical_steps": 2, "typical_out_tokens": 150}}
+
 
 
 @app.get("/health")

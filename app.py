@@ -419,9 +419,189 @@ def agent_steer(tool_name: str = "search_store", reason: str = "looping"):
     return {"ok": True, "steerage_prompt": prompt, "action": "injected_to_context"}
 
 
+# --------------------------------------------------------------------------- #
+# Breakthrough Feature APIs (Counterfactual, Throttle, MCP Copilot, Stress, CFO)
+# --------------------------------------------------------------------------- #
+@app.get("/api/counterfactual")
+def get_counterfactual(service: str = "checkout-service"):
+    """Generate dual timeline data points: Unmitigated breach path vs ChronoLens defused path."""
+    from chronolens.foresee import generate_counterfactual_projection
+    return generate_counterfactual_projection(service=service, slo_ms=cfg.p99_slo_ms)
+
+
+@app.post("/api/agent/throttle")
+def agent_throttle(enabled: bool = True, max_tokens: int = 256):
+    """Dynamically cap agent context window and token budget across turns."""
+    from chronolens.loopguard import apply_dynamic_throttle
+    # also attempt notifying demo_agent if up
+    try:
+        httpx.get(f"http://localhost:8091/admin/throttle?enabled={str(enabled).lower()}&max_tokens={max_tokens}", timeout=1.0)
+    except Exception:
+        pass
+    res = apply_dynamic_throttle(enabled=enabled, max_tokens=max_tokens)
+    return {"ok": True, "throttle_state": res}
+
+
+@app.get("/api/agent/throttle/status")
+def agent_throttle_status():
+    """Retrieve dynamic token circuit-breaker status."""
+    from chronolens.loopguard import get_throttle_status
+    return get_throttle_status()
+
+
+@app.post("/api/mcp/chat")
+async def mcp_chat(request: Request):
+    """SigNoz MCP Natural Language Incident Co-Pilot query endpoint."""
+    from chronolens.copilot import ask_signoz_copilot
+    try:
+        body = await request.json()
+        user_query = body.get("query", "Why did checkout-service trigger an alert?")
+    except Exception:
+        user_query = "Summarize recent system reliability"
+    return ask_signoz_copilot(user_query, cfg)
+
+
+@app.post("/api/stress/run")
+def run_stress_calibration(service_name: str = "checkout-service"):
+    """Run self-calibrating micro-fault stress test and auto-tune guardrails."""
+    from chronolens.stress import run_self_tuning_calibration
+    res = run_self_tuning_calibration(cfg, service_name=service_name)
+    return {"ok": True, "calibration": res}
+
+
+@app.get("/api/cfo/report")
+def get_cfo_report():
+    """Generate executive SLA & financial ROI report for CFO and SRE leaders."""
+    from chronolens.dollars import build_executive_cfo_report
+    try:
+        ledger = Ledger()
+        records = ledger.list()
+    except Exception:
+        records = []
+    return build_executive_cfo_report(ledger_records=records, cfg=cfg)
+
+
+# --------------------------------------------------------------------------- #
+# WhatsApp Business Cloud API Webhook & Control Endpoints
+# --------------------------------------------------------------------------- #
+@app.get("/webhook/whatsapp")
+def whatsapp_verify(request: Request):
+    """Meta WhatsApp Webhook Verification handshake."""
+    params = dict(request.query_params)
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge", "")
+
+    if mode == "subscribe" and token == cfg.whatsapp_verify_token:
+        from fastapi.responses import Response
+        return Response(content=challenge, media_type="text/plain", status_code=200)
+
+    return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+
+@app.post("/webhook/whatsapp")
+async def whatsapp_webhook(request: Request):
+    """Inbound Meta WhatsApp Webhook: verifies HMAC signature and processes button clicks."""
+    from chronolens.whatsapp_bot import process_whatsapp_button_click, verify_whatsapp_signature
+
+    raw_body = await request.body()
+    sig_header = request.headers.get("x-hub-signature-256")
+
+    if not verify_whatsapp_signature(raw_body, sig_header, cfg.whatsapp_app_secret):
+        return JSONResponse({"error": "Invalid signature"}, status_code=403)
+
+    try:
+        data = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    # Process inbound interactive button replies async
+    entries = data.get("entry", [])
+    for entry in entries:
+        changes = entry.get("changes", [])
+        for change in changes:
+            val = change.get("value", {})
+            messages = val.get("messages", [])
+            for msg in messages:
+                sender = msg.get("from", cfg.whatsapp_recipient_number)
+                msg_type = msg.get("type")
+                if msg_type == "interactive":
+                    interactive = msg.get("interactive", {})
+                    btn_reply = interactive.get("button_reply", {})
+                    btn_id = btn_reply.get("id")
+                    if btn_id:
+                        threading.Thread(
+                            target=process_whatsapp_button_click,
+                            args=(btn_id, sender, cfg),
+                            daemon=True,
+                        ).start()
+
+    return {"status": "ok"}
+
+
+@app.post("/api/whatsapp/test")
+def whatsapp_test_card(lang: str = "en-IN"):
+    """Trigger a test WhatsApp interactive approval card (supports lang=hi-IN for Hindi)."""
+    from chronolens.foresee import Forecast
+    from chronolens.whatsapp_bot import post_whatsapp_approval
+
+    fc = Forecast(
+        service="checkout-service",
+        current_p99_ms=480.0,
+        slope_ms_per_s=18.5,
+        seconds_to_breach=18.2,
+        breaching_now=False,
+        confidence=0.92,
+        confident=True,
+    )
+    plan = {"action": "scale_out", "capacity_delta": 1}
+    res = post_whatsapp_approval(fc, plan, cfg, lang=lang)
+    return {"ok": True, "lang": lang, "whatsapp_response": res}
+
+
+@app.get("/api/whatsapp/status")
+def whatsapp_status():
+    """Retrieve WhatsApp Cloud API integration status."""
+    return {
+        "enabled": cfg.whatsapp_enabled(),
+        "phone_number_id": cfg.whatsapp_phone_number_id[:6] + "..." if cfg.whatsapp_phone_number_id else "",
+        "recipient_number": cfg.whatsapp_recipient_number,
+        "verify_token": cfg.whatsapp_verify_token,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Sarvam AI Multilingual Endpoints
+# --------------------------------------------------------------------------- #
+@app.post("/api/sarvam/translate")
+async def sarvam_translate(request: Request):
+    """Translate incident text, WhatsApp messages, or CFO reports using Sarvam AI."""
+    from chronolens.sarvam import translate_text
+    try:
+        body = await request.json()
+        text = body.get("text", "Checkout service latency is climbing to SLO wall.")
+        target_lang = body.get("target_lang", "hi-IN")
+        source_lang = body.get("source_lang", "en-IN")
+    except Exception:
+        text = "Checkout service latency is climbing to SLO wall."
+        target_lang = "hi-IN"
+        source_lang = "en-IN"
+
+    translated = translate_text(text, target_lang=target_lang, source_lang=source_lang, cfg=cfg)
+    return {
+        "ok": True,
+        "original_text": text,
+        "translated_text": translated,
+        "target_lang": target_lang,
+        "sarvam_enabled": cfg.sarvam_enabled(),
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
 
     print("ChronoLens Mission Control -> http://localhost:8095")
     uvicorn.run(app, host="0.0.0.0", port=8095, log_level="warning")
+
+
+
