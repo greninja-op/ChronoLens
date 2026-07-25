@@ -145,14 +145,25 @@ def agent_mode(mode: str = "normal"):
         return JSONResponse({"error": f"agent not reachable: {e}"}, status_code=502)
 
 
-@app.post("/api/agent/loopcheck")
+@app.get("/api/agent/loopcheck")
 def agent_loopcheck():
-    """Drive one agent turn and run the loop guard on it (the cost-spiral breaker)."""
+    """Drive one agent turn and run the loop guard on it (the cost-spiral breaker),
+    corroborating with live SigNoz agent spans via Query Builder v5."""
     from chronolens.loopguard import evaluate
     try:
         turn = httpx.get(f"{cfg.agent_url}/chat", timeout=12).json()
     except Exception as e:
         return JSONResponse({"error": f"agent not reachable: {e}"}, status_code=502)
+
+    # Corroborate with live SigNoz GenAI spans (full-circle agent observability)
+    try:
+        with SigNozClient(cfg) as sn:
+            spans = sn.query_agent_spans(_AGENT_SERVICE, window_seconds=120)
+            if spans:
+                turn["signoz_telemetry"] = spans
+    except Exception:
+        pass
+
     v = evaluate(turn.get("steps", 0), turn.get("tools", []), turn.get("cost_usd", 0.0),
                  max_steps=cfg.agent_max_steps, cost_budget=cfg.agent_cost_budget_usd,
                  repeat_threshold=cfg.agent_repeat_threshold)
