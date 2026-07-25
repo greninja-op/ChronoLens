@@ -1,24 +1,29 @@
-"""Tiny load generator for the ChronoLens demo store.
+"""Tiny load generator for the demo store — drives /order continuously.
 
-Hammers /order continuously so SigNoz has a live p99 stream to forecast on.
-    python scripts/loadgen.py [interval_ms]
+Used to give SigNoz a real p99 series to forecast against.
+
+    python scripts/loadgen.py [seconds] [rps]
 """
+from __future__ import annotations
+
 import sys
 import time
 
 import httpx
 
+DURATION = float(sys.argv[1]) if len(sys.argv) > 1 else 120.0
+RPS = float(sys.argv[2]) if len(sys.argv) > 2 else 8.0
 URL = "http://localhost:8090/order"
-interval = (int(sys.argv[1]) / 1000.0) if len(sys.argv) > 1 else 0.2
 
+deadline = time.time() + DURATION
+gap = 1.0 / max(0.5, RPS)
 sent = 0
 with httpx.Client(timeout=10.0) as c:
-    while True:
+    while time.time() < deadline:
         try:
             c.get(URL)
             sent += 1
-            if sent % 25 == 0:
-                print(f"sent {sent}", flush=True)
-        except Exception as exc:
-            print(f"err: {exc}", flush=True)
-        time.sleep(interval)
+        except Exception:
+            pass
+        time.sleep(gap)
+print(f"loadgen done: {sent} requests over {DURATION:.0f}s")
