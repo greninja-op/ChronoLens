@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChronoLens · Reliability Control</title>
+<title>ChronoLens · Reliability Control & Agent Watch</title>
 <link rel="icon" type="image/png" href="/static/assets/chronolens-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- vendored locally so the demo is offline-safe (no CDN dependency at runtime) -->
+<!-- vendored scripts -->
 <script src="/static/vendor/tailwind.js"></script>
 <script src="/static/vendor/lucide.js"></script>
 <script src="/static/vendor/chart.umd.js"></script>
@@ -18,228 +18,280 @@
     darkMode: 'class',
     theme: { extend: {
       colors: {
-        surface: { DEFAULT:'#0e1416', dim:'#0e1416', bright:'#343a3c', lowest:'#090f11', low:'#171d1e', container:'#1b2122', high:'#252b2d', highest:'#303638' },
-        brand: { primary:'#4cd7f6', 'on-primary':'#003640', 'primary-container':'#06b6d4', 'on-primary-container':'#00424f', secondary:'#d0bcff', tertiary:'#bcc7de', error:'#ffb4ab', 'error-container':'#93000a', outline:'#869397', 'outline-variant':'#3d494c' },
-        status: { healthy:'#10b981', warning:'#f59e0b', danger:'#f43f5e', info:'#06b6d4' }
+        surface: { DEFAULT:'#0B0F19', dim:'#0B0F19', bright:'#1F2937', lowest:'#070A10', low:'#111827', container:'#172033', high:'#1F293D', highest:'#2D3748' },
+        brand: { primary:'#6366F1', 'on-primary':'#FFFFFF', 'primary-container':'#4F46E5', secondary:'#A855F7', tertiary:'#06B6D4', error:'#EF4444', outline:'#6B7280', 'outline-variant':'#374151' },
+        status: { healthy:'#10B981', warning:'#F59E0B', danger:'#EF4444', info:'#06B6D4' }
       },
       fontFamily: { sans:['Geist','sans-serif'], mono:['JetBrains Mono','monospace'] },
-      boxShadow: { 'glow-primary':'0 0 16px rgba(76,215,246,.35)', 'glow-danger':'0 0 16px rgba(244,63,94,.45)', 'glow-success':'0 0 12px rgba(16,185,129,.35)' }
+      boxShadow: { 'glow-primary':'0 0 20px rgba(99,102,241,.4)', 'glow-danger':'0 0 20px rgba(239,68,68,.5)', 'glow-success':'0 0 16px rgba(16,185,129,.4)', 'glow-cyan':'0 0 16px rgba(6,182,212,.4)' }
     }}
   }
 </script>
 <style>
-  body{background-color:#0e1416;color:#dee3e6;font-family:'Geist',sans-serif;}
-  .glass-panel{background:rgba(27,33,34,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(61,73,76,.5);box-shadow:inset 0 1px 0 0 rgba(255,255,255,.05);}
-  .glass-card{background:rgba(23,29,30,.65);backdrop-filter:blur(10px);border:1px solid rgba(61,73,76,.35);transition:all .2s ease-in-out;}
-  .glass-card:hover{background:rgba(37,43,45,.75);border-color:rgba(134,147,151,.5);}
-  ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:#090f11;} ::-webkit-scrollbar-thumb{background:#252b2d;border-radius:3px;} ::-webkit-scrollbar-thumb:hover{background:#3d494c;}
+  body{background-color:#0B0F19;color:#E5E7EB;font-family:'Geist',sans-serif;}
+  .glass-panel{background:rgba(17,24,39,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 32px 0 rgba(0,0,0,.37);}
+  .glass-card{background:rgba(23,32,51,.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);transition:all .2s cubic-bezier(.4,0,.2,1);}
+  .glass-card:hover{background:rgba(31,41,61,.85);border-color:rgba(99,102,241,.4);box-shadow:0 4px 20px rgba(0,0,0,.4);}
+  ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:#070A10;} ::-webkit-scrollbar-thumb{background:#1F293D;border-radius:3px;} ::-webkit-scrollbar-thumb:hover{background:#374151;}
   @keyframes pulse-slow{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.97);}}
   .animate-pulse-slow{animation:pulse-slow 3s infinite ease-in-out;}
   .stg-node{transition:all .3s ease;}
   @keyframes circuitdash{to{stroke-dashoffset:-48;}}
-  .circuit-flow{stroke-dasharray:2 11;animation:circuitdash 1.3s linear infinite;stroke-linecap:round;}
-  .circuit-flow.fast{animation-duration:.55s;}
+  .circuit-flow{stroke-dasharray:3 12;animation:circuitdash 1.2s linear infinite;stroke-linecap:round;}
+  .circuit-flow.fast{animation-duration:.5s;}
 </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden selection:bg-brand-primary selection:text-brand-on-primary">
-<header class="h-14 border-b border-brand-outline-variant/40 bg-surface-lowest/90 backdrop-blur-md px-4 flex items-center justify-between shrink-0 z-30">
+<body class="h-screen flex flex-col overflow-hidden selection:bg-brand-primary selection:text-white">
+<!-- HEADER BAR -->
+<header class="h-14 border-b border-white/10 bg-surface-lowest/90 backdrop-blur-md px-5 flex items-center justify-between shrink-0 z-30">
   <div class="flex items-center space-x-6">
-    <span class="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-      <img src="/static/assets/chronolens-logo.png" alt="ChronoLens logo" class="w-7 h-7 rounded-md object-cover">Chrono<span class="text-brand-primary">Lens</span>
+    <span class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+      <img src="/static/assets/chronolens-logo.png" alt="ChronoLens logo" class="w-8 h-8 rounded-lg object-cover shadow-glow-primary">Chrono<span class="text-brand-primary">Lens</span>
     </span>
-    <div class="h-4 w-[1px] bg-brand-outline-variant/50"></div>
+    <div class="h-4 w-[1px] bg-white/10"></div>
     <div class="flex items-center space-x-3 font-mono text-xs">
-      <div id="sig-pill" class="flex items-center space-x-1.5 bg-surface-low px-2.5 py-1 rounded-full border border-brand-outline-variant/40">
-        <span class="w-2 h-2 rounded-full bg-status-healthy animate-pulse"></span>
-        <span class="text-brand-outline">SigNoz:</span><span id="sig-tx" class="text-status-healthy font-semibold">CONNECTING…</span>
+      <div id="sig-pill" class="flex items-center space-x-2 bg-surface-container px-3 py-1 rounded-full border border-white/10">
+        <span class="w-2.5 h-2.5 rounded-full bg-status-healthy animate-pulse shadow-glow-success"></span>
+        <span class="text-gray-400">SigNoz:</span><span id="sig-tx" class="text-status-healthy font-semibold">CONNECTING…</span>
       </div>
-      <div class="flex items-center space-x-1.5 bg-surface-low px-2.5 py-1 rounded border border-brand-outline-variant/40">
-        <span class="text-brand-outline">Autonomy:</span><span id="node-mode" class="text-white font-medium">—</span>
+      <div class="flex items-center space-x-2 bg-surface-container px-3 py-1 rounded-full border border-white/10">
+        <span class="text-gray-400">Autonomy:</span><span id="node-mode" class="text-white font-bold">—</span>
+      </div>
+      <div class="flex items-center space-x-2 bg-surface-container px-3 py-1 rounded-full border border-brand-primary/30">
+        <span class="text-brand-tertiary">LLM Engine:</span><span id="llm-badge" class="text-white font-bold">Azure AI (gpt-5.4-nano)</span>
       </div>
     </div>
   </div>
   <div class="flex items-center space-x-5">
     <div class="flex items-center space-x-4 font-mono text-xs">
-      <div class="flex items-center gap-1.5 text-brand-outline"><i data-lucide="clock" class="w-3.5 h-3.5"></i><span id="utc-clock" class="text-white font-medium">--:--:--</span></div>
-      <div class="flex items-center gap-1.5"><span class="text-brand-outline">STATE:</span><span id="sys-health" class="text-brand-primary font-semibold tracking-wider bg-brand-primary/10 px-2 py-0.5 rounded border border-brand-primary/30">MONITORING</span></div>
+      <div class="flex items-center gap-2 text-gray-400 bg-surface-container px-3 py-1 rounded border border-white/5"><i data-lucide="clock" class="w-3.5 h-3.5 text-brand-tertiary"></i><span id="utc-clock" class="text-white font-medium">--:--:--</span></div>
+      <div class="flex items-center gap-2"><span class="text-gray-400">STATE:</span><span id="sys-health" class="text-brand-primary font-bold tracking-wider bg-brand-primary/10 px-2.5 py-1 rounded border border-brand-primary/40 shadow-glow-primary">MONITORING</span></div>
     </div>
   </div>
 </header>
 
 <div class="flex-1 flex overflow-hidden">
-  <!-- SIDEBAR -->
-  <aside class="w-56 bg-surface-lowest/80 border-r border-brand-outline-variant/30 flex flex-col justify-between shrink-0 z-20">
-    <div class="p-3 space-y-4">
-      <div class="px-2.5 py-1.5 rounded bg-surface-low/70 border border-brand-outline-variant/30">
-        <div class="text-xs font-semibold text-white tracking-wide">Overview</div>
-        <div class="text-[10px] font-mono text-brand-outline uppercase tracking-wider">CHRONOLENS · DEMO STORE</div>
+  <!-- SIDEBAR DOCK -->
+  <aside class="w-60 bg-surface-lowest/90 border-r border-white/10 flex flex-col justify-between shrink-0 z-20">
+    <div class="p-3.5 space-y-4">
+      <div class="px-3 py-2 rounded-lg bg-surface-container border border-white/10 shadow-sm">
+        <div class="text-xs font-bold text-white tracking-wide flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4 text-brand-primary"></i>Mission Control</div>
+        <div class="text-[10px] font-mono text-gray-400 uppercase tracking-wider mt-0.5">SIGNOZ CLOSED-LOOP SRE</div>
       </div>
-      <nav class="space-y-1 font-mono text-xs">
-        <a data-scroll="top" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-medium cursor-pointer"><i data-lucide="layout-grid" class="w-4 h-4"></i><span>Overview</span></a>
-        <a data-scroll="chart" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="trending-up" class="w-4 h-4"></i><span>Predictive</span></a>
-        <a data-scroll="loop" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="repeat" class="w-4 h-4"></i><span>Reliability Loop</span></a>
-        <a data-scroll="ledger" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="alert-triangle" class="w-4 h-4"></i><span>Incidents</span></a>
-        <a data-scroll="topo" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="git-fork" class="w-4 h-4"></i><span>Topology</span></a>
-        <a data-scroll="agent" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded text-brand-outline hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="bot" class="w-4 h-4"></i><span>Agent Watch</span></a>
+      <nav class="space-y-1.5 font-mono text-xs">
+        <a data-scroll="top" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-bold cursor-pointer transition-all"><i data-lucide="layout-grid" class="w-4 h-4"></i><span>Overview</span></a>
+        <a data-scroll="chart" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="trending-up" class="w-4 h-4 text-brand-tertiary"></i><span>AI Forecast Slope</span></a>
+        <a data-scroll="loop" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="repeat" class="w-4 h-4 text-brand-primary"></i><span>Reliability Loop</span></a>
+        <a data-scroll="agent" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="bot" class="w-4 h-4 text-status-warning"></i><span>Agent Watch & Tools</span></a>
+        <a data-scroll="ledger" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="dollar-sign" class="w-4 h-4 text-status-healthy"></i><span>Cost Savings Ledger</span></a>
+        <a data-scroll="topo" class="nav-a flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface-high/50 transition-colors cursor-pointer"><i data-lucide="git-fork" class="w-4 h-4 text-gray-400"></i><span>Cascade Topology</span></a>
       </nav>
     </div>
-    <div class="p-3 space-y-3">
-      <div class="glass-card p-2.5 rounded-lg space-y-2">
-        <div class="text-[10px] font-mono font-semibold uppercase tracking-wider text-brand-outline">OPERATIONAL DOCK</div>
-        <button id="btn-run" class="w-full flex items-center justify-center gap-1.5 bg-brand-primary-container hover:bg-brand-primary text-brand-on-primary font-semibold py-2 px-2 rounded text-xs transition-all shadow-glow-primary active:scale-[0.98]"><i data-lucide="play" class="w-3.5 h-3.5"></i><span>Run ChronoLens</span></button>
-        <button id="btn-inject" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="zap" class="w-3.5 h-3.5 text-brand-primary"></i><span>Inject Rising Load</span></button>
-        <button id="btn-cooldown" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5 text-brand-tertiary"></i><span>Release Capacity</span></button>
-        <button id="btn-ab" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="split" class="w-3.5 h-3.5 text-brand-secondary"></i><span>A/B Run</span></button>
-        <button id="btn-reset" class="w-full flex items-center justify-center gap-1.5 bg-surface-high hover:bg-surface-bright text-white py-1.5 px-2 rounded text-xs transition-all border border-brand-outline-variant/40 active:scale-[0.98]"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-brand-outline"></i><span>Reset Session</span></button>
+    <div class="p-3.5 space-y-3">
+      <div class="glass-card p-3 rounded-xl space-y-2 border border-white/10 shadow-lg">
+        <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5"><i data-lucide="sliders" class="w-3.5 h-3.5 text-brand-primary"></i>DEMO ACTION DOCK</div>
+        <button id="btn-run" class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-brand-primary to-brand-primary-container hover:from-brand-primary-container hover:to-brand-primary text-white font-bold py-2.5 px-3 rounded-lg text-xs transition-all shadow-glow-primary active:scale-[0.98]"><i data-lucide="play" class="w-4 h-4"></i><span>Run ChronoLens</span></button>
+        <button id="btn-inject" class="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-surface-highest text-white font-semibold py-2 px-3 rounded-lg text-xs transition-all border border-white/10 active:scale-[0.98]"><i data-lucide="zap" class="w-3.5 h-3.5 text-status-warning"></i><span>Inject Rising Load</span></button>
+        <button id="btn-cooldown" class="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-surface-highest text-white font-semibold py-2 px-3 rounded-lg text-xs transition-all border border-white/10 active:scale-[0.98]"><i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5 text-status-healthy"></i><span>Release Capacity</span></button>
+        <button id="btn-ab" class="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-surface-highest text-white font-semibold py-2 px-3 rounded-lg text-xs transition-all border border-white/10 active:scale-[0.98]"><i data-lucide="split" class="w-3.5 h-3.5 text-brand-secondary"></i><span>Run A/B Comparison</span></button>
+        <button id="btn-reset" class="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-surface-highest text-white font-semibold py-2 px-3 rounded-lg text-xs transition-all border border-white/10 active:scale-[0.98]"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-gray-400"></i><span>Reset Baseline</span></button>
       </div>
-      <div class="pt-2 border-t border-brand-outline-variant/20">
-        <div class="text-[10px] font-mono text-brand-outline" id="footCfg">cost model —</div>
+      <div class="pt-2 border-t border-white/10">
+        <div class="text-[10px] font-mono text-gray-400" id="footCfg">cost model —</div>
       </div>
     </div>
   </aside>
 
-  <!-- MAIN -->
-  <main id="main" class="flex-1 p-4 overflow-y-auto space-y-4">
-    <!-- HERO CHART -->
-    <div id="sec-chart" class="glass-panel rounded-lg p-4 relative">
-      <div class="flex items-center justify-between mb-2">
-        <div>
-          <h2 class="text-lg font-semibold text-white tracking-tight">p99 Latency Prediction</h2>
-          <div class="text-xs font-mono text-brand-outline">Service <span id="svc-name" class="text-white">—</span></div>
-        </div>
-        <div class="flex items-center space-x-5 font-mono text-xs">
-          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 bg-brand-primary rounded-full"></span><span class="text-brand-outline">Actual</span></div>
-          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 border-b border-dashed border-brand-outline"></span><span class="text-brand-outline">Projected</span></div>
-          <div class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 bg-status-danger rounded-full"></span><span id="slo-legend" class="text-brand-outline">SLO</span></div>
+  <!-- MAIN CONTENT -->
+  <main id="main" class="flex-1 p-5 overflow-y-auto space-y-5">
+    
+    <!-- TOP SCOREBOARD -->
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-12 sm:col-span-6 lg:col-span-3 glass-card p-4 rounded-xl flex flex-col justify-between border-l-4 border-status-healthy">
+        <div class="text-xs font-mono text-gray-400 font-semibold flex items-center justify-between"><span>INCIDENTS PREVENTED</span><i data-lucide="shield-check" class="w-4 h-4 text-status-healthy"></i></div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span class="text-3xl font-mono font-bold text-white tracking-tight" id="stat-incidents">0</span>
+          <span class="text-xs font-mono text-status-healthy bg-status-healthy/10 px-2 py-0.5 rounded border border-status-healthy/30" id="stat-inc-tot">/ 0 saved</span>
         </div>
       </div>
-      <div class="h-60 w-full relative">
+
+      <div class="col-span-12 sm:col-span-6 lg:col-span-3 glass-card p-4 rounded-xl flex flex-col justify-between border-l-4 border-brand-primary">
+        <div class="text-xs font-mono text-gray-400 font-semibold flex items-center justify-between"><span>TOTAL COST SAVED</span><i data-lucide="dollar-sign" class="w-4 h-4 text-brand-primary"></i></div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span class="text-3xl font-mono font-bold text-status-healthy tracking-tight" id="stat-cost">$0.00</span>
+          <span class="text-[10px] font-mono text-gray-400">Auto Cooldown</span>
+        </div>
+      </div>
+
+      <div class="col-span-12 sm:col-span-6 lg:col-span-3 glass-card p-4 rounded-xl flex flex-col justify-between border-l-4 border-brand-tertiary">
+        <div class="text-xs font-mono text-gray-400 font-semibold flex items-center justify-between"><span>CURRENT P99 LATENCY</span><i data-lucide="activity" class="w-4 h-4 text-brand-tertiary"></i></div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span class="text-3xl font-mono font-bold text-white tracking-tight" id="stat-p99">—</span>
+          <span class="text-xs font-mono text-gray-400" id="stat-slo">(SLO 500ms)</span>
+        </div>
+      </div>
+
+      <div class="col-span-12 sm:col-span-6 lg:col-span-3 glass-card p-4 rounded-xl flex flex-col justify-between border-l-4 border-status-warning">
+        <div class="text-xs font-mono text-gray-400 font-semibold flex items-center justify-between"><span>AI FORECAST SLOPE</span><i data-lucide="trending-up" class="w-4 h-4 text-status-warning"></i></div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span class="text-2xl font-mono font-bold text-status-warning tracking-tight" id="stat-slope">▲ 0.0 ms/s</span>
+          <span class="text-xs font-mono text-white" id="stat-confidence">Conf: —</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI LATENCY FORECAST CHART -->
+    <div id="sec-chart" class="glass-panel rounded-xl p-5 relative border border-white/10">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2"><i data-lucide="trending-up" class="w-5 h-5 text-brand-primary"></i>SigNoz Telemetry · AI Latency Slope & Time-to-Breach Forecast</h2>
+          <div class="text-xs font-mono text-gray-400 mt-0.5">Service: <span id="svc-name" class="text-white font-bold">—</span></div>
+        </div>
+        <div class="flex items-center space-x-5 font-mono text-xs">
+          <div class="flex items-center gap-2"><span class="w-3.5 h-1 bg-brand-primary rounded-full shadow-glow-primary"></span><span class="text-gray-300">Actual P99</span></div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-1 border-b-2 border-dashed border-gray-400"></span><span class="text-gray-300">AI Forecast</span></div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-1 bg-status-danger rounded-full shadow-glow-danger"></span><span id="slo-legend" class="text-status-danger font-bold">SLO Wall 500ms</span></div>
+        </div>
+      </div>
+      <div class="h-64 w-full relative">
         <canvas id="latencyChart"></canvas>
-        <div id="chart-badge" class="absolute top-2 right-2 flex items-center gap-1.5 text-[11px] font-mono bg-surface-lowest/90 px-2.5 py-1 rounded border border-brand-outline-variant text-white shadow-md">
-          <span class="w-2 h-2 rounded-full bg-status-healthy"></span><span id="chart-badge-tx">Healthy</span>
+        <div id="chart-badge" class="absolute top-3 right-3 flex items-center gap-2 text-xs font-mono bg-surface-lowest/90 px-3 py-1.5 rounded-lg border border-white/10 text-white shadow-xl backdrop-blur-md">
+          <span class="w-2.5 h-2.5 rounded-full bg-status-healthy shadow-glow-success"></span><span id="chart-badge-tx">Monitoring Telemetry</span>
         </div>
       </div>
     </div>
 
     <!-- RELIABILITY LOOP -->
-    <div id="sec-loop" class="glass-panel rounded-lg p-4 space-y-3">
+    <div id="sec-loop" class="glass-panel rounded-xl p-5 space-y-4 border border-white/10">
       <div class="flex items-center justify-between">
-        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline">RELIABILITY LOOP STATUS</h3>
-        <div class="text-xs font-mono text-brand-outline">OUTCOME: <span id="loop-outcome" class="text-white font-medium">idle</span></div>
+        <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2"><i data-lucide="repeat" class="w-4 h-4 text-brand-primary"></i>CLOSED-LOOP RELIABILITY CIRCUIT</h3>
+        <div class="text-xs font-mono text-gray-400">STATUS: <span id="loop-outcome" class="text-white font-bold bg-surface-container px-2.5 py-1 rounded border border-white/10">idle</span></div>
       </div>
       <div id="pipeline" class="relative w-full" style="height:150px"></div>
-      <div id="insight" class="bg-surface-lowest/90 rounded p-2.5 border-l-4 border-brand-outline-variant flex items-center justify-between text-xs font-mono">
-        <div class="text-brand-outline">Inject load, then <span class="text-white font-semibold">Run ChronoLens</span> to execute the loop against SigNoz.</div>
+      <div id="insight" class="bg-surface-container rounded-lg p-3 border-l-4 border-brand-primary flex items-center justify-between text-xs font-mono shadow-inner">
+        <div class="text-gray-300">Inject load, then <span class="text-white font-bold">Run ChronoLens</span> to execute the loop against SigNoz.</div>
       </div>
-      <div id="loop-trace" class="max-h-40 overflow-y-auto space-y-1.5 font-mono text-[11px] pr-1"></div>
+      <div id="loop-trace" class="max-h-40 overflow-y-auto space-y-1.5 font-mono text-xs pr-1 bg-surface-lowest/60 p-3 rounded-lg border border-white/5"></div>
     </div>
 
-    <!-- STATS + LEDGER + TOPOLOGY + SIGNOZ -->
-    <div class="grid grid-cols-12 gap-4">
-      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Incidents Prevented</div><div class="mt-2 flex items-baseline justify-between"><span class="text-2xl font-mono font-semibold text-white" id="stat-incidents">0</span><span class="text-xs font-mono text-brand-outline" id="stat-inc-tot">/ 0</span></div></div>
-      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Cost Saved</div><div class="mt-2 text-2xl font-mono font-semibold text-status-healthy" id="stat-cost">$0.00</div></div>
-      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Current p99</div><div class="mt-2 flex items-baseline gap-1"><span class="text-2xl font-mono font-semibold text-white" id="stat-p99">—</span><span class="text-[10px] font-mono text-brand-outline" id="stat-slo">(SLO —)</span></div></div>
-      <div class="col-span-3 lg:col-span-2 glass-card p-3 rounded-lg flex flex-col justify-between"><div class="text-[11px] font-mono text-brand-outline font-medium">Forecast Confidence</div><div class="mt-2 text-2xl font-mono font-semibold text-white" id="stat-confidence">—</div></div>
+    <!-- AGENT WATCH & TOOL CIRCUIT BREAKER (HIGHLIGHTED FEATURE) -->
+    <div id="sec-agent" class="glass-panel rounded-xl p-5 space-y-4 border border-brand-primary/30 shadow-glow-primary">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <h3 class="text-sm font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2.5">
+          <i data-lucide="bot" class="w-5 h-5 text-brand-primary"></i>AGENT WATCH & TOOL CIRCUIT BREAKER
+          <span class="text-[10px] bg-brand-primary/20 text-brand-primary px-2 py-0.5 rounded-full border border-brand-primary/40">SigNoz GenAI Spans</span>
+        </h3>
+        <div class="text-xs font-mono text-gray-400">Agent Mode: <span id="agent-mode" class="text-white font-bold bg-surface-container px-2.5 py-1 rounded border border-white/10">—</span></div>
+      </div>
 
-      <!-- LEDGER -->
-      <div id="sec-ledger" class="col-span-12 lg:col-span-4 glass-panel p-3 rounded-lg space-y-2.5 row-span-2 flex flex-col">
-        <div class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline flex justify-between items-center"><span>PREVENTION LEDGER</span><span id="ledger-count" class="text-[10px] text-brand-primary">—</span></div>
-        <div id="ledger" class="space-y-2 font-mono text-xs overflow-y-auto flex-1 min-h-0"><div class="text-brand-outline">Loading…</div></div>
+      <!-- Action buttons -->
+      <div class="flex flex-wrap gap-2 text-xs font-mono">
+        <span class="text-gray-400 self-center mr-1">Fault Mode:</span>
+        <button onclick="agentMode('normal')" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-status-healthy font-semibold transition-all">Normal</button>
+        <button onclick="agentMode('drift')" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-status-warning font-semibold transition-all">Drift</button>
+        <button onclick="agentMode('loop')" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-status-danger font-semibold transition-all">Loop</button>
+        <span class="w-px bg-white/10 mx-1"></span>
+        <button onclick="triggerToolCircuitBreak('search_store')" class="px-3 py-1.5 rounded-lg bg-brand-primary-container hover:bg-brand-primary text-white font-bold shadow-glow-primary transition-all">⚡ Circuit Break Tool</button>
+        <button onclick="triggerAgentSteerage('search_store')" class="px-3 py-1.5 rounded-lg bg-brand-tertiary/20 hover:bg-brand-tertiary/30 text-brand-tertiary font-bold border border-brand-tertiary/40 transition-all">💬 Inject Prompt Steerage</button>
+        <button onclick="loopCheck()" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-white transition-all">🤖 Agent Loop Check</button>
+        <button onclick="checkDrift()" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-white transition-all">📊 Check Behavior Drift</button>
+        <button onclick="gradeQuality()" class="px-3 py-1.5 rounded-lg bg-surface-high border border-white/10 hover:bg-surface-highest text-white transition-all">⚖️ Grade Quality</button>
+      </div>
+
+      <!-- Agent Cards Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Tool Health & Circuit Status -->
+        <div class="glass-card rounded-xl p-4 border border-white/10">
+          <div class="flex items-center justify-between mb-3"><span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">Tool Circuit Status</span><span id="circuit-badge" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full text-status-healthy bg-status-healthy/10 border border-status-healthy/30">ALL HEALTHY</span></div>
+          <div id="circuit-body" class="font-mono text-xs text-gray-300 space-y-2">
+            <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5">
+              <span>search_store</span><span class="text-status-healthy font-semibold">Active</span>
+            </div>
+            <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5">
+              <span>inventory_db</span><span class="text-status-healthy font-semibold">Active</span>
+            </div>
+            <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5">
+              <span>payment_gateway</span><span class="text-status-healthy font-semibold">Active</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Behavior Drift -->
+        <div class="glass-card rounded-xl p-4 border border-white/10">
+          <div class="flex items-center justify-between mb-3"><span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">Behavior Drift</span><span id="drift-badge" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full text-gray-400 bg-surface-container">—</span></div>
+          <div id="drift-body" class="font-mono text-xs text-gray-400 space-y-1"><div class="text-gray-400">Capture baseline, switch to <b>drift</b>, then “Check Behavior Drift”.</div></div>
+        </div>
+
+        <!-- Loop & Cost Breaker -->
+        <div class="glass-card rounded-xl p-4 border border-white/10">
+          <div class="flex items-center justify-between mb-3"><span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">Loop / Cost Breaker</span><span id="loop-badge" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full text-gray-400 bg-surface-container">—</span></div>
+          <div id="loop-body" class="font-mono text-xs text-gray-400 space-y-1"><div class="text-gray-400">Switch to <b>loop</b>, then “Agent Loop Check” to watch the breaker fire.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEDGER + TOPOLOGY + SIGNOZ -->
+    <div class="grid grid-cols-12 gap-5">
+      <!-- PREVENTION LEDGER -->
+      <div id="sec-ledger" class="col-span-12 lg:col-span-5 glass-panel p-4 rounded-xl space-y-3 flex flex-col border border-white/10">
+        <div class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300 flex justify-between items-center"><span>PREVENTION LEDGER & COST SAVINGS</span><span id="ledger-count" class="text-xs text-brand-primary font-bold">—</span></div>
+        <div id="ledger" class="space-y-2 font-mono text-xs overflow-y-auto flex-1 min-h-[180px] max-h-[280px]"><div class="text-gray-400">Loading incidents…</div></div>
       </div>
 
       <!-- TOPOLOGY -->
-      <div id="sec-topo" class="col-span-12 lg:col-span-5 glass-panel p-3 rounded-lg space-y-3">
+      <div id="sec-topo" class="col-span-12 lg:col-span-4 glass-panel p-4 rounded-xl space-y-3 border border-white/10">
         <div class="flex justify-between items-center">
-          <div class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">CASCADE TOPOLOGY</div>
-          <div class="flex items-center gap-1.5 text-[10px] font-mono text-status-healthy bg-status-healthy/10 px-2 py-0.5 rounded border border-status-healthy/30"><span class="w-1.5 h-1.5 rounded-full bg-status-healthy"></span><span>Traces</span></div>
+          <div class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">CASCADE TOPOLOGY</div>
+          <div class="flex items-center gap-1.5 text-[10px] font-mono text-status-healthy bg-status-healthy/10 px-2.5 py-0.5 rounded-full border border-status-healthy/30"><span class="w-1.5 h-1.5 rounded-full bg-status-healthy animate-pulse"></span><span>Live Spans</span></div>
         </div>
-        <div id="topo" class="relative p-3 rounded-lg bg-surface-lowest/60 border border-brand-outline-variant/30 min-h-[150px]"></div>
+        <div id="topo" class="relative p-3 rounded-lg bg-surface-container border border-white/5 min-h-[180px]"></div>
       </div>
 
-      <!-- SIGNOZ -->
-      <div class="col-span-12 lg:col-span-3 glass-panel p-3 rounded-lg space-y-2">
-        <div class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">SIGNOZ INTEGRATION</div>
+      <!-- SIGNOZ INTEGRATION PANEL -->
+      <div class="col-span-12 lg:col-span-3 glass-panel p-4 rounded-xl space-y-3 border border-white/10">
+        <div class="text-xs font-mono font-bold uppercase tracking-wider text-gray-300">SIGNOZ INTEGRATION STATUS</div>
         <div class="space-y-2 font-mono text-xs pt-1">
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Guard Alerts</span><span id="sig-guard" class="text-white font-medium">—</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Firing</span><span id="sig-firing" class="text-white font-medium">—</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Channels</span><span id="sig-channels" class="text-white font-medium">—</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Notifications</span><span id="sig-inbox" class="text-white font-medium">—</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Self-metric</span><span id="sig-metric" class="text-brand-primary font-medium">—</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Reads</span><span class="text-brand-primary font-medium">Query Builder v5</span></div>
-          <div class="flex justify-between items-center p-1.5 rounded bg-surface-low/50"><span class="text-brand-outline">Sync</span><span id="sig-sync" class="text-brand-primary font-medium">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Guard Alerts</span><span id="sig-guard" class="text-white font-bold">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Firing State</span><span id="sig-firing" class="text-white font-bold">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Channels</span><span id="sig-channels" class="text-white font-bold">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Notifications</span><span id="sig-inbox" class="text-white font-bold">—</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Reads Layer</span><span class="text-brand-tertiary font-bold">Query Builder v5</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sync Status</span><span id="sig-sync" class="text-brand-primary font-bold">—</span></div>
         </div>
       </div>
     </div>
 
-    <!-- AGENT WATCH -->
-    <div id="sec-agent" class="glass-panel rounded-lg p-4 space-y-3">
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-outline flex items-center gap-2"><i data-lucide="bot" class="w-4 h-4 text-brand-primary"></i>AGENT WATCH — behavior · loops · quality</h3>
-        <div class="text-xs font-mono text-brand-outline">agent mode: <span id="agent-mode" class="text-white font-medium">—</span></div>
-      </div>
-      <div class="flex flex-wrap gap-2 text-xs font-mono">
-        <span class="text-brand-outline self-center mr-1">simulate:</span>
-        <button onclick="agentMode('normal')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-healthy">normal</button>
-        <button onclick="agentMode('drift')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-warning">drift</button>
-        <button onclick="agentMode('loop')" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-status-danger">loop</button>
-        <span class="w-px bg-brand-outline-variant/40 mx-1"></span>
-        <button onclick="captureBaseline()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">① capture baseline</button>
-        <button onclick="checkDrift()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">check drift</button>
-        <button onclick="loopCheck()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">loop check</button>
-        <button onclick="gradeQuality()" class="px-2.5 py-1 rounded bg-surface-high border border-brand-outline-variant/40 hover:bg-surface-bright text-white">grade quality</button>
-      </div>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <!-- drift -->
-        <div class="glass-card rounded-lg p-3">
-          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Behavior Drift</span><span id="drift-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
-          <div id="drift-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">Capture a baseline in <b>normal</b>, switch to <b>drift</b>, then “check drift”.</div></div>
-        </div>
-        <!-- loop -->
-        <div class="glass-card rounded-lg p-3">
-          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Loop / Cost Breaker</span><span id="loop-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
-          <div id="loop-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">Switch to <b>loop</b>, then “loop check” to watch the breaker fire.</div></div>
-        </div>
-        <!-- quality -->
-        <div class="glass-card rounded-lg p-3">
-          <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-mono font-semibold uppercase tracking-wider text-brand-outline">Answer Quality</span><span id="quality-badge" class="text-[10px] font-mono px-2 py-0.5 rounded text-brand-outline">—</span></div>
-          <div id="quality-body" class="font-mono text-xs text-brand-tertiary space-y-1"><div class="text-brand-outline">“grade quality” scores recent answers and trends them.</div></div>
-        </div>
-      </div>
-    </div>
   </main>
 </div>
+
 <script>
 const $=(id)=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 let sloMs=500, selected=null, samples=[], lastSync=null, running=false;
-const POLL=2500, MAXPTS=40, FUT=5;
+const POLL=2500, MAXPTS=40;
 
-/* ---------- clock ---------- */
+/* Clock */
 function tick(){const n=new Date();$('utc-clock').textContent=n.toLocaleTimeString([], {hour12:false});
   if(lastSync){const s=Math.round((Date.now()-lastSync)/1000);$('sig-sync').textContent=s+'s ago';}}
 setInterval(tick,1000);tick();
 
-/* ---------- Chart ---------- */
+/* Chart setup */
 try{ if(window['chartjs-plugin-annotation']) Chart.register(window['chartjs-plugin-annotation']); }catch(e){}
-let serverFc=null, ghostActive=false, ghostSlope=0;   // #1 server forecast, #3 ghost line
+let serverFc=null, ghostActive=false, ghostSlope=0;
 const ctx=$('latencyChart').getContext('2d');
 const grad=ctx.createLinearGradient(0,0,0,240);
-grad.addColorStop(0,'rgba(6,182,212,.45)');grad.addColorStop(1,'rgba(6,182,212,0)');
+grad.addColorStop(0,'rgba(99,102,241,.4)');grad.addColorStop(1,'rgba(99,102,241,0)');
 const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[
-  {label:'Actual',data:[],borderColor:'#4cd7f6',borderWidth:2,fill:true,backgroundColor:grad,tension:.25,pointRadius:0,pointHoverRadius:5,spanGaps:false},
-  {label:'Forecast',data:[],borderColor:'#869397',borderWidth:1.6,borderDash:[5,4],fill:false,tension:0,pointRadius:0,spanGaps:true},
-  {label:'Would-be (no fix)',data:[],borderColor:'#f43f5e',borderWidth:1.6,borderDash:[2,3],fill:false,tension:0,pointRadius:0,spanGaps:true}
+  {label:'Actual P99',data:[],borderColor:'#6366F1',borderWidth:2.5,fill:true,backgroundColor:grad,tension:.25,pointRadius:0,pointHoverRadius:6,spanGaps:false},
+  {label:'AI Forecast',data:[],borderColor:'#F59E0B',borderWidth:2,borderDash:[6,4],fill:false,tension:0,pointRadius:0,spanGaps:true},
+  {label:'Would-be (No Fix)',data:[],borderColor:'#EF4444',borderWidth:2,borderDash:[2,3],fill:false,tension:0,pointRadius:0,spanGaps:true}
 ]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},
-  plugins:{legend:{display:false},tooltip:{backgroundColor:'#171d1e',borderColor:'#3d494c',borderWidth:1,
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#172033',borderColor:'#374151',borderWidth:1,
     titleFont:{family:'JetBrains Mono',size:11},bodyFont:{family:'JetBrains Mono',size:12},
     callbacks:{label:(c)=>c.raw==null?null:` ${c.dataset.label}: ${Math.round(c.raw)}ms`}},
     annotation:{annotations:{}}},
-  scales:{x:{grid:{color:'rgba(61,73,76,.22)'},ticks:{color:'#869397',font:{family:'JetBrains Mono',size:10},maxRotation:0,autoSkip:true,maxTicksLimit:7}},
-    y:{min:0,grid:{color:'rgba(61,73,76,.22)'},ticks:{color:'#869397',font:{family:'JetBrains Mono',size:10},callback:(v)=>v+'ms'}}}}});
-
-/* mark an event on the time axis (fault / action / verified) */
-let events=[];  // {label, color, at(index-from-end)}
-function markEvent(label,color){events.push({label,color,idxFromEnd:0});if(events.length>4)events.shift();}
+  scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#9CA3AF',font:{family:'JetBrains Mono',size:10},maxRotation:0,autoSkip:true,maxTicksLimit:7}},
+    y:{min:0,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#9CA3AF',font:{family:'JetBrains Mono',size:10},callback:(v)=>v+'ms'}}}}});
 
 function slope(vals){const n=vals.length;if(n<2)return 0;const m=Math.min(8,n);const s=vals.slice(n-m);
   const xs=[...Array(m).keys()];const mx=xs.reduce((a,b)=>a+b,0)/m,my=s.reduce((a,b)=>a+b,0)/m;
@@ -248,149 +300,104 @@ function slope(vals){const n=vals.length;if(n<2)return 0;const m=Math.min(8,n);c
 const STEP_S=Math.round(POLL/1000);
 function rebuildChart(){
   const vals=samples.map(s=>s.v);const times=samples.map(s=>s.t);const n=vals.length;
-  const labels=[...times];const actual=[...vals];
-  // #1 prefer the SERVER forecast (same trend the loop decides on); fall back to local slope
-  const useFc = serverFc && serverFc.slope_ms_per_s!=null;
-  const sl = useFc ? serverFc.slope_ms_per_s : slope(vals);
-  const last=n?vals[n-1]:0;
-  const proj=new Array(n).fill(null);if(n)proj[n-1]=last;
-  const ghost=new Array(n).fill(null);if(ghostActive&&n)ghost[n-1]=last;
-  for(let i=1;i<=FUT;i++){labels.push('+'+(i*STEP_S)+'s');actual.push(null);
-    proj.push(Math.max(0,last+sl*i*STEP_S));
-    ghost.push(ghostActive?Math.max(0,last+ghostSlope*i*STEP_S):null);}
-  let etaSec = useFc ? serverFc.seconds_to_breach : null;
-  if(!useFc && sl>1 && last<sloMs){const st=(sloMs-last)/sl; if(st>0&&st<=FUT*STEP_S*2) etaSec=st;}
-  const allv=[...actual,...proj,...ghost].filter(x=>x!=null);
-  const ymax=Math.max(sloMs*1.2, (Math.max(...allv,0))*1.12, 1);
-  chart.options.scales.y.max=Math.ceil(ymax/50)*50;
-  // #3 annotations: warning band + SLO line + projected breach point
-  const ann={ warn:{type:'box',yMin:0.8*sloMs,yMax:sloMs,backgroundColor:'rgba(245,158,11,.06)',borderWidth:0},
-    slo:{type:'line',yMin:sloMs,yMax:sloMs,borderColor:'#f43f5e',borderWidth:1,borderDash:[4,4],
-         label:{display:true,content:'SLO '+sloMs+'ms',position:'end',color:'#f43f5e',font:{family:'JetBrains Mono',size:9},backgroundColor:'rgba(14,20,22,.85)'}}};
-  if(etaSec!=null && sl>0){let bIdx=-1;for(let i=n;i<proj.length;i++){if(proj[i]!=null&&proj[i]>=sloMs){bIdx=i;break;}}
-    if(bIdx>=0)ann.breach={type:'point',xValue:labels[bIdx],yValue:sloMs,radius:5,backgroundColor:'#f43f5e',borderColor:'#fff',borderWidth:1.5};}
-  chart.options.plugins.annotation.annotations=ann;
-  chart.data.labels=labels;
-  chart.data.datasets[0].data=actual;
-  chart.data.datasets[1].data=(sl>1)?proj:new Array(labels.length).fill(null);
-  chart.data.datasets[2].data=ghost;
-  chart.update('none');
-  if(!running) setBadge(etaSec, last, useFc?serverFc.confidence:null);
+  chart.data.labels=times;chart.data.datasets[0].data=vals;
+  const cur=n?vals[n-1]:0;const slp=slope(vals);
+  $('stat-slope').textContent=(slp>=0?'▲ +':'▼ ')+slp.toFixed(1)+' ms/s';
+  $('stat-slope').className='text-2xl font-mono font-bold tracking-tight '+(slp>3?'text-status-warning':'text-status-healthy');
+  chart.update();
 }
-function setBadge(etaSec,last,conf){
-  const b=$('chart-badge'),tx=$('chart-badge-tx');const dot=b.querySelector('span');
-  const cf = conf!=null?` · ${Math.round(conf*100)}%`:'';
-  if(last>=sloMs){dot.className='w-2 h-2 rounded-full bg-status-danger animate-ping';tx.textContent='Breaching now';tx.className='text-status-danger';}
-  else if(etaSec!=null){dot.className='w-2 h-2 rounded-full bg-brand-primary animate-ping';tx.textContent='ETA to breach ~'+Math.round(etaSec)+'s'+cf;tx.className='text-brand-primary';}
-  else{dot.className='w-2 h-2 rounded-full bg-status-healthy';tx.textContent='Healthy';tx.className='text-status-healthy';}
-}
-async function loadForecast(){try{const f=await(await fetch('/api/forecast')).json();if(!f.error){serverFc=f;if(f.confident&&f.confidence!=null)$('stat-confidence').textContent=Math.round(f.confidence*100)+'%';rebuildChart();}}catch(e){}}
 
-/* ---------- pipeline ---------- */
-const STAGES=[['LEARN','brain'],['FORESEE','eye'],['CLASSIFY','filter'],['CASCADE','git-merge'],['GOVERN','shield'],['PREVENT','zap'],['VERIFY','check'],['COOLDOWN','snowflake'],['RECORD','book-open']];
-let lastSteps=[], pipeBound=false;
-function renderPipeline(steps, running){
-  const box=$('pipeline'); const W=Math.max(560,box.clientWidth||900), H=150;
-  const left=18,right=W-18,topY=42,botY=120,r=26,padX=46;
-  const n=STAGES.length, stepX=(W-2*padX)/(n-1);
-  const xs=STAGES.map((_,i)=>Math.round(padX+i*stepX));
-  const set=new Set((steps||[]).map(s=>s.toUpperCase()));
-  let reached=-1;STAGES.forEach((s,i)=>{if(set.has(s[0]))reached=i;});
-  const full = reached===n-1;
-  // closed-loop "racetrack" circuit: nodes sit on the top edge, current returns along the bottom
-  const track=`M ${left+r} ${topY} H ${right-r} Q ${right} ${topY} ${right} ${topY+r} V ${botY-r} Q ${right} ${botY} ${right-r} ${botY} H ${left+r} Q ${left} ${botY} ${left} ${botY-r} V ${topY+r} Q ${left} ${topY} ${left+r} ${topY} Z`;
-  const litX = reached<0? xs[0] : xs[reached];
-  const dur = running? 1.5 : 5.5;
-  const showDot = running || reached>=0;
-  const baseStroke = full? '#10b981' : '#243033';
-  let svg=`<svg class="absolute inset-0" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="z-index:0" xmlns="http://www.w3.org/2000/svg">
-    <defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <path id="trackp" d="${track}" fill="none" stroke="none"/>
-    <path d="${track}" fill="none" stroke="${baseStroke}" stroke-width="${full?3:2.5}" opacity="${full?0.9:1}"/>
-    <path d="${track}" fill="none" stroke="#4cd7f6" stroke-width="1.6" opacity="${running?0.9:0.45}" class="circuit-flow${running?' fast':''}"/>
-    ${!full?`<path d="M ${xs[0]} ${topY} H ${litX}" fill="none" stroke="#10b981" stroke-width="3.5" stroke-linecap="round"/>`:''}
-    ${xs.map(x=>`<circle cx="${x}" cy="${topY}" r="6" fill="#0e1416" stroke="${baseStroke}" stroke-width="1.5"/>`).join('')}
-    ${showDot?`<circle r="5.5" fill="#4cd7f6" filter="url(#glow)"><animateMotion dur="${dur}s" repeatCount="indefinite" rotate="0"><mpath href="#trackp"/></animateMotion></circle>`:''}
+async function loadForecast(){
+  try{const f=await(await fetch('/api/forecast')).json();serverFc=f;
+    if(f.confidence!=null){
+      const pct=Math.round(f.confidence*100);
+      $('stat-confidence').textContent=`Conf: ${pct}%`;
+    }
+  }catch(e){}
+}
+
+/* Pipeline rendering */
+const STAGES=[['LEARN','book-open'],['FORESEE','eye'],['CLASSIFY','filter'],['CASCADE','git-branch'],['GOVERN','shield'],['PREVENT','wrench'],['VERIFY','check-circle'],['COOLDOWN','snowflake'],['RECORD','file-text']];
+let pipeBound=false, lastSteps=[];
+function renderPipeline(steps,running){
+  const box=$('pipeline');if(!box)return;
+  const W=box.clientWidth||600, H=140;
+  const topY=35, botY=105, left=35, right=W-35;
+  const xs=STAGES.map((_,i)=>left+i*(right-left)/(STAGES.length-1));
+  const reached=steps?steps.length-1:-1;
+  const full=reached===STAGES.length-1;
+  const track=`M ${left} ${topY} H ${right} V ${botY} H ${left} Z`;
+  let svg=`<svg class="absolute inset-0" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <path d="${track}" fill="none" stroke="#374151" stroke-width="2"/>
+    <path d="${track}" fill="none" stroke="#6366F1" stroke-width="2" class="circuit-flow${running?' fast':''}"/>
   </svg>`;
   const nodes=STAGES.map((s,i)=>{
     const state= reached<0?'pending':(i<reached?'done':(i===reached?'active':'pending'));
-    let cls,icls;
-    if(state==='active'){cls='w-11 h-11 bg-brand-primary-container border-2 border-brand-primary text-brand-on-primary shadow-glow-primary animate-pulse-slow';icls='w-5 h-5';}
-    else if(state==='done'){cls='w-9 h-9 bg-status-healthy/10 border border-status-healthy/70 text-status-healthy shadow-glow-success';icls='w-4 h-4';}
-    else{cls='w-9 h-9 bg-surface-low border border-brand-outline-variant text-brand-outline';icls='w-4 h-4';}
-    const lbl=state==='active'?'text-brand-primary font-bold':state==='done'?'text-status-healthy font-semibold':'text-brand-outline font-semibold';
-    const sz=state==='active'?22:18;
-    return `<div class="absolute flex flex-col items-center" style="left:${xs[i]}px;top:${topY-sz}px;transform:translateX(-50%);z-index:2">
-      <div class="rounded-full flex items-center justify-center ${cls}"><i data-lucide="${s[1]}" class="${icls}"></i></div>
-      <span class="mt-1 text-[10px] font-mono uppercase ${lbl}">${s[0]}</span></div>`;
+    let cls;
+    if(state==='active'){cls='bg-brand-primary text-white border-2 border-white shadow-glow-primary animate-pulse-slow';}
+    else if(state==='done'){cls='bg-status-healthy/20 text-status-healthy border border-status-healthy/60';}
+    else{cls='bg-surface-container text-gray-500 border border-white/10';}
+    return `<div class="absolute flex flex-col items-center" style="left:${xs[i]}px;top:${topY-18}px;transform:translateX(-50%);z-index:2">
+      <div class="w-9 h-9 rounded-full flex items-center justify-center ${cls}"><i data-lucide="${s[1]}" class="w-4 h-4"></i></div>
+      <span class="mt-1.5 text-[10px] font-mono uppercase font-bold text-gray-300">${s[0]}</span></div>`;
   }).join('');
-  const fb=`<div class="absolute font-mono text-[9px] tracking-wider ${full?'text-status-healthy':'text-brand-outline'}" style="left:50%;top:${botY}px;transform:translate(-50%,-50%);background:#0e1416;padding:0 8px;z-index:2">FEEDBACK · ledger → LEARN</div>`;
-  box.innerHTML=svg+nodes+fb;lucide.createIcons();
-  lastSteps=steps||[];
-  if(!pipeBound){pipeBound=true;window.addEventListener('resize',()=>renderPipeline(lastSteps,false));}
+  box.innerHTML=svg+nodes;lucide.createIcons();
 }
 renderPipeline([]);
 
-/* ---------- data loaders ---------- */
+/* Load Services & Metrics */
 async function loadServices(){
   try{const d=await(await fetch('/api/services')).json();
     if(d.error){setSig(false);return;}
     setSig(true);lastSync=Date.now();
     const svc=d.services||[];if(!svc.length){$('svc-name').textContent='no services yet';return;}
-    if(svc[0].slo_ms){sloMs=svc[0].slo_ms;$('slo-legend').textContent='SLO '+sloMs+'ms';$('stat-slo').textContent='(SLO '+sloMs+')';}
-    if(!selected||!svc.find(s=>s.name===selected))selected=svc[0].name;
-    const cur=svc.find(s=>s.name===selected)||svc[0];
+    const cur=svc[0];
     $('svc-name').textContent=cur.name;
     $('stat-p99').textContent=cur.p99_ms+'ms';
-    $('stat-p99').className='text-2xl font-mono font-semibold '+(cur.state==='critical'?'text-status-danger':cur.state==='warning'?'text-status-warning':'text-white');
     samples.push({t:new Date().toLocaleTimeString([], {hour12:false}).slice(0,8),v:cur.p99_ms});
     if(samples.length>MAXPTS)samples.shift();
     rebuildChart();setSysHealth(cur.state);
   }catch(e){setSig(false);}
 }
 function setSig(ok){const p=$('sig-pill'),t=$('sig-tx');const dot=p.querySelector('span');
-  if(ok){dot.className='w-2 h-2 rounded-full bg-status-healthy animate-pulse';t.textContent='CONNECTED (Live)';t.className='text-status-healthy font-semibold';}
-  else{dot.className='w-2 h-2 rounded-full bg-status-danger';t.textContent='OFFLINE';t.className='text-status-danger font-semibold';}}
+  if(ok){dot.className='w-2.5 h-2.5 rounded-full bg-status-healthy animate-pulse shadow-glow-success';t.textContent='CONNECTED (Live)';t.className='text-status-healthy font-bold';}
+  else{dot.className='w-2.5 h-2.5 rounded-full bg-status-danger';t.textContent='OFFLINE';t.className='text-status-danger font-bold';}}
 function setSysHealth(state){const e=$('sys-health');
-  if(running){e.textContent='PREVENTING';e.className='text-brand-primary font-semibold tracking-wider bg-brand-primary/10 px-2 py-0.5 rounded border border-brand-primary/30';return;}
+  if(running){e.textContent='PREVENTING';e.className='text-brand-primary font-bold tracking-wider bg-brand-primary/10 px-2.5 py-1 rounded border border-brand-primary/40 shadow-glow-primary';return;}
   const map={critical:['AT RISK','danger'],warning:['DEGRADING','warning'],healthy:['MONITORING','healthy']};
   const m=map[state]||map.healthy;const c=m[1];
-  e.textContent=m[0];e.className=`text-status-${c} font-semibold tracking-wider bg-status-${c}/10 px-2 py-0.5 rounded border border-status-${c}/30`;}
+  e.textContent=m[0];e.className=`text-status-${c} font-bold tracking-wider bg-status-${c}/10 px-2.5 py-1 rounded border border-status-${c}/40`;}
 
 function badgeFor(o){const m={'breach avoided':['healthy','avoided'],'pre-empted':['warning','pre-empted'],'escalated':['danger','escalated'],'suggested':['info','suggested'],'held':['info','held'],'healthy':['healthy','healthy']};return m[o]||['info',o];}
 async function loadPrevented(){
   try{const d=await(await fetch('/api/prevented')).json();
     const usd=(d.dollars_saved||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    $('stat-incidents').textContent=d.prevented||0;$('stat-inc-tot').textContent='/ '+(d.total||0);
+    $('stat-incidents').textContent=d.prevented||0;$('stat-inc-tot').textContent='/ '+(d.total||0)+' saved';
     $('stat-cost').textContent='$'+usd;$('ledger-count').textContent=(d.total||0)+' filed';
     const inc=d.incidents||[];
     $('ledger').innerHTML=inc.length?inc.map(c=>{const b=badgeFor(c.outcome);
-      const money=c.dollars_saved?('+$'+Number(c.dollars_saved).toFixed(0)+' saved'):(c.action||'');
-      return `<div class="flex items-center justify-between p-2 rounded bg-surface-low/80 border border-brand-outline-variant/30 hover:border-brand-outline-variant transition-colors">
-        <div class="min-w-0"><div class="text-white font-medium truncate">${esc(c.service)} <span class="text-brand-outline">· ${esc(c.signal||'')}</span></div>
-        <div class="text-[10px] text-brand-outline">${esc(c.at)} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms</div></div>
-        <span class="text-status-${b[0]} font-semibold bg-status-${b[0]}/10 px-2 py-0.5 rounded border border-status-${b[0]}/30 shrink-0 ml-2 text-[10px]">${esc(b[1])}${c.dollars_saved?(' · +$'+Number(c.dollars_saved).toFixed(0)):''}</span></div>`;
-    }).join(''):'<div class="text-brand-outline text-center py-6">No incidents yet. Inject load, then Run ChronoLens.</div>';
+      return `<div class="flex items-center justify-between p-2.5 rounded-lg bg-surface-container border border-white/5 hover:border-brand-primary/40 transition-colors">
+        <div class="min-w-0"><div class="text-white font-bold truncate">${esc(c.service)} <span class="text-gray-400">· ${esc(c.signal||'')}</span></div>
+        <div class="text-[10px] text-gray-400">${esc(c.at)} · p99 ${c.p99_at_prediction_ms}→${c.final_p99_ms}ms</div></div>
+        <span class="text-status-${b[0]} font-bold bg-status-${b[0]}/10 px-2 py-0.5 rounded border border-status-${b[0]}/30 shrink-0 ml-2 text-[10px]">${esc(b[1])}${c.dollars_saved?(' · +$'+Number(c.dollars_saved).toFixed(0)):''}</span></div>`;
+    }).join(''):'<div class="text-gray-400 text-center py-8">No incidents filed yet. Click "Inject Rising Load" then "Run ChronoLens".</div>';
     renderTopo(inc[0]);
   }catch(e){}
 }
 async function loadConfig(){try{const c=await(await fetch('/api/config')).json();
   $('node-mode').textContent=(c.autonomy||'—').toUpperCase();
-  $('stat-confidence').textContent='—';
   $('footCfg').innerHTML=`$${c.cost_per_unit_hr}/unit·hr · LLM ${esc(c.llm_provider)}<br>ceiling ${c.max_capacity} · dwell ${c.min_dwell_s}s`;
 }catch(e){}}
 async function loadSignoz(){try{const s=await(await fetch('/api/signoz')).json();
   if(!s.connected){$('sig-guard').textContent='—';$('sig-firing').textContent='—';$('sig-channels').textContent='—';return;}
   $('sig-guard').textContent=s.guard_alerts;
-  $('sig-firing').innerHTML=s.firing>0?`<span class="text-status-danger font-semibold bg-status-danger/10 px-2 py-0.5 rounded border border-status-danger/30 animate-pulse">${s.firing} FIRING</span>`:'0';
+  $('sig-firing').innerHTML=s.firing>0?`<span class="text-status-danger font-bold bg-status-danger/10 px-2 py-0.5 rounded border border-status-danger/30 animate-pulse">${s.firing} FIRING</span>`:'0';
   $('sig-channels').textContent=(s.channels||[]).length;
   }catch(e){}
   try{const ib=await(await fetch('/api/inbox')).json();$('sig-inbox').textContent=(ib.count||0)+' recv';}catch(e){}
-  try{const m=await(await fetch('/api/metrics_self')).json();
-    const p=m.prevented_total; $('sig-metric').textContent=(p==null?'—':('prevented '+Math.round(p)));}catch(e){}
 }
 
-/* ---------- topology ---------- */
+/* Topology */
 const CHAIN=['/order','cart.lookup','inventory.check','payment.charge','payment.db_query','order.db_write'];
 const ICONMAP={'/order':'shopping-bag','cart.lookup':'shopping-cart','inventory.check':'box','payment.charge':'credit-card','payment.db_query':'database','order.db_write':'hard-drive'};
 function renderTopo(lastCase){
@@ -398,117 +405,91 @@ function renderTopo(lastCase){
   $('topo').innerHTML=`<div class="flex flex-wrap items-center gap-y-3">`+CHAIN.map((n,i)=>{
     const isRoot=n===root;
     const pill=isRoot
-      ?`<div class="relative flex items-center gap-1.5 bg-brand-primary/10 border-2 border-brand-primary rounded-full px-3 py-1.5 shadow-glow-primary"><div class="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-primary text-brand-on-primary text-[8px] font-mono font-bold px-1.5 rounded-full uppercase">ROOT</div><i data-lucide="${ICONMAP[n]||'circle'}" class="w-3.5 h-3.5 text-brand-primary"></i><span class="text-xs font-mono font-bold text-white">${esc(n)}</span></div>`
-      :`<div class="flex items-center gap-1.5 bg-surface-low/95 border border-brand-outline-variant/50 rounded-full px-3 py-1.5 hover:border-brand-primary transition-all"><i data-lucide="${ICONMAP[n]||'circle'}" class="w-3.5 h-3.5 text-brand-outline"></i><span class="text-xs font-mono text-white">${esc(n)}</span></div>`;
-    const arrow=i<CHAIN.length-1?`<i data-lucide="chevron-right" class="w-4 h-4 text-brand-outline-variant mx-1"></i>`:'';
+      ?`<div class="relative flex items-center gap-2 bg-brand-primary/10 border-2 border-brand-primary rounded-full px-3 py-1.5 shadow-glow-primary"><div class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-primary text-white text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">ROOT</div><i data-lucide="${ICONMAP[n]||'circle'}" class="w-4 h-4 text-brand-primary"></i><span class="text-xs font-mono font-bold text-white">${esc(n)}</span></div>`
+      :`<div class="flex items-center gap-2 bg-surface-container border border-white/10 rounded-full px-3 py-1.5"><i data-lucide="${ICONMAP[n]||'circle'}" class="w-4 h-4 text-gray-400"></i><span class="text-xs font-mono text-gray-300">${esc(n)}</span></div>`;
+    const arrow=i<CHAIN.length-1?`<i data-lucide="chevron-right" class="w-4 h-4 text-gray-500 mx-1"></i>`:'';
     return pill+arrow;
-  }).join('')+`</div><div class="mt-3 text-[10px] font-mono text-brand-outline">Root fixed first — the fix targets the cause, not the /order symptom.</div>`;
+  }).join('')+`</div><div class="mt-3 text-[10px] font-mono text-gray-400">SigNoz Span Grouping: Root cause isolated before remediation.</div>`;
   lucide.createIcons();
 }
 renderTopo(null);
 
-/* ---------- loop runs ---------- */
-function traceRow(e){const cmap={done:'status-healthy',ok:'status-healthy',info:'brand-primary',warn:'status-warning',pending:'brand-outline'};const c=cmap[e.status]||'brand-outline';
-  return `<div class="flex gap-2 p-1.5 rounded bg-surface-low/40"><span class="text-${c} font-semibold shrink-0 w-20">${esc(e.step)}</span><span class="text-brand-tertiary">${esc(e.text)}</span></div>`;}
-function fillInsight(tl,outcome){
-  const f=tl.find(e=>e.step==='FORESEE'&&e.status==='warn');const cl=tl.find(e=>e.step==='CLASSIFY');const b=badgeFor(outcome);
-  const pred=f?f.text:(tl.find(e=>e.step==='FORESEE')||{}).text||'no breach predicted';
-  const act=cl?cl.text:'—';
-  $('insight').className=`bg-surface-lowest/90 rounded p-2.5 border-l-4 border-status-${b[0]} flex items-center justify-between text-xs font-mono gap-3`;
-  $('insight').innerHTML=`<div class="min-w-0"><span class="text-white font-semibold">Prediction:</span> <span class="text-brand-outline">${esc(pred)}</span> <span class="text-white font-semibold ml-2">Action:</span> <span class="text-brand-primary">${esc(act)}</span></div>
-    <div class="flex items-center gap-1 text-status-${b[0]} font-semibold shrink-0"><i data-lucide="shield-check" class="w-4 h-4"></i><span>${esc(b[1])}</span></div>`;
-  $('loop-outcome').textContent=outcome||'—';lucide.createIcons();
-}
+/* Actions & Loops */
 function runLoop(managed){
   if(running)return;running=true;setButtons(false);
-  // remember the pre-run slope so we can draw the "would-be" ghost line on a save
-  ghostActive=false; ghostSlope=(serverFc&&serverFc.slope_ms_per_s>0)?serverFc.slope_ms_per_s:8;
-  $('loop-trace').innerHTML='<div class="text-brand-primary flex items-center gap-2 p-2"><span class="w-3 h-3 border-2 border-brand-outline-variant border-t-brand-primary rounded-full animate-spin"></span>Streaming the closed loop live from SigNoz…</div>';
+  $('loop-trace').innerHTML='<div class="text-brand-primary flex items-center gap-2 p-2 font-bold"><span class="w-3 h-3 border-2 border-white/20 border-t-brand-primary rounded-full animate-spin"></span>Streaming closed loop live from SigNoz…</div>';
   setSysHealth();renderPipeline([],true);
-  const tl=[]; let traceHtml='';
-  const es=new EventSource('/api/respond/stream?managed='+managed);   // #4 live stage-by-stage
+  const es=new EventSource('/api/respond/stream?managed='+managed);
   es.onmessage=(m)=>{
     let ev; try{ev=JSON.parse(m.data);}catch(_){return;}
     if(ev._done){
       es.close();
-      fillInsight(tl, ev.outcome);
-      if(ev.error) $('loop-trace').innerHTML+=`<div class="text-status-danger p-1.5">${esc(ev.error)}</div>`;
-      if(ev.outcome==='breach avoided'){ghostActive=true;   // #3 show what would have happened
-        const dot=$('chart-badge').querySelector('span');dot.className='w-2 h-2 rounded-full bg-status-healthy';
-        $('chart-badge-tx').textContent='Verified — breach avoided';$('chart-badge-tx').className='text-status-healthy';}
+      $('loop-outcome').textContent=ev.outcome||'completed';
       running=false;setButtons(true);loadServices();loadPrevented();loadSignoz();loadForecast();
       return;
     }
-    tl.push(ev); renderPipeline(tl.map(e=>e.step), true);
-    if(ev.step==='PREVENT') markEvent('action','#4cd7f6');
-    traceHtml+=traceRow(ev); $('loop-trace').innerHTML=traceHtml;
-    $('loop-trace').scrollTop=$('loop-trace').scrollHeight;
+    renderPipeline([ev.step], true);
+    $('loop-trace').innerHTML+=`<div class="flex justify-between text-xs p-1.5 rounded bg-surface-container border border-white/5"><span class="text-brand-primary font-bold">${esc(ev.step)}</span><span class="text-gray-300">${esc(ev.text||'')}</span></div>`;
   };
-  es.onerror=()=>{es.close();if(running){running=false;setButtons(true);
-    $('loop-trace').innerHTML+='<div class="text-status-warning p-1.5">stream ended</div>';}};
-}
-async function runAB(){
-  if(running)return;running=true;setButtons(false);
-  $('loop-trace').innerHTML='<div class="text-brand-primary p-2">Running A/B — baseline then managed…</div>';renderPipeline([],true);
-  try{const d=await(await fetch('/api/ab',{method:'POST'})).json();
-    const bt=(d.baseline&&d.baseline.timeline)||[],mt=(d.managed&&d.managed.timeline)||[];
-    renderPipeline(mt.map(e=>e.step),false);fillInsight(mt,d.managed&&d.managed.outcome);
-    $('loop-trace').innerHTML=`<div class="text-brand-outline font-semibold p-1">A · BASELINE (no action) → ${esc((d.baseline&&d.baseline.outcome)||'—')}</div>`+bt.map(traceRow).join('')+
-      `<div class="text-brand-primary font-semibold p-1 mt-1">B · MANAGED (ChronoLens) → ${esc((d.managed&&d.managed.outcome)||'—')}</div>`+mt.map(traceRow).join('');
-  }catch(e){$('loop-trace').innerHTML=`<div class="text-status-danger p-2">${esc(e)}</div>`;}
-  running=false;setButtons(true);loadServices();loadPrevented();loadSignoz();
+  es.onerror=()=>{es.close();running=false;setButtons(true);};
 }
 function setButtons(on){['btn-run','btn-inject','btn-cooldown','btn-ab','btn-reset'].forEach(id=>{$(id).disabled=!on;$(id).style.opacity=on?'':'0.5';});}
-async function doFault(mode,level){if(mode==='off'){ghostActive=false;}try{await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'});}catch(e){}setTimeout(()=>{loadServices();loadForecast();},800);}
+async function doFault(mode,level){try{await fetch(`/api/fault?mode=${mode}&level=${level}`,{method:'POST'});}catch(e){}setTimeout(()=>{loadServices();loadForecast();},800);}
 async function doCooldown(){try{await fetch('/api/cooldown',{method:'POST'});}catch(e){}loadServices();loadPrevented();}
 
 $('btn-run').onclick=()=>runLoop(true);
 $('btn-inject').onclick=()=>doFault('traffic-ramp',20);
 $('btn-reset').onclick=()=>doFault('off',0);
-$('btn-ab').onclick=runAB;
+$('btn-ab').onclick=()=>runLoop(false);
 $('btn-cooldown').onclick=doCooldown;
-document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo',agent:'sec-agent'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-  document.querySelectorAll('.nav-a').forEach(x=>{x.className=x.className.replace('text-brand-primary bg-brand-primary/10 border-l-2 border-brand-primary font-medium','text-brand-outline');});});
 
-/* ---------- Agent Watch (drift / loop / quality) ---------- */
-function badgeSet(id,text,cls){const e=$(id);e.textContent=text;e.className='text-[10px] font-mono px-2 py-0.5 rounded '+cls;}
+/* Agent Watch Handlers */
+async function triggerToolCircuitBreak(toolName){
+  try{
+    const r=await(await fetch(`/api/agent/circuit-break?tool_name=${toolName}`,{method:'POST'})).json();
+    $('circuit-badge').textContent='CIRCUIT OPEN (Broken)';
+    $('circuit-badge').className='text-[10px] font-mono px-2.5 py-0.5 rounded-full text-status-danger bg-status-danger/10 border border-status-danger/30 animate-pulse';
+    $('circuit-body').innerHTML=`<div class="p-2 rounded bg-surface-container border border-status-danger/30"><div class="text-status-danger font-bold">⚡ Tool '${esc(toolName)}' Circuit-Broken</div><div class="text-[10px] text-gray-400 mt-1">Telemetry showed high latency > 2500ms. Calls hot-disabled.</div></div>`;
+  }catch(e){}
+}
+
+async function triggerAgentSteerage(toolName){
+  try{
+    const r=await(await fetch(`/api/agent/steer?tool_name=${toolName}&reason=looping`,{method:'POST'})).json();
+    alert('Agent Steerage Prompt Injected into Live Context:\n\n' + r.steerage_prompt);
+  }catch(e){}
+}
+
 async function agentMode(m){try{const r=await(await fetch('/api/agent/mode?mode='+m,{method:'POST'})).json();$('agent-mode').textContent=r.mode||m;}catch(e){$('agent-mode').textContent='agent offline';}}
-async function loadAgentStatus(){try{const s=await(await fetch('/api/agent/status')).json();if(s.mode)$('agent-mode').textContent=s.mode;}catch(e){}}
-async function captureBaseline(){$('drift-body').innerHTML='<div class="text-brand-primary"><span class="w-2 h-2"></span>capturing baseline…</div>';
-  try{const r=await(await fetch('/api/agent/baseline?samples=10',{method:'POST'})).json();
-    if(r.error){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
-    const f=r.captured;$('drift-body').innerHTML=`<div class="text-status-healthy">baseline captured (${f.n} turns)</div><div>tools: ${esc(Object.keys(f.tool_freq).join(', '))}</div><div>model: ${esc(Object.keys(f.model_freq).join(', '))} · steps ${f.avg_steps} · ${f.avg_tokens} tok</div>`;
-    badgeSet('drift-badge','baseline set','text-status-healthy bg-status-healthy/10');
-  }catch(e){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
-async function checkDrift(){$('drift-body').innerHTML='<div class="text-brand-primary">measuring…</div>';
+async function checkDrift(){
   try{const r=await(await fetch('/api/agent/drift?samples=10')).json();
-    if(r.error){$('drift-body').innerHTML=`<div class="text-status-warning">${esc(r.error)}</div>`;badgeSet('drift-badge','no baseline','text-brand-outline bg-surface-high');return;}
+    if(r.error){$('drift-body').innerHTML=`<div class="text-status-warning">${esc(r.error)}</div>`;return;}
     const d=r.drift;const pct=Math.round(d.score*100);
-    badgeSet('drift-badge',d.drifted?('DRIFTED '+pct+'%'):('stable '+pct+'%'),d.drifted?'text-status-warning bg-status-warning/10 animate-pulse':'text-status-healthy bg-status-healthy/10');
-    const changes=(d.changes||[]).map(c=>`<div>• ${esc(c)}</div>`).join('')||'<div>no notable change</div>';
-    $('drift-body').innerHTML=`<div class="${d.drifted?'text-status-warning':'text-status-healthy'} font-semibold">drift score ${d.score}</div>${changes}`;
-  }catch(e){$('drift-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
-async function loopCheck(){$('loop-body').innerHTML='<div class="text-brand-primary">running one turn…</div>';
-  try{const r=await(await fetch('/api/agent/loopcheck',{method:'POST'})).json();
+    $('drift-badge').textContent=d.drifted?('DRIFTED '+pct+'%'):('stable '+pct+'%');
+    $('drift-badge').className='text-[10px] font-mono px-2.5 py-0.5 rounded-full '+(d.drifted?'text-status-warning bg-status-warning/10 border border-status-warning/30':'text-status-healthy bg-status-healthy/10 border border-status-healthy/30');
+    $('drift-body').innerHTML=`<div class="font-bold text-white">Drift score ${d.score}</div><div class="text-gray-400">${(d.changes||[]).join('; ') || 'Behavior consistent'}</div>`;
+  }catch(e){}
+}
+async function loopCheck(){
+  try{const r=await(await fetch('/api/agent/loopcheck')).json();
     if(r.error){$('loop-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
     const v=r.verdict;
-    badgeSet('loop-badge',v.looping?'LOOP — BREAK':'ok',v.looping?'text-status-danger bg-status-danger/10 animate-pulse':'text-status-healthy bg-status-healthy/10');
-    $('loop-body').innerHTML=`<div class="${v.looping?'text-status-danger':'text-status-healthy'} font-semibold">${v.looping?'runaway detected':'within limits'}</div>`+
-      `<div>steps ${v.steps} · dominant '${esc(v.dominant_tool)}' ${Math.round(v.dominant_frac*100)}% · ${v.distinct_tools} distinct</div>`+
-      `<div>cost $${v.cost_usd}${v.looping?` → break at step ${v.break_at_step}, <span class="text-status-healthy">saved $${v.saved_usd}</span>`:''}</div>`+
-      `<div class="text-brand-outline">${esc(v.reason)}</div>`;
-  }catch(e){$('loop-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
-async function gradeQuality(){$('quality-body').innerHTML='<div class="text-brand-primary">grading…</div>';
+    $('loop-badge').textContent=v.looping?'LOOP — BREAK':'OK';
+    $('loop-badge').className='text-[10px] font-mono px-2.5 py-0.5 rounded-full '+(v.looping?'text-status-danger bg-status-danger/10 border border-status-danger/30 animate-pulse':'text-status-healthy bg-status-healthy/10 border border-status-healthy/30');
+    $('loop-body').innerHTML=`<div class="font-bold text-white">${v.looping?'Runaway loop detected!':'Normal step count'}</div><div class="text-gray-400">steps ${v.steps} · cost $${v.cost_usd}</div>`;
+  }catch(e){}
+}
+async function gradeQuality(){
   try{const r=await(await fetch('/api/agent/quality?samples=8')).json();
     if(r.error){$('quality-body').innerHTML=`<div class="text-status-danger">${esc(r.error)}</div>`;return;}
-    const col=r.verdict==='good'?'status-healthy':r.verdict==='degraded'?'status-warning':'status-danger';
-    badgeSet('quality-badge',r.verdict+' '+Math.round(r.avg_score*100)+'%','text-'+col+' bg-'+col+'/10');
-    const reasons=(r.samples&&r.samples[r.samples.length-1]&&r.samples[r.samples.length-1].reasons||[]).map(x=>esc(x)).join('; ');
-    $('quality-body').innerHTML=`<div class="text-${col} font-semibold">avg quality ${r.avg_score} · ${r.verdict}</div><div>${r.degraded_pct}% of answers flagged</div><div class="text-brand-outline">${reasons}</div>`;
-  }catch(e){$('quality-body').innerHTML=`<div class="text-status-danger">${esc(e)}</div>`;}}
+    $('quality-body').innerHTML=`<div class="font-bold text-status-healthy">Avg Quality: ${r.avg_score}</div><div class="text-gray-400">Verdict: ${r.verdict}</div>`;
+  }catch(e){}
+}
+
+document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo',agent:'sec-agent'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});
 
 lucide.createIcons();
-loadServices();loadPrevented();loadConfig();loadSignoz();loadForecast();loadAgentStatus();
+loadServices();loadPrevented();loadConfig();loadSignoz();loadForecast();
 setInterval(loadServices,POLL);setInterval(loadPrevented,6000);setInterval(loadSignoz,8000);setInterval(loadForecast,3500);
 </script>
 </body>
