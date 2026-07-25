@@ -460,21 +460,60 @@ async function loadSignoz(){try{const s=await(await fetch('/api/signoz')).json()
 }
 
 /* Topology */
-const CHAIN=['/order','cart.lookup','inventory.check','payment.charge','payment.db_query','order.db_write'];
-const ICONMAP={'/order':'shopping-bag','cart.lookup':'shopping-cart','inventory.check':'box','payment.charge':'credit-card','payment.db_query':'database','order.db_write':'hard-drive'};
+const CHAIN=['/order','cart.lookup','inventory.check','payment.charge','payment.db_query'];
+const ICONMAP={'/order':'shopping-bag','cart.lookup':'shopping-cart','inventory.check':'box','payment.charge':'credit-card','payment.db_query':'database'};
+
 function renderTopo(lastCase){
   const root=(lastCase&&lastCase.evidence&&lastCase.evidence.blast_root)||'payment.db_query';
-  $('topo').innerHTML=`<div class="flex flex-wrap items-center gap-y-3">`+CHAIN.map((n,i)=>{
-    const isRoot=n===root;
-    const pill=isRoot
-      ?`<div class="relative flex items-center gap-2 bg-brand-primary/10 border-2 border-brand-primary rounded-full px-3 py-1.5 shadow-glow-primary"><div class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-primary text-white text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">ROOT</div><i data-lucide="${ICONMAP[n]||'circle'}" class="w-4 h-4 text-brand-primary"></i><span class="text-xs font-mono font-bold text-white">${esc(n)}</span></div>`
-      :`<div class="flex items-center gap-2 bg-surface-container border border-white/10 rounded-full px-3 py-1.5"><i data-lucide="${ICONMAP[n]||'circle'}" class="w-4 h-4 text-gray-400"></i><span class="text-xs font-mono text-gray-300">${esc(n)}</span></div>`;
-    const arrow=i<CHAIN.length-1?`<i data-lucide="chevron-right" class="w-4 h-4 text-gray-500 mx-1"></i>`:'';
-    return pill+arrow;
-  }).join('')+`</div><div class="mt-3 text-[10px] font-mono text-gray-400">SigNoz Span Grouping: Root cause isolated before remediation.</div>`;
+  
+  const nodes = CHAIN.map((n) => {
+    const isRoot = n === root;
+    const isGreen = n === 'cart.lookup' || n === 'inventory.check' || isRoot;
+    const borderCls = isRoot ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 ring-1 ring-emerald-500/50' : (isGreen ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-400' : 'border-sky-500/40 bg-sky-950/20 text-sky-300');
+    const iconColor = isRoot ? 'text-emerald-400' : (isGreen ? 'text-emerald-400' : 'text-sky-400');
+    const badge = isRoot ? `<div class="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-black text-[8px] font-mono font-bold px-1.5 py-0.2 rounded uppercase">ROOT</div>` : '';
+    
+    return `<div class="relative flex items-center justify-between px-3 py-1.5 rounded-lg border ${borderCls} transition-all">
+      ${badge}
+      <div class="flex items-center gap-2">
+        <i data-lucide="${ICONMAP[n]||'circle'}" class="w-3.5 h-3.5 ${iconColor}"></i>
+        <span class="text-xs font-mono font-semibold">${esc(n)}</span>
+      </div>
+      <span class="text-[10px] font-mono text-slate-500 font-medium">span</span>
+    </div>`;
+  }).join('<div class="flex justify-center py-0.5"><i data-lucide="arrow-down" class="w-3 h-3 text-slate-600"></i></div>');
+
+  $('topo').innerHTML = `<div class="grid grid-cols-12 gap-3 items-center">
+    <!-- Left Root Node: User -->
+    <div class="col-span-3 flex flex-col items-center justify-center h-full">
+      <div class="px-3 py-2 rounded-lg border border-sky-500/40 bg-sky-950/30 text-sky-400 font-mono text-xs font-bold shadow-sm flex items-center gap-1.5">
+        <i data-lucide="user" class="w-3.5 h-3.5 text-sky-400"></i>
+        <span>user</span>
+      </div>
+    </div>
+
+    <!-- Connecting SVG Arrow / Curves -->
+    <div class="col-span-1 flex items-center justify-center">
+      <svg class="w-full h-40 text-slate-600 stroke-current fill-none" viewBox="0 0 20 160" preserveAspectRatio="none">
+        <path d="M 0 80 C 10 80, 10 15, 20 15" stroke-width="1.5" stroke-dasharray="3,3" />
+        <path d="M 0 80 C 10 80, 10 48, 20 48" stroke-width="1.5" stroke-dasharray="3,3" />
+        <path d="M 0 80 C 10 80, 10 80, 20 80" stroke-width="1.5" />
+        <path d="M 0 80 C 10 80, 10 112, 20 112" stroke-width="1.5" stroke-dasharray="3,3" />
+        <path d="M 0 80 C 10 80, 10 145, 20 145" stroke-width="1.5" stroke-dasharray="3,3" />
+      </svg>
+    </div>
+
+    <!-- Right Vertical Stack -->
+    <div class="col-span-8 space-y-1">
+      ${nodes}
+    </div>
+  </div>
+  <div class="mt-3 text-[10px] font-mono text-slate-400 border-t border-[#222734] pt-2">SigNoz Span Grouping: Root cause isolated before remediation.</div>`;
+  
   lucide.createIcons();
 }
 renderTopo(null);
+
 
 /* Actions & Loops */
 function runLoop(managed){
