@@ -41,11 +41,15 @@ class Config:
     drift_threshold: float        # behavior drift score that trips an alert (0..1)
 
     # --- pluggable LLM (NL explanations; all optional) ---
-    llm_provider: str          # none | openai | bedrock | gemini
+    llm_provider: str          # none | openai | bedrock | gemini | azure
     openai_api_key: str
     openai_model: str
     bedrock_model: str
     aws_region: str
+    azure_ai_endpoint: str
+    azure_ai_key: str
+    azure_ai_api_version: str
+    azure_chat_model: str
 
     # --- cost model (turn capacity units into dollars) ---
     cost_per_unit_hr: float    # $ per capacity unit per hour
@@ -93,6 +97,10 @@ class Config:
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             bedrock_model=os.getenv("BEDROCK_MODEL", "anthropic.claude-3-haiku-20240307-v1:0"),
             aws_region=os.getenv("AWS_REGION", "us-east-1"),
+            azure_ai_endpoint=os.getenv("AZURE_AI_ENDPOINT", "").rstrip("/"),
+            azure_ai_key=os.getenv("AZURE_AI_KEY", ""),
+            azure_ai_api_version=os.getenv("AZURE_AI_API_VERSION", "2024-05-01-preview"),
+            azure_chat_model=os.getenv("AZURE_CHAT_MODEL", "gpt-5.4-nano"),
             cost_per_unit_hr=_f("COST_PER_UNIT_HR", 0.65),
             enabled=os.getenv("CHRONOLENS_ENABLED", "on").lower() not in ("off", "0", "false", "no"),
             autonomy=os.getenv("CHRONOLENS_AUTONOMY", "auto").lower(),

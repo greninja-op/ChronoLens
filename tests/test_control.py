@@ -191,3 +191,21 @@ def test_shell_adapter_no_command_configured():
     from chronolens.adapters import ShellAdapter
     res = ShellAdapter().apply("restart", "svc", 0.0)
     assert not res.ok and "no CHRONOLENS_CMD_RESTART" in res.detail
+
+
+# --------------------------------------------------------------------------- #
+# LLM explain (incl. Azure provider)
+# --------------------------------------------------------------------------- #
+def test_llm_explain_azure_fallback(monkeypatch):
+    from chronolens.llm import explain
+    class AzureCfg:
+        llm_provider = "azure"
+        azure_ai_endpoint = "https://aip-f-resource.services.ai.azure.com"
+        azure_ai_key = "invalid-test-key"
+        azure_ai_api_version = "2024-05-01-preview"
+        azure_chat_model = "gpt-5.4-nano"
+
+    # Should fail open cleanly to rule-based explanation without crashing
+    exp = explain({"service": "checkout", "signal": "load", "action": "scale"}, cfg=AzureCfg())
+    assert exp.text and exp.source in ("rule-based", "azure")
+

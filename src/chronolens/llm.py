@@ -72,6 +72,8 @@ def explain(evidence: dict, cfg: Config | None = None) -> Explanation:
             text = _gemini(prompt, cfg)
         elif provider == "bedrock":
             text = _bedrock(prompt, cfg)
+        elif provider == "azure":
+            text = _azure(prompt, cfg)
         else:
             return Explanation(base, "rule-based")
         text = (text or "").strip()
@@ -96,9 +98,11 @@ def _openai(prompt: str, cfg: Config) -> str:
 
 
 def _gemini(prompt: str, cfg: Config) -> str:
+    import os
     import google.generativeai as genai
 
-    genai.configure(api_key=cfg.openai_api_key or "")
+    api_key = os.getenv("GEMINI_API_KEY") or cfg.openai_api_key or ""
+    genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
     return model.generate_content(prompt).text
 
@@ -117,3 +121,29 @@ def _bedrock(prompt: str, cfg: Config) -> str:
     resp = client.invoke_model(modelId=cfg.bedrock_model, body=json.dumps(body))
     payload = json.loads(resp["body"].read())
     return payload["content"][0]["text"]
+
+
+def _azure(prompt: str, cfg: Config) -> str:
+    from openai import AzureOpenAI, OpenAI
+
+    if "services.ai.azure.com" in cfg.azure_ai_endpoint or not cfg.azure_ai_endpoint.endswith("/openai"):
+        client = OpenAI(
+            base_url=f"{cfg.azure_ai_endpoint}/v1",
+            api_key=cfg.azure_ai_key,
+        )
+    else:
+        client = AzureOpenAI(
+            azure_endpoint=cfg.azure_ai_endpoint,
+            api_key=cfg.azure_ai_key,
+            api_version=cfg.azure_ai_api_version,
+        )
+    resp = client.chat.completions.create(
+        model=cfg.azure_chat_model,
+        messages=[
+            {"role": "system", "content": "You are a concise, concrete SRE assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
+    )
+    return resp.choices[0].message.content or ""
+

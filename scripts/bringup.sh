@@ -9,7 +9,7 @@
 #
 # Foundry runs on Linux/macOS. On Windows, run this inside WSL2 (Ubuntu).
 # See ../docs/14-signoz-install-guide.md for install/troubleshooting.
-set -euo pipefail
+set -eu
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
