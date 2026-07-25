@@ -100,21 +100,33 @@ def ancestors_of(service: str, parent_index: dict[str, list[str]],
     return out
 
 
-def pick_root(forecasts: dict[str, Any], parent_index: dict[str, list[str]]) -> str:
+def pick_root(forecasts: dict[str, Any], parent_index: dict[str, list[str]],
+              edges: list[dict[str, Any]] | None = None) -> str:
     """The root is the *most downstream* service that is degrading.
 
-    A leaf (something nothing else depends on downstream of it) that is climbing
-    is a cause; a service that is climbing only because its dependency is slow is
-    a symptom. Prefer the deepest degrading node, tie-broken by steepest slope.
+    A leaf (nothing depends on anything below it) that is climbing is a cause; a
+    service climbing only because its dependency is slow is a symptom. Prefer the
+    deepest degrading node, tie-broken by steepest slope.
+
+    When a dependency graph exists, only services **in that graph** can be the
+    root: an unrelated standalone service (a sidecar, a demo agent) has no
+    downstream blast path, so naming it the cause of a cascade is meaningless.
     """
     if not forecasts:
         return ""
-    # depth = how many services sit above it (are its ancestors)
+
     def upstream_count(svc: str) -> int:
         return len(ancestors_of(svc, parent_index))
 
-    climbing = {s: f for s, f in forecasts.items() if getattr(f, "slope_ms_per_s", 0) > 0}
-    pool = climbing or forecasts
+    pool = forecasts
+    if edges:
+        in_graph = {str(e["parent"]) for e in edges} | {str(e["child"]) for e in edges}
+        connected = {s: f for s, f in forecasts.items() if s in in_graph}
+        if connected:
+            pool = connected
+
+    climbing = {s: f for s, f in pool.items() if getattr(f, "slope_ms_per_s", 0) > 0}
+    pool = climbing or pool
     return max(pool, key=lambda s: (upstream_count(s), pool[s].slope_ms_per_s))
 
 
@@ -160,7 +172,7 @@ def forecast_blast_radius(series_by_service: dict[str, list[float]],
                            notes=["every service returned an empty series"])
 
     parent_index = build_parent_index(edges)
-    root = pick_root(forecasts, parent_index)
+    root = pick_root(forecasts, parent_index, edges)
     root_fc = forecasts[root]
 
     victims: list[Victim] = [Victim(

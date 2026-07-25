@@ -89,3 +89,30 @@ def test_narrative_names_root_and_provenance_note_present():
     br = forecast_blast_radius(series, EDGES, slo_ms=SLO, step_s=15.0)
     assert "payment" in br.narrative
     assert any("projection" in n.lower() for n in br.notes)
+
+
+# --------------------------------------------------------------------------- #
+# Root selection must stay inside the dependency graph.                        #
+# --------------------------------------------------------------------------- #
+class _F:
+    def __init__(self, slope): self.slope_ms_per_s = slope
+
+
+def test_standalone_service_cannot_be_the_root_when_a_graph_exists():
+    """A sidecar/agent with no dependencies has no blast path — it isn't a cause."""
+    forecasts = {"payment": _F(4.0), "checkout": _F(1.0), "orders": _F(0.5),
+                 "some-agent": _F(99.0)}   # steepest, but not in the graph
+    root = pick_root(forecasts, build_parent_index(EDGES), EDGES)
+    assert root == "payment"
+
+
+def test_without_a_graph_the_steepest_service_is_still_chosen():
+    forecasts = {"lonely": _F(9.0), "quiet": _F(0.1)}
+    assert pick_root(forecasts, {}, []) == "lonely"
+
+
+def test_unconnected_services_are_excluded_from_the_blast_chain():
+    series = {"payment": CLIMB, "checkout": FLAT, "orders": FLAT, "some-agent": CLIMB}
+    br = forecast_blast_radius(series, EDGES, slo_ms=SLO, step_s=15.0)
+    assert br.root_service == "payment"
+    assert "some-agent" not in [v.service for v in br.victims]
