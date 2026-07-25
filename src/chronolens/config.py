@@ -87,12 +87,6 @@ class Config:
     whatsapp_api_version: str
     whatsapp_recipient_number: str
 
-    # --- Sarvam AI (Bharat & Multilingual Layer) ---
-    sarvam_api_key: str
-    sarvam_stt_model: str
-    sarvam_tts_model: str
-    sarvam_tts_speaker: str
-
     @classmethod
     def load(cls) -> "Config":
         return cls(
@@ -132,13 +126,10 @@ class Config:
             whatsapp_token=os.getenv("WHATSAPP_TOKEN", ""),
             whatsapp_phone_number_id=os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""),
             whatsapp_app_secret=os.getenv("WHATSAPP_APP_SECRET", ""),
-            whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", "versifine-verify-2348"),
+            # No baked-in secrets/numbers: these must come from .env.
+            whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
             whatsapp_api_version=os.getenv("WHATSAPP_API_VERSION", "v23.0"),
-            whatsapp_recipient_number=os.getenv("WHATSAPP_RECIPIENT_NUMBER", "919400245958"),
-            sarvam_api_key=os.getenv("SARVAM_API_KEY", ""),
-            sarvam_stt_model=os.getenv("SARVAM_STT_MODEL", "saaras:v3"),
-            sarvam_tts_model=os.getenv("SARVAM_TTS_MODEL", "bulbul:v3"),
-            sarvam_tts_speaker=os.getenv("SARVAM_TTS_SPEAKER", "ritu"),
+            whatsapp_recipient_number=os.getenv("WHATSAPP_RECIPIENT_NUMBER", ""),
         )
 
     def slack_enabled(self) -> bool:
@@ -149,9 +140,7 @@ class Config:
         """WhatsApp Cloud API integration is live when token and phone_number_id are present."""
         return bool(self.whatsapp_token and self.whatsapp_phone_number_id)
 
-    def sarvam_enabled(self) -> bool:
-        """Sarvam AI translation & speech layer is active when API key is present."""
-        return bool(self.sarvam_api_key)
+
 
 
 

@@ -27,9 +27,17 @@ def verify_whatsapp_signature(
     signature_header: str | None,
     app_secret: str,
 ) -> bool:
-    """Validate Meta x-hub-signature-256 header using HMAC-SHA256."""
-    if not app_secret or not signature_header:
-        return True  # Soft-bypass in dev if secret not strictly enforced
+    """Validate Meta x-hub-signature-256 header using HMAC-SHA256.
+
+    Fails **closed** whenever a secret is configured: if ``WHATSAPP_APP_SECRET`` is
+    set, a missing or mismatched signature is rejected. The only permissive case is
+    local development with no secret configured at all (nothing to verify against),
+    which is why the webhook must not be exposed publicly without the secret set.
+    """
+    if not app_secret:
+        return True   # dev only: no secret configured, nothing to verify against
+    if not signature_header:
+        return False  # secret IS configured -> an unsigned request is rejected
 
     expected_prefix = "sha256="
     if not signature_header.startswith(expected_prefix):
@@ -106,10 +114,6 @@ def post_whatsapp_approval(
         f"• *Proposed Action*: `{action}` (+{plan.get('capacity_delta', 1)} unit)\n\n"
         f"Tap *Approve* to execute reversible remediation and verify via SigNoz."
     )
-
-    if lang and lang.lower().startswith("hi"):
-        from .sarvam import translate_text
-        body_text = translate_text(body_text, target_lang="hi-IN", cfg=cfg)
 
     url = _meta_url(cfg)
 

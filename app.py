@@ -341,8 +341,31 @@ def config_view():
         "llm_provider": cfg.llm_provider,
         "max_capacity": cfg.max_capacity,
         "min_dwell_s": cfg.min_dwell_s,
+        "p99_slo_ms": cfg.p99_slo_ms,
         "notify": bool(cfg.notify_webhook_url),
+        "slack": cfg.slack_enabled(),
+        "whatsapp": cfg.whatsapp_enabled(),
     }
+
+
+@app.post("/api/slack/test")
+def slack_test():
+    """Post a Slack approval card for the current worst service (demo/verification)."""
+    if not cfg.slack_enabled():
+        return {"ok": False, "error": "Slack not configured (SLACK_BOT_TOKEN + SLACK_APP_TOKEN)"}
+    from chronolens.slack_bot import post_approval
+    try:
+        with SigNozClient(cfg) as sn:
+            names = [s.get("serviceName") for s in sn.list_services(window_seconds=300)]
+            names = [n for n in names if n and n != "chronolens"]
+            svc = max(names, key=lambda n: sn.service_p99_ms(n)) if names else "checkout-service"
+            p99 = sn.service_p99_ms(svc) if names else 480.0
+    except Exception:
+        svc, p99 = "checkout-service", 480.0
+    res = post_approval(cfg, service=svc, signal="load", action="scale",
+                        why="p99 trending toward the SLO under rising load",
+                        eta_s=45.0, p99_ms=p99, confidence=0.86, slo_ms=cfg.p99_slo_ms)
+    return {"ok": res.ok, "service": svc, "reason": res.reason}
 
 
 @app.get("/api/signoz")
@@ -400,43 +423,6 @@ def prevented():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@app.post("/api/agent/circuit-break")
-def agent_circuit_break(tool_name: str = "search_store"):
-    """Circuit break a degraded AI agent tool."""
-    from chronolens.steerage import ToolCircuitBreaker
-    tb = ToolCircuitBreaker()
-    tb.record_call(tool_name, latency_ms=4000.0, success=False)
-    tb.record_call(tool_name, latency_ms=4000.0, success=False)
-    tb.record_call(tool_name, latency_ms=4000.0, success=False)
-    return {"ok": True, "tool_name": tool_name, "status": tb.get_status()}
-
-
-@app.post("/api/agent/steer")
-def agent_steer(tool_name: str = "search_store", reason: str = "looping"):
-    """Inject dynamic steerage instruction to break an AI agent loop without losing context."""
-    from chronolens.steerage import build_steerage_prompt
-    prompt = build_steerage_prompt(tool_name, reason=reason)
-    return {"ok": True, "steerage_prompt": prompt, "action": "injected_to_context"}
-
-
-# --------------------------------------------------------------------------- #
-# Breakthrough Feature APIs (Counterfactual, Throttle, MCP Copilot, Stress, CFO)
-# --------------------------------------------------------------------------- #
-@app.get("/api/counterfactual")
-def get_counterfactual(service: str = "checkout-service"):
-    """Dual-timeline chart data (unmitigated vs defused).
-
-    NOTE: this is a **synthetic illustration** — it takes no SigNoz input. For the
-    real, SigNoz-measured counterfactual use `/api/proof` (Chrono-Proof).
-    """
-    from chronolens.foresee import generate_counterfactual_projection
-    out = generate_counterfactual_projection(service=service, slo_ms=cfg.p99_slo_ms)
-    out["data_source"] = "synthetic"
-    out["disclaimer"] = ("Illustrative shape only — not measured. Use /api/proof for the "
-                         "SigNoz-measured counterfactual.")
-    return out
-
-
 @app.get("/api/blast")
 def get_blast_radius(window_seconds: int = 300, step_interval: int = 15):
     """BLAST-RADIUS FORECAST — which services fall next, in what order, and when.
@@ -483,26 +469,6 @@ def get_proof(service: str = "", window_seconds: int = 300, step_interval: int =
         return JSONResponse({"ok": False, "error": f"proof unavailable: {e}"}, status_code=502)
 
 
-@app.post("/api/agent/throttle")
-def agent_throttle(enabled: bool = True, max_tokens: int = 256):
-    """Dynamically cap agent context window and token budget across turns."""
-    from chronolens.loopguard import apply_dynamic_throttle
-    # also attempt notifying demo_agent if up
-    try:
-        httpx.get(f"http://localhost:8091/admin/throttle?enabled={str(enabled).lower()}&max_tokens={max_tokens}", timeout=1.0)
-    except Exception:
-        pass
-    res = apply_dynamic_throttle(enabled=enabled, max_tokens=max_tokens)
-    return {"ok": True, "throttle_state": res}
-
-
-@app.get("/api/agent/throttle/status")
-def agent_throttle_status():
-    """Retrieve dynamic token circuit-breaker status."""
-    from chronolens.loopguard import get_throttle_status
-    return get_throttle_status()
-
-
 @app.post("/api/mcp/chat")
 async def mcp_chat(request: Request):
     """SigNoz MCP Natural Language Incident Co-Pilot query endpoint."""
@@ -513,26 +479,6 @@ async def mcp_chat(request: Request):
     except Exception:
         user_query = "Summarize recent system reliability"
     return ask_signoz_copilot(user_query, cfg)
-
-
-@app.post("/api/stress/run")
-def run_stress_calibration(service_name: str = "checkout-service"):
-    """Run self-calibrating micro-fault stress test and auto-tune guardrails."""
-    from chronolens.stress import run_self_tuning_calibration
-    res = run_self_tuning_calibration(cfg, service_name=service_name)
-    return {"ok": True, "calibration": res}
-
-
-@app.get("/api/cfo/report")
-def get_cfo_report():
-    """Generate executive SLA & financial ROI report for CFO and SRE leaders."""
-    from chronolens.dollars import build_executive_cfo_report
-    try:
-        ledger = Ledger()
-        records = ledger.list()
-    except Exception:
-        records = []
-    return build_executive_cfo_report(ledger_records=records, cfg=cfg)
 
 
 # --------------------------------------------------------------------------- #
@@ -620,34 +566,7 @@ def whatsapp_status():
         "enabled": cfg.whatsapp_enabled(),
         "phone_number_id": cfg.whatsapp_phone_number_id[:6] + "..." if cfg.whatsapp_phone_number_id else "",
         "recipient_number": cfg.whatsapp_recipient_number,
-        "verify_token": cfg.whatsapp_verify_token,
-    }
-
-
-# --------------------------------------------------------------------------- #
-# Sarvam AI Multilingual Endpoints
-# --------------------------------------------------------------------------- #
-@app.post("/api/sarvam/translate")
-async def sarvam_translate(request: Request):
-    """Translate incident text, WhatsApp messages, or CFO reports using Sarvam AI."""
-    from chronolens.sarvam import translate_text
-    try:
-        body = await request.json()
-        text = body.get("text", "Checkout service latency is climbing to SLO wall.")
-        target_lang = body.get("target_lang", "hi-IN")
-        source_lang = body.get("source_lang", "en-IN")
-    except Exception:
-        text = "Checkout service latency is climbing to SLO wall."
-        target_lang = "hi-IN"
-        source_lang = "en-IN"
-
-    translated = translate_text(text, target_lang=target_lang, source_lang=source_lang, cfg=cfg)
-    return {
-        "ok": True,
-        "original_text": text,
-        "translated_text": translated,
-        "target_lang": target_lang,
-        "sarvam_enabled": cfg.sarvam_enabled(),
+        "verify_token_set": bool(cfg.whatsapp_verify_token),
     }
 
 

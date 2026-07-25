@@ -85,42 +85,7 @@ def evaluate(steps: int, tools: list[str], cost_usd: float, *,
     )
 
 
-# --------------------------------------------------------------------------- #
-# Dynamic Token & Context Circuit-Breaker State
-# --------------------------------------------------------------------------- #
-_THROTTLE_STATE = {
-    "enabled": False,
-    "max_tokens": 300,
-    "force_fallback_model": False,
-    "fallback_model": "gpt-4o-mini",
-    "throttled_turn_count": 0,
-    "saved_tokens_total": 0,
-}
-
-
-def apply_dynamic_throttle(
-    enabled: bool = True,
-    max_tokens: int = 256,
-    force_fallback_model: bool = True,
-    fallback_model: str = "gpt-4o-mini",
-) -> dict:
-    """Dynamically cap agent context windows and token expenditure across ongoing turns."""
-    _THROTTLE_STATE["enabled"] = enabled
-    _THROTTLE_STATE["max_tokens"] = max_tokens
-    _THROTTLE_STATE["force_fallback_model"] = force_fallback_model
-    _THROTTLE_STATE["fallback_model"] = fallback_model
-    return dict(_THROTTLE_STATE)
-
-
-def get_throttle_status() -> dict:
-    """Retrieve current dynamic token circuit-breaker state."""
-    return dict(_THROTTLE_STATE)
-
-
-def record_throttled_turn(tokens_saved: int = 150) -> dict:
-    """Record a turn that was dynamically capped to save context budget."""
-    if _THROTTLE_STATE["enabled"]:
-        _THROTTLE_STATE["throttled_turn_count"] += 1
-        _THROTTLE_STATE["saved_tokens_total"] += max(0, tokens_saved)
-    return dict(_THROTTLE_STATE)
+# NOTE: the "dynamic throttle" was removed. It only mutated a module-level dict
+# (no agent ever read it) and duplicated what `evaluate()` above already does with
+# a real cost budget and step ceiling. The loop breaker is the honest mechanism.
 
