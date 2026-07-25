@@ -455,7 +455,7 @@ async function checkDrift(){
 }
 async function loopCheck(){
   $('d-loop').textContent='driving one turn…';
-  try{ const r=await(await fetch('/api/agent/loopcheck',{method:'POST'})).json();
+  try{ const r=await(await fetch('/api/agent/loopcheck')).json();
     if(r.error){ $('d-loop').textContent=r.error; return; }
     const v=r.verdict;
     $('d-loop').innerHTML=`<span class="mono" style="font-size:15px;color:${v.looping?'var(--bad)':'var(--ok)'}">${v.looping?'LOOP DETECTED':'within limits'}</span>

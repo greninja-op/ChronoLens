@@ -93,7 +93,12 @@ def _project(pre: list[float], step_s: float, n_future: int) -> tuple[list[float
 
     band = round(1.5 * _resid_std(pre, smooth), 1)
     last = smooth[-1]
-    path = [round(last + slope_step * (i + 1), 1) for i in range(n_future)]
+    # Latency is physically non-negative: a falling trend extrapolated far enough
+    # would otherwise project *negative* milliseconds, which is nonsense on a chart
+    # and instantly discredits the whole proof. Floor the path at a small positive
+    # value so a recovering series flattens out instead of going through zero.
+    floor = max(1.0, 0.05 * last)
+    path = [round(max(floor, last + slope_step * (i + 1)), 1) for i in range(n_future)]
     slope_per_s = round(slope_step / step_s, 2) if step_s else 0.0
     return path, slope_per_s, band
 

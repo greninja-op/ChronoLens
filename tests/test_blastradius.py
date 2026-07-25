@@ -84,6 +84,36 @@ def test_empty_input_fails_soft():
     assert br.notes
 
 
+def test_noise_slope_does_not_hijack_the_root():
+    """Regression: a jitter-level +slope on a shallow service must not become 'the cause'.
+
+    Found live — chronolens-store had a +0.0x ms/s slope while its dependencies were
+    flat, so it was picked as root and the whole dependency graph was discarded
+    (1 victim instead of 3).
+    """
+    class _F:
+        def __init__(self, slope):
+            self.slope_ms_per_s = slope
+    # 'orders' (shallowest) has only noise; nothing is really degrading.
+    forecasts = {"orders": _F(0.02), "checkout": _F(-0.01), "payment": _F(0.0)}
+    idx = build_parent_index(EDGES)
+    # with a noise floor, no service counts as climbing -> deepest node wins
+    assert pick_root(forecasts, idx, EDGES, min_slope_ms_per_s=3.0) == "payment"
+    # a genuine climb above the floor still wins even if shallower
+    forecasts["orders"] = _F(9.0)
+    assert pick_root(forecasts, idx, EDGES, min_slope_ms_per_s=3.0) == "orders"
+
+
+def test_full_chain_is_reported_when_nothing_is_degrading():
+    """All-flat services should still surface the whole graph, not one row."""
+    flat = {"payment": FLAT, "checkout": FLAT, "orders": FLAT}
+    br = forecast_blast_radius(flat, EDGES, slo_ms=SLO, step_s=15.0,
+                               min_slope_ms_per_s=3.0)
+    assert br.ok
+    assert br.root_service == "payment"          # deepest, not the noisiest
+    assert len(br.victims) == 3                  # the chain, not a single row
+
+
 def test_narrative_names_root_and_provenance_note_present():
     series = {"payment": CLIMB, "checkout": FLAT, "orders": FLAT}
     br = forecast_blast_radius(series, EDGES, slo_ms=SLO, step_s=15.0)

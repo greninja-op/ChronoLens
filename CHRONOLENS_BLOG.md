@@ -1,246 +1,412 @@
-# ChronoLens: Building a Predictive SRE Control Plane with SigNoz, WhatsApp Approve-to-Act, Slack, and Agent Watch
+# ChronoLens: proving the outage that never happened
 
-> **Submitted for the Agents of SigNoz Hackathon 2026 (Track 1: AI & Agent Observability)**
+**How we built a self-preventing reliability loop on SigNoz — and how we made it prove its own results with measured telemetry instead of a pretty chart.**
 
----
+> Built for the **Agents of SigNoz** hackathon (Track 01 — AI & Agent Observability).
+> Repo: [github.com/greninja-op/ChronoLens](https://github.com/greninja-op/ChronoLens)
 
-## Executive Summary
-
-Traditional Site Reliability Engineering (SRE) is inherently **reactive**. Alerts trigger *after* P99 latency breaches an SLO wall, *after* error rates spike, or *after* customers experience downtime. In microservice architectures and AI agent workflows, this lag costs thousands of dollars per minute in degraded user experience and uncontained infrastructure cascades.
-
-**ChronoLens** transforms SRE from reactive post-mortems into **predictive, closed-loop prevention**. Powered by **SigNoz** as its observability backbone, ChronoLens:
-
-1. **Predicts SLO Breaches Before They Happen**: Uses real-time linear regression on SigNoz P99 latency telemetry to calculate breach slope (`ms/s`) and exact ETA to breach.
-2. **Human-in-the-Loop Approve-to-Act via WhatsApp & Slack**: Fires interactive WhatsApp cards with `[✅ Approve Fix]` and `[❌ Deny Fix]` buttons and simultaneous Slack notifications (`#sre-alerts`) directly to on-call engineers.
-3. **Closed-Loop Remediation & SigNoz Verification**: Executes automated, reversible actions (`scale_out`, `rollback`, `cache_warm`) and immediately re-queries SigNoz to verify that P99 returned below SLO before closing the incident loop.
-4. **Agent Watch (GenAI Spans Observability)**: Monitors OpenTelemetry GenAI spans in SigNoz to detect LLM token cost drift, latency degradation, and context window bloat, triggering an automatic circuit breaker.
-5. **Multilingual Bharat Voice Layer**: Integrates Sarvam AI (Saarika STT & Bulbul TTS) to deliver voice and Hindi/English alerts.
+<!-- IMAGE: hero — Mission Control dashboard, full window, Chrono-Proof chart visible.
+     File: docs/images/dashboard.png  ·  Suggested caption: "ChronoLens Mission Control." -->
 
 ---
 
-## 🏛️ Comprehensive Architecture & Detailed Working
+## The problem nobody can demo
 
-ChronoLens connects SigNoz observability with multi-channel human feedback (WhatsApp & Slack) and automated closed-loop remediation:
+Observability tells you what broke. Every SRE tool on the market is excellent at the postmortem
+and useless at the ten seconds before it. So we built the obvious thing: predict the breach, act
+before it lands, verify the fix.
 
-```
-                  ┌───────────────────────────────────────────┐
-                  │           SigNoz Observability            │
-                  │   (P99 Metrics API + OTel GenAI Spans)    │
-                  └─────────────────────┬─────────────────────┘
-                                        │
-                                        ▼ Real-Time Telemetry Poll
-                  ┌───────────────────────────────────────────┐
-                  │    ChronoLens Forecasting Engine          │
-                  │   (Linear Regression & Slope Analysis)    │
-                  └─────────────────────┬─────────────────────┘
-                                        │
-                       Breach Forecast Detected (P99 -> SLO)
-                                        │
-                    ┌───────────────────┴───────────────────┐
-                    ▼                                       ▼
-        ┌───────────────────────┐               ┌───────────────────────┐
-        │  WhatsApp Business    │               │     Slack Webhook     │
-        │ Cloud API Interactive │               │    (#sre-alerts)      │
-        └───────────┬───────────┘               └───────────────────────┘
-                    │
-          Engineer Taps [Approve]
-                    │
-                    ▼ Webhook Callback (HMAC SHA-256)
-        ┌───────────────────────────────────────────────────┐
-        │          Closed-Loop SRE Engine                   │
-        │   PREVENT ──► VERIFY ──► COOLDOWN ──► RECORD      │
-        └───────────────────┬───────────────────────────────┘
-                            │
-                            ▼ Telemetry Verification
-        ┌───────────────────────────────────────────────────┐
-        │         SigNoz Telemetry Re-Query                 │
-        │    (Confirms P99 < 500ms SLO Wall)                │
-        └───────────────────────────────────────────────────┘
-```
+Then we hit the problem that kills every prevention tool.
+
+**Prevention is invisible.** When it works, nothing happens. There's no incident, no graph spike,
+no war room — just a flat line and an engineer with no way to prove the flat line was earned. The
+industry's usual answer is a "what would have happened" chart drawn from a formula, and anyone
+technical can dismiss it in one sentence: *you made that curve up.*
+
+We had exactly that in our own codebase. An endpoint called `/api/counterfactual` that produced a
+beautiful dual-timeline chart out of a hardcoded exponential decay, with no telemetry behind it.
+We deleted it.
+
+What replaced it is the feature this post is really about.
 
 ---
 
-### Step-by-Step Lifecycle Flow
+## Chrono-Proof: a counterfactual made of measurements
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                               CHRONOLENS LIFECYCLE                               │
-├──────────────┬───────────────────────────────────────────────────────────────────┤
-│ PHASE 1      │ Real-time Telemetry Ingestion from SigNoz Query Builder           │
-│              │ • Polls p99(duration_nano) per service every 2 seconds           │
-│              │ • Computes d(P99)/dt slope over 60-second sliding window           │
-├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ PHASE 2      │ Predictive SLO Breach Forecasting                                 │
-│              │ • Evaluates ETA to breach: (SLO_Wall - Current_P99) / Slope       │
-│              │ • Triggers alert when ETA < 30s AND P99 approaching SLO wall      │
-├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ PHASE 3      │ Multi-Channel Human-in-the-Loop Dispatch                          │
-│              │ • Meta WhatsApp Cloud API: Interactive Approve/Deny buttons       │
-│              │ • Slack Webhook: Real-time alert card to #sre-alerts channel       │
-│              │ • Sarvam AI: Hindi/English voice call & STT/TTS alert dispatch     │
-├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ PHASE 4      │ Webhook Processing & HMAC SHA-256 Verification                   │
-│              │ • Validates Meta x-hub-signature-256 header against app secret   │
-│              │ • Extracts button ID (wa_appr:service:action) and executes        │
-├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ PHASE 5      │ Closed-Loop Remediation & SigNoz Metric Verification               │
-│              │ • Executes reversible fix (e.g., scale_out +1 unit)              │
-│              │ • Re-queries SigNoz to verify P99 dropped under 500ms SLO wall    │
-│              │ • Records incident avoided & dollar savings in Prevention Ledger  │
-├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ PHASE 6      │ Agent Watch GenAI Circuit Breaker                                 │
-│              │ • Ingests OTel gen_ai.* span attributes from SigNoz               │
-│              │ • Detects 3x token cost drift -> triggers Break & Pin baseline     │
-└──────────────┴───────────────────────────────────────────────────────────────────┘
+The honest way to prove a negative is to be strict about which half of the claim is measured and
+which half is estimated — and to say so on the artifact itself.
+
+Chrono-Proof does five things:
+
+1. Pulls the **real** p99 series for the service out of SigNoz (Query Builder v5, `time_series`).
+2. Splits that series at the moment ChronoLens acted.
+3. Fits the trend on the **pre-action samples only** — the same EWMA + Holt machinery the
+   forecaster uses — and extrapolates it across the post-action window, with a confidence band
+   derived from the residual spread.
+4. Overlays the **measured** post-action reality from SigNoz.
+5. Quantifies the gap: breach-seconds avoided, peak milliseconds shaved, and SLO-violation area
+   (error budget) saved.
+
+Here is real output from a live run, not a mock-up:
+
+```text
+=== CHRONO-PROOF: chronolens-store (source: signoz) ===
+
+  MEASURED (SigNoz)   peak      48 ms ·     0s over SLO · final 45 ms
+  PROJECTED (est.)    peak    4474 ms ±1108 ·   90s over SLO · trend +15.2 ms/s
+
+  Breach avoided      90s
+  Peak shaved         4427 ms
+  Error budget saved  306490 ms·s
+  Prevented           True  (confidence 71%)
 ```
 
----
+Every number carries its provenance. The defused arm is `measured`. The counterfactual arm is a
+**labelled linear extrapolation with an interval** — an estimate, and the note on the payload says
+exactly that:
 
-## 🔬 How ChronoLens Uses SigNoz & OpenTelemetry
+> The 'measured' arm is SigNoz data. The 'projected' arm is a linear extrapolation of the measured
+> pre-action trend (± band) — a labelled estimate, not a measurement.
 
-SigNoz is not an afterthought in ChronoLens — it is the **central nervous system**:
+<!-- IMAGE: Chrono-Proof panel close-up — cyan measured line, amber dashed projection, SLO marker,
+     and the five stats underneath. File: docs/images/chrono_proof.png -->
 
-### 1. P99 Latency Telemetry & Predictive Forecasting
-ChronoLens polls SigNoz telemetry at high frequency using the SigNoz Query Builder API (`queryType: "builder"`, aggregation `p99(duration_nano)`). Instead of waiting for `P99 > 500ms`, our forecasting engine calculates the rate of latency growth ($\frac{d(P99)}{dt}$) over a sliding window:
+### The bug that made it honest
 
-$$\text{ETA to Breach} = \frac{\text{SLO Wall} - \text{Current P99}}{\text{Slope (ms/s)}}$$
+Our first version guessed *when* the action happened by taking the series peak. That broke in a
+way worth documenting: while a load ramp was still running, p99 climbed again after the fix, the
+"peak" landed in the wrong place, and Chrono-Proof reported **"the fix did not hold"** for a fix
+that had held.
 
-If $P99 = 480\text{ms}$, $\text{SLO} = 500\text{ms}$, and $\text{Slope} = +18.5\text{ms/s}$, ChronoLens forecasts an SLO breach in **18.2 seconds** and triggers proactive remediation before any user experiences a failure.
+The correct answer was already in the system. Every remediation writes a case file to the ledger
+with a timestamp, so the proof now derives the action point from the **recorded action time**:
 
-![SigNoz Auto-Created Dashboard showing P99 Latency & SLO Threshold Panel](docs/images/signoz_dashboard.jpg)
-*Figure 1: SigNoz dashboard with real-time P99 latency, error rates, and 500ms SLO threshold metrics.*
+```python
+idx = int(round(n_samples - 1 - (age / step_s)))
+```
 
----
-
-### 2. GenAI Spans & Agent Watch (Track 1 Focus)
-AI agents behave unpredictably: prompt bloat, infinite retry loops, and token cost surges can silently degrade application economics. 
-
-ChronoLens ingests **SigNoz OpenTelemetry GenAI Semantic Conventions**:
-- `gen_ai.request.model` — Model identifier (e.g. `gpt-5.4-mini`, `gpt-5.4-nano`)
-- `gen_ai.usage.prompt_tokens` — Input prompt token count
-- `gen_ai.usage.completion_tokens` — Output completion token count
-- `gen_ai.client.token.cost` — Derived cost per request
-- `gen_ai.operation.name` — Operation name (`chat`, `completion`, `embeddings`)
-- `gen_ai.tool.name` — Executed agent tool name with status
-
-When token cost drifts **> 3x above baseline** in a 60-second window, the **Agent Watch Circuit Breaker** fires an interactive WhatsApp card and Slack message permitting the SRE to:
-- **Throttle Agent Context Window**: Truncates history to prevent token explosions.
-- **Pin Baseline Model**: Reverts from expensive models (e.g. GPT-5.4) back to cost-optimized fallback models (e.g. gpt-5.4-nano).
-
-![SigNoz Traces Explorer showing OpenTelemetry GenAI Spans and Attributes](docs/images/signoz_genai_traces.jpg)
-*Figure 2: SigNoz Traces Explorer displaying an LLM request span with OpenTelemetry `gen_ai.*` attributes expanded (`gen_ai.request.model`, token usage, cost per request).*
+It skips non-action rows (`none`, `pre-provision`, `suggest:*`), takes the newest real action, and
+falls back to the peak heuristic only when no case matches the window — stating which anchor it
+used. Six unit tests cover the arithmetic, the rejections and the fallback.
 
 ---
 
-### 3. Self-Observability (Watching the Watcher)
-ChronoLens emits its own OpenTelemetry spans into SigNoz — one span per predictive cycle step, tagged with `chronolens.stage` / `foresight.stage` attributes. The prediction → WhatsApp approval → execution loop is fully traceable within SigNoz right alongside monitored microservices.
+## Blast-radius: which service falls next
 
-![SigNoz Traces showing ChronoLens Loop Self-Observability Spans](docs/images/signoz_self_trace.jpg)
-*Figure 3: ChronoLens self-trace in SigNoz showing the entire execution pipeline.*
+Predicting that *one* service will breach is table stakes. The question that actually matters in a
+distributed system is the one nobody answers in advance:
 
----
+> payment is about to go — what goes down with it, in what order, and how long do I have?
 
-### 4. Verification Loop
-Remediation without verification is dangerous. After executing an action (`scale_out`), ChronoLens queries SigNoz to verify that:
-1. P99 latency dropped below the 500ms SLO target.
-2. Error rates did not spike.
-3. System metrics stabilized.
+SigNoz already knows the topology. It derives a service dependency graph from traces and exposes
+it at `/api/v1/dependency_graph`. We walk that graph upward from the degrading dependency, because
+**a caller can never be faster than the thing it waits on**: a slow child pushes latency into
+every ancestor, scaled by how much of the parent's traffic actually depends on that path.
 
-Only after SigNoz confirms stabilization does ChronoLens mark the incident as **PREVENTED** in the **Prevention Ledger**.
+Live output, three real services:
 
----
+```text
+=== BLAST-RADIUS FORECAST (topology: signoz-service-map) ===
 
-## 🚀 Two-Way Notification Channels & Integration Layer (WhatsApp, Slack, Sarvam AI)
+  Root cause: chronolens-payments-db  [root hop: payment.db_query]
 
-Alert fatigue is real. SREs receive hundreds of unactionable notifications daily across fragmented channels. ChronoLens unifies on-call notifications into **interactive, multi-channel approve-to-act workflows**:
+  service                     p99     slope  inherit   breach in
+  chronolens-payments-db *  6824ms    +37.3     +0.0         NOW
+  chronolens-payments       6824ms    +37.3    +37.3         NOW
+  chronolens-store           951ms    +27.6    +27.6         NOW
+```
 
-![WhatsApp Approve-to-Act Interactive Card](docs/images/whatsapp_approval.png)
+Two details that make this real rather than decorative:
 
-### Multi-Channel Feature Matrix
+- **The root is the most-downstream degrading service.** A service climbing only because its
+  dependency is slow is a *symptom*. Fixing it mutes the alarm and changes nothing.
+- **Only services inside the dependency graph can be the root.** An unconnected sidecar with a
+  steep slope isn't the cause of a cascade — it has no downstream blast path. (We found this by
+  watching it confidently blame our demo AI agent, which nothing depends on.)
 
-| Feature | 📱 WhatsApp (Meta Cloud API) | 💬 Slack (#sre-alerts) | 🎙️ Sarvam AI (Bharat Voice) |
-|---------|------------------------------|------------------------|-----------------------------|
-| **Protocol / Transport** | Meta Graph API v23.0 + Webhook | Incoming Webhook (Block-Kit) | Saarika STT & Bulbul TTS REST |
-| **Interactivity** | `[✅ Approve Fix]` / `[❌ Deny Fix]` Reply Buttons | Real-time Channel Status Cards | Interactive Voice Response (IVR) |
-| **Security** | HMAC-SHA256 (`x-hub-signature-256`) | Secret Webhook Tokens | Bearer API Key Authentication |
-| **Automation** | Conversational Automation (Icebreakers & Slash Commands) | Webhook Channel Dispatch | Multilingual Translation (`hi-IN`) |
-| **Use Case** | On-call Mobile Approve-to-Act | Team Incident Channel Visibility | Critical Voice Escalation Calls |
+<!-- IMAGE: Blast-radius panel — root cause line + the ranked victim list with ETAs.
+     File: docs/images/blast_radius.png -->
 
----
+### One service can't cascade
 
-### Channel Deep-Dive
+This feature was untestable in our own demo at first: the store was a single service, so there was
+nothing to chain. We split it into a real three-tier topology, each tier emitting spans under its
+own `service.name` with the parent context preserved:
 
-1. **Meta WhatsApp Cloud API (Interactive Approve-to-Act)**:
-   - Delivers interactive cards with `[✅ Approve Fix]` and `[❌ Deny Fix]` buttons directly to on-call mobile devices.
-   - Built-in conversational automation providing tappable starter prompts (*"Check live SRE health"*, *"Trigger incident approval card"*) and slash commands (`/status`, `/approve`, `/agents`, `/test`, `/ledger`, `/loop`, `/help`).
-   - Inbound button taps are validated via HMAC-SHA256 signature checking on `/webhook/whatsapp` and trigger instant closed-loop execution.
+```
+chronolens-store  ──▶  chronolens-payments  ──▶  chronolens-payments-db
+```
 
-2. **Slack Integration (`#sre-alerts`)**:
-   - Posts rich Slack Block-Kit formatted alert cards to the `#sre-alerts` channel (`SLACK_WEBHOOK_URL`, channel `C0BKQTT7TL1`).
-   - Displays affected microservice, current P99 latency, slope trajectory, estimated time to breach, and remediation status for full team transparency.
+Now `dependency-slow` injected at the deepest tier produces a genuine measured cascade, and SigNoz's
+own dependency graph is what ChronoLens reads to trace it.
 
-3. **Sarvam AI (Multilingual Voice & Translation Layer)**:
-   - Provides Indian regional language support (`hi-IN` Hindi / `en-IN` English).
-   - Uses **Saarika v2.5 STT** for speech recognition and **Bulbul v3 TTS** (`ritu` speaker voice) for automated voice escalation calls when latency breaches imminent SLO targets.
-
----
-
-## 🌐 Mission Control Dashboard
-
-![ChronoLens Mission Control Dashboard](docs/images/dashboard.png)
-
-The ChronoLens web dashboard (`http://localhost:8095`) provides complete real-time visibility:
-- **Top 4 Scorecards**: Incidents Prevented, Total Cost Saved, Current P99 Latency vs. SLO, and Agent Watch Circuit Status.
-- **Dark Emerald P99 Latency Graph**: Live Chart.js visualization comparing actual latency against the predicted slope and 500ms SLO threshold.
-- **Vertical Cascade Topology**: Service dependency graph (`/order` → `cart.lookup` → `inventory.check` → `payment.charge` → `payment.db_query`) highlighting root-cause spans.
-
-![Vertical Cascade Topology](docs/images/cascade_topology.png)
-
-- **Prevention Ledger**: Real-time log of every prevented incident, action taken, and dollar savings.
+<!-- IMAGE: SigNoz's Service Map view showing the three-tier chain.
+     File: docs/images/signoz_service_map.png -->
 
 ---
 
-## 🤖 AI Models, IDEs & Developer Tooling Used
+## The loop that does the work
 
-Building a production-grade predictive SRE engine in a hackathon timeframe required leverage across cutting-edge AI models, specialized IDEs, and developer tools:
+Chrono-Proof and blast-radius are the evidence layer. Underneath is the control loop:
 
-| Category | Tool / Model | Role & Contribution |
-|----------|--------------|----------------------|
-| **Primary Code Generation & Logic** | **Codex (GPT-5.6 Terra)** | Generated core SRE forecasting algorithms, FastAPI webhook signature logic, and linear regression models. |
-| **IDE & Architectural Guidance** | **Kiro IDE (Claude Opus 4.8)** | Handled system design, property-based testing setup (Hypothesis), and complex async control loop structuring. |
-| **Agentic IDE & Execution Engine** | **Google Antigravity IDE (Gemini 3.6 Flash)** | Pair programmer agent orchestrating terminal execution, browser testing subagent, git subtree management, and multi-file refactoring. |
-| **Multilingual Voice/Speech** | **Sarvam AI (Saarika / Bulbul)** | Handled Hindi/English speech-to-text, text-to-speech, and translation. |
-| **LLM Runtime Engine** | **Azure AI Foundry (gpt-5.4-mini / gpt-5.4-nano)** | Powered the fast high-frequency message classifier and agent watch reasoning engine. |
-| **Observability Infrastructure** | **SigNoz & SigNoz MCP Server** | Telemetry ingestion, metrics API, OpenTelemetry GenAI spans, ClickHouse query engine, and MCP tool automation. |
+```
+LEARN → FORESEE → CLASSIFY → CASCADE → GOVERN → PREVENT → VERIFY → COOLDOWN → RECORD
+  ▲                                                                              │
+  └──────────────────── the ledger becomes LEARN's memory ──────────────────────┘
+```
+
+- **LEARN** reads past incidents, including time-of-day seasonality. For a repeat offender it
+  pre-provisions a higher floor *before* anything degrades, and it corroborates recurrence against
+  SigNoz's own alert state rather than trusting only its local ledger.
+- **FORESEE** projects p99 to a time-to-breach behind a **confidence guard**: enough samples, slope
+  above a noise floor, and a *sustained* rise. An elevated error rate from a second, independent
+  signal lifts confidence.
+- **CLASSIFY** picks the fix that matches the signal, not always "scale": load → scale,
+  dependency → circuit-break, pool → resize, memory → restart, errors → roll back. The `errors`
+  signal is cross-checked against a SigNoz **logs** query, so classification spans two signals.
+- **CASCADE** names the root hop from a grouped traces query, plus an exemplar trace ID for a
+  deep link.
+- **GOVERN** is a trust ladder — `suggest` (never acts alone), `earn` (autonomous after N verified
+  saves on that service), `auto`.
+- **PREVENT** acts behind anti-flap guardrails: a minimum dwell time between actions, a hard
+  capacity ceiling, an hourly action budget, and a global kill switch. Every action is reversible
+  and every action stores its precise inverse.
+- **VERIFY** asks SigNoz whether the breach was actually avoided. If it wasn't, it rolls back and
+  escalates.
+- **COOLDOWN** returns the capacity once load subsides, so prevention isn't paid for with permanent
+  over-provisioning.
+- **RECORD** files the receipt that LEARN reads next time.
+
+A run against live SigNoz, abridged:
+
+```text
+[FORESEE ] chronolens-store: p99 2540.8ms, rising 8ms/s → SLO breach NOW (confidence 100%)
+[CLASSIFY] Signal: load → reversible fix 'scale'
+[CASCADE ] Degradation at 'payment.charge' (p99 1005.1ms) (measured in traces) …
+           Exemplar trace: a6c3d99cc80d5efc2dfa9f720cdbe773
+[GOVERN  ] autonomy=auto — acting automatically
+[PREVENT ] Applied 'scale' (reversible). Rollback: scale back down once load subsides
+[VERIFY  ] Confirmed via SigNoz: p99 back to 53.5ms — breach avoided
+[COOLDOWN] Load subsided — scaled 8.0 → 2.0, returned 6.0 capacity units (~$3.90)
+[GUARD   ] Filed a guarding SigNoz alert + dashboard on chronolens-store p99
+[RECORD  ] Case filed: breach avoided · returned 6.0 units (~$3.90)
+```
+
+<!-- IMAGE: the live loop panel mid-run, stages lighting up.
+     File: docs/images/closed_loop.png -->
 
 ---
 
-## 🛠️ Complete Tech Stack
+## Agent Watch: the same loop, pointed at an AI agent
 
-- **Observability**: SigNoz (P99 Telemetry, OTel GenAI Spans, ClickHouse Query API, MCP Server)
-- **Backend & Webhook**: Python 3.11, FastAPI, Uvicorn, HMAC-SHA256
-- **Predictive Engine**: NumPy, SciPy (Linear Regression Slope Analysis)
-- **Messaging & Channels**: 
-  - WhatsApp Business Cloud API (Meta Graph API v23.0)
-  - Slack Webhook Integration (`#sre-alerts`)
-- **Multilingual / Voice**: Sarvam AI (Saarika STT, Bulbul TTS, Translate API)
-- **LLM Engine**: Azure AI Foundry (`gpt-5.4-mini` / `gpt-5.4-nano`)
-- **Frontend**: Vanilla JS, Tailwind CSS, Chart.js, Lucide Icons
-- **Deployment**: Docker, Docker Compose, Reticule VPS
+Track 01 is agent observability, so ChronoLens watches an agent the way it watches a service — and
+agents fail in ways HTTP status codes never capture.
+
+The demo agent is a café assistant instrumented with **OpenTelemetry GenAI semantic-convention
+attributes**. Each turn emits an `agent.turn` parent span with child `gen_ai.chat` and
+`tool.execute` spans, carrying `gen_ai.request.model`, `gen_ai.usage.input_tokens` /
+`output_tokens`, `llm.step_count`, `llm.cost_usd` and `agent.tools`. It runs in three modes —
+`normal` (the learned baseline), `drift`, and `loop` — so each failure is reproducible on demand.
+
+Three analyzers read those spans:
+
+| Analyzer | The failure it catches |
+| --- | --- |
+| **Behaviour drift** | After a prompt tweak or model swap the agent still returns 200 OK with normal latency, but it now calls a tool it never used, takes more steps, or writes far longer answers. A fingerprint (tool distribution, model mix, avg steps, avg tokens) is scored against a saved baseline. |
+| **Loop / cost breaker** | The agent reasons in circles, calling the same tool repeatedly, burning tokens with no crash. It fires on **no progress** and on a **cost budget**, not just a clock — so a long but genuinely productive turn is left alone. |
+| **Answer quality** | Grades recent answers (rule-based, optionally LLM-assisted) to separate *changed* from *worse* — drift is a change signal, not a verdict. |
+
+### Detecting from SigNoz, not by poking the agent
+
+This is the part we had to fix to be honest. The analyzers originally called the agent's `/chat`
+endpoint to get turns — which means "agent observability" that never touched the observability
+platform. Now the default path issues a **raw traces query** (`requestType: "raw"`) against SigNoz
+for the agent's `agent.turn` spans and reconstructs the turns from their attributes:
+
+```text
+turns read FROM SIGNOZ: 16
+   gpt-4o-mini  2 steps  ['get_menu', 'place_order']  $9e-05  src=signoz
+```
+
+Every response now reports `data_source: "signoz"`, and falls back to driving the agent only when
+SigNoz has no spans yet (a cold stack) — saying so when it does. Answer-quality grading still drives
+the agent, because span attributes only carry a short preview of the response text and you cannot
+grade what you cannot read. We state that rather than implying it's telemetry-driven.
+
+<!-- IMAGE: Agent Watch section showing drift %, loop verdict and quality score.
+     File: docs/images/agent_watch.png -->
+<!-- IMAGE: SigNoz Traces explorer showing agent.turn / gen_ai.chat / tool.execute spans with
+     GenAI attributes. File: docs/images/signoz_genai_traces.jpg -->
 
 ---
 
-## 💡 What We Learned & Key Takeaways
+## Human-in-the-loop: Slack and WhatsApp
 
-1. **Predictive > Reactive**: Catching latency trends 15-20 seconds before breach prevents user impact entirely.
-2. **SigNoz Telemetry is Surprisingly Rich**: SigNoz's OpenTelemetry integration allowed us to query both standard microservice metrics and GenAI LLM span telemetry out-of-the-box.
-3. **Human-in-the-Loop Builds Trust**: Full autonomous remediation can be terrifying for SRE teams. WhatsApp interactive Approve-to-Act and Slack channel alerts balance speed with human governance.
-4. **AI-Assisted Pair Programming**: Combining Codex (GPT-5.6 Terra), Kiro IDE (Claude Opus 4.8), and Google Antigravity IDE (Gemini 3.6 Flash) enabled shipping a multi-tier SRE system in record time.
+The trust ladder's `suggest` tier is only meaningful if a human can actually approve something. So
+when GOVERN decides ChronoLens may not act alone, it posts an **interactive approval card**:
+
+> 🕳️ **ChronoLens needs your approval**
+> **Service:** `payment` · **Forecast:** p99 past SLO in ~85s (confidence 86%)
+> **Signal:** pool · **Proposed fix:** `pool-resize` — *reversible*
+> `[ ✅ Approve ]  [ ✋ Deny ]`
+
+Tapping **Approve** runs the real PREVENT → VERIFY → COOLDOWN → RECORD path and then **edits the
+same message** with the SigNoz-verified outcome ("p99 back to 53.5 ms — breach avoided"). Deny
+records the decision and stands down. Agent anomalies get their own card with
+**Break / pin baseline**, which pins the agent to its last-good baseline and verifies the next turn.
+
+**Do you need both?** No — and we're explicit about it:
+
+| Channel | Mechanism | When to use it |
+| --- | --- | --- |
+| **Slack** | Socket Mode (an outbound WebSocket), so **no public URL** is needed. Free tier is enough: a bot token (`xoxb-`) plus an app-level token (`xapp-`). | The default. Least friction, richest UI (Block Kit buttons), ideal for a team channel and for local development. |
+| **WhatsApp** | Meta WhatsApp Cloud API webhooks with HMAC-SHA256 signature verification, interactive reply buttons. Needs a public HTTPS endpoint and a Meta business number. | Reach — an on-call engineer who isn't at a desk. Convenience, not capability. |
+
+Either one alone is sufficient. They implement the same contract; Slack is the recommended path and
+WhatsApp exists because approving a production fix from a phone lock screen is genuinely useful.
+
+<!-- IMAGE: Slack approval card before and after tapping Approve (the message rewrite).
+     File: docs/images/slack_approval.png -->
+<!-- IMAGE: WhatsApp interactive approval card on a phone.
+     File: docs/images/whatsapp_approval.png -->
+
+### A note on the signature check
+
+Our first implementation of the WhatsApp webhook returned `True` when the app secret or signature
+header was missing — a development shortcut that accepts unsigned requests. It now **fails closed**
+whenever a secret is configured: a missing signature is rejected. The only permissive case is local
+development with no secret set at all, and the README says not to expose the webhook without one.
+Worth flagging because it's the kind of shortcut that quietly ships.
+---
+
+## The telemetry stack: OpenTelemetry in, SigNoz out
+
+Nothing in ChronoLens has a private data path. Everything it knows arrives as OpenTelemetry and
+everything it concludes is written back to SigNoz.
+
+**What we emit (OpenTelemetry):**
+
+- The demo services export **OTLP traces** over gRPC (`:4317`) with `service.name` per service, so
+  SigNoz derives the dependency graph itself rather than being told about it.
+- The demo agent adds **GenAI semantic-convention attributes** — `gen_ai.request.model`,
+  `gen_ai.usage.input_tokens` / `output_tokens`, plus `llm.step_count`, `llm.cost_usd`,
+  `agent.tools` — on `agent.turn` / `gen_ai.chat` / `tool.execute` spans.
+- ChronoLens instruments **itself**: each loop stage is a `chronolens.stage` span under one loop
+  trace, and it exports its own **metrics** (`chronolens.prevented_total`, `cost_saved_usd`,
+  `seconds_to_breach`). Its guard dashboard then reads those metrics back out of SigNoz — the loop
+  watching the loop.
+
+**What we read (SigNoz):**
+
+| Surface | Used for |
+| --- | --- |
+| **Query Builder v5 — traces** (`scalar`, `time_series`, `raw`, `group_by`) | p99 per service, p99 series for forecasting and Chrono-Proof, per-span-name breakdown for the cascade root, and raw `agent.turn` spans for Agent Watch |
+| **Query Builder v5 — logs** | `severity_text='ERROR'` counts that cross-check the `errors` classification against a second signal |
+| **Metrics read-back** | ChronoLens's own gauges, so the dashboard closes the circle |
+| **Service dependency graph** | The real topology behind the blast-radius forecast |
+| **Exemplar trace IDs** | Deep links from a receipt into the exact trace |
+| **Alert state / history** | LEARN confirms recurrence from SigNoz's firing rules, not just its local ledger |
+
+**What we write (SigNoz):**
+
+| Surface | Used for |
+| --- | --- |
+| **Threshold alert rules** | A guard alert per prevented incident, so it stays watched |
+| **Dashboards** | A guard dashboard with a p99 panel and a panel reading ChronoLens's own metric |
+| **Saved views** | A pinned Traces-explorer view for the guarded service |
+| **Silences** | Muted while the loop actively remediates, lifted after VERIFY — nobody is paged for a fix already in flight |
+| **Notification channels** | Discovered and reused, so ChronoLens routes its notes through the same channel an alert would |
+
+The **SigNoz MCP server** ships alongside via Foundry, and reads use the MCP-compatible query shape.
 
 ---
 
-## 🔗 Links & Resources
+## The demo app and the agent's model
 
-- **GitHub Repository**: [https://github.com/greninja-op/ChronoLens](https://github.com/greninja-op/ChronoLens)
-- **Live Demo Dashboard**: `http://localhost:8095`
-- **SigNoz Project**: [https://signoz.io](https://signoz.io)
+Two things are watched, and it matters that we're precise about what's real.
+
+**The demo store** is a synthetic multi-service app (store → checkout → payment, each its own
+`service.name`) with two jobs: emit believable traces, and expose *reversible levers* — scale,
+pool-resize, circuit-break, restart, roll back, reset. Its faults ramp gradually
+(`traffic-ramp`, `dependency-slow`, `pool-leak`, `memory-leak`, `error-spike`) because a step
+function isn't forecastable and a forecast you can't test isn't a forecast.
+
+**The agent's model is simulated by default, and we say so.** The café assistant's three modes
+(`normal` / `drift` / `loop`) produce deterministic token counts, tool sequences and costs from a
+price table. That's a deliberate choice: a drift demo has to be *reproducible*, and a real model
+that happens to answer consistently proves nothing. The spans it emits are real OpenTelemetry
+GenAI spans either way, which is what the analyzers consume.
+
+For real inference, `LLM_PROVIDER` switches the explanation layer and the agent to a live backend —
+`openai`, `bedrock` (AWS), `azure`, or `gemini` — via one API key. With no key set, ChronoLens runs
+end-to-end on a rule-based explainer. Nothing in the loop requires an LLM to function; the LLM only
+makes the *narration* nicer, which is the right place for a non-deterministic component.
+
+---
+
+## Reproduce it
+
+The hackathon asks for a reproducible install, so the repo ships `casting.yaml` +
+`casting.yaml.lock` and **Foundry** brings up SigNoz *and* its MCP server in one command:
+
+```bash
+bash scripts/bringup.sh          # SigNoz UI :8080 · OTLP :4317/:4318 · MCP :8000/mcp
+cp .env.example .env             # add SIGNOZ_API_KEY
+pip install -r requirements.txt
+python -m demo_store.store       # the watched services  :8090
+python demo_agent/agent.py       # the watched agent      :8091
+python app.py                    # Mission Control        :8095
+```
+
+Then drive it from the UI, or:
+
+```bash
+python -m chronolens.cli respond   # one full loop
+python -m chronolens.cli proof     # the measured counterfactual
+python -m chronolens.cli blast     # who falls next
+python -m chronolens.cli slack     # the approval listener
+```
+
+---
+
+## What we cut, and why it matters
+
+Late on, we audited our own repo and deleted six features: a synthetic "counterfactual" chart that
+drew a curve from a formula, a "stress test" that ran a hardcoded array and claimed to read SigNoz,
+a tool circuit-breaker rebuilt on every request so it forgot instantly, an executive ROI report that
+asserted "100% verification rate" as a string literal, a translation layer unrelated to
+observability, and a token throttle nothing read.
+
+They demoed fine. That's the problem — each one was a place where a judge opening the file would
+find a claim the code didn't support, which poisons trust in the features that *are* real. Two
+docstrings claimed "real-time OpenTelemetry span metrics from SigNoz" in modules containing no
+SigNoz call at all.
+
+The same pass fixed a webhook that accepted unsigned requests, an endpoint that returned its own
+verify token, and a real-looking phone number committed as a default in source.
+
+Fewer features, each of which survives being read. That's the trade we'd make again.
+
+---
+
+## Honest limits
+
+- The **projected** arm of Chrono-Proof is a linear extrapolation of a measured trend, not a
+  measurement. Real systems plateau under saturation, so a long projection is an upper bound. Every
+  field is labelled by provenance and the confidence score falls as the pre-action trend gets noisier.
+- **Answer-quality grading drives the agent**, because span attributes carry only a short preview of
+  the response text. The drift and loop analyzers read SigNoz; this one can't yet.
+- The **agent is simulated by default** (see above).
+- The blast radius is only as good as the dependency graph — with a single service there is nothing
+  to chain, and it says `topology_source: unavailable` rather than inventing edges.
+
+---
+
+## What we'd build next
+
+Read `gen_ai.response` bodies from logs so quality grading is fully telemetry-driven; extend the
+blast radius to rank by business impact rather than time-to-breach; and let LEARN tune the
+confidence guard from its own false-positive history.
+
+The idea we keep coming back to is the one this project started from: **an outage that never
+happened should still leave evidence.** Everything else is plumbing.

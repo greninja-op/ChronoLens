@@ -101,7 +101,8 @@ def ancestors_of(service: str, parent_index: dict[str, list[str]],
 
 
 def pick_root(forecasts: dict[str, Any], parent_index: dict[str, list[str]],
-              edges: list[dict[str, Any]] | None = None) -> str:
+              edges: list[dict[str, Any]] | None = None,
+              min_slope_ms_per_s: float = 0.0) -> str:
     """The root is the *most downstream* service that is degrading.
 
     A leaf (nothing depends on anything below it) that is climbing is a cause; a
@@ -125,7 +126,12 @@ def pick_root(forecasts: dict[str, Any], parent_index: dict[str, list[str]],
         if connected:
             pool = connected
 
-    climbing = {s: f for s, f in pool.items() if getattr(f, "slope_ms_per_s", 0) > 0}
+    # Only a *meaningful* rise counts as degrading. Without a noise floor a slope of
+    # +0.02ms/s (jitter) would mark a shallow service as the cause and throw away the
+    # whole dependency graph — which is exactly the bug this guard exists to stop.
+    floor = max(0.0, float(min_slope_ms_per_s))
+    climbing = {s: f for s, f in pool.items()
+                if getattr(f, "slope_ms_per_s", 0.0) > floor}
     pool = climbing or pool
     return max(pool, key=lambda s: (upstream_count(s), pool[s].slope_ms_per_s))
 
@@ -172,7 +178,8 @@ def forecast_blast_radius(series_by_service: dict[str, list[float]],
                            notes=["every service returned an empty series"])
 
     parent_index = build_parent_index(edges)
-    root = pick_root(forecasts, parent_index, edges)
+    root = pick_root(forecasts, parent_index, edges,
+                     min_slope_ms_per_s=min_slope_ms_per_s)
     root_fc = forecasts[root]
 
     victims: list[Victim] = [Victim(

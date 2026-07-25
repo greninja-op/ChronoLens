@@ -8,7 +8,18 @@
 
 Built for the **Agents of SigNoz** hackathon (Track: AI & Agent Observability).
 
-> **Status:** verified end-to-end against a live SigNoz (reads via Query Builder v5, guard alert + dashboard + saved view writes, alert silences during remediation, self-emitted metrics). A managed run predicts a breach and VERIFY confirms via SigNoz that p99 dropped back under the SLO — "breach avoided". **Mission Control** is a dark control-room UI at `http://localhost:8095` with a live p99 forecast chart, an animated closed-circuit loop, the prevention ledger, cascade topology, and a live SigNoz integration panel. (The UI loads Tailwind/Chart.js/Lucide from CDNs, so it needs internet at runtime.)
+> **Status:** verified end-to-end against a live SigNoz. A managed run predicts a breach and VERIFY confirms via SigNoz that p99 dropped back under the SLO — "breach avoided" — then files a receipt. **Mission Control** is at `http://localhost:8095`.
+> Tailwind / Chart.js / Lucide are **vendored offline** in `static/vendor/`, so the UI works with no internet; only the web fonts are fetched from the network (it degrades to system fonts without them).
+
+## Headline features
+
+| Feature | What it does | Where |
+| --- | --- | --- |
+| **Chrono-Proof** | Proves the outage that never happened, from **measured** SigNoz data: fits the trend on pre-action samples only, extrapolates the unmitigated path (± band), overlays the measured reality, and reports breach-seconds avoided / peak shaved / error budget saved. Every field is labelled `measured` vs `projected`. | `src/chronolens/proof.py` · `GET /api/proof` · `cli proof` |
+| **Blast-radius forecast** | Predicts **which services fall next, in what order, and when** — from SigNoz's own service dependency graph plus each service's p99 trend. Names the most-downstream degrading service as the cause so remediation targets the root, not the loudest alarm. | `src/chronolens/blastradius.py` · `GET /api/blast` · `cli blast` |
+| **The closed loop** | LEARN → FORESEE → CLASSIFY → CASCADE → GOVERN → PREVENT → VERIFY → COOLDOWN → RECORD, with a confidence guard, anti-flap guardrails and a trust ladder. | `src/chronolens/loop.py` · `cli respond` |
+| **Agent Watch** | Behaviour drift, a loop / cost-spiral breaker, and answer-quality grading for an OpenTelemetry-instrumented demo LLM agent. Drift and the loop breaker read the agent's **GenAI spans out of SigNoz** (`source=signoz`). | `drift.py` `loopguard.py` `judge.py` · `/api/agent/*` |
+| **Approve-to-act** | When GOVERN only *suggests*, ChronoLens posts an interactive **Approve / Deny** card to Slack (Socket Mode) or WhatsApp; approving runs the real PREVENT → VERIFY → COOLDOWN → RECORD path and edits the message with the SigNoz-verified outcome. | `slack_bot.py` `whatsapp_bot.py` · `cli slack` |
 
 ## The closed loop (loop engineering)
 ```
@@ -129,8 +140,22 @@ python -m chronolens.cli respond off   # baseline arm: predict + record, no acti
 python -m chronolens.cli ab            # run baseline then managed back-to-back (the A/B)
 python -m chronolens.cli cooldown      # give spare capacity back once load subsides (save cost)
 python -m chronolens.cli prevented     # the receipts ledger (units + $ saved, per-signal)
-python -m chronolens.cli config        # show autonomy / guardrails / cost / LLM config
+python -m chronolens.cli config        # show autonomy / guardrails / cost / LLM / Slack config
+python -m chronolens.cli proof         # CHRONO-PROOF: the SigNoz-measured counterfactual
+python -m chronolens.cli blast         # BLAST-RADIUS: who falls next, in what order, and when
+python -m chronolens.cli slack test    # post a Slack approval card
+python -m chronolens.cli slack         # run the Socket Mode listener (approve-to-act)
 ```
+
+### Generating demo traffic
+The loop needs a live p99 series to forecast against:
+```bash
+python scripts/loadgen.py 600 10                       # 600s at ~10 rps
+curl "localhost:8090/admin/fault?mode=traffic-ramp&level=12"   # ramp latency toward the SLO
+curl "localhost:8090/admin/fault?mode=dependency-slow&level=25" # slow the deepest tier (blast radius)
+curl "localhost:8090/admin/fault?mode=off&level=0"     # clear
+```
+> Fault modes: `traffic-ramp`, `traffic-wave`, `dependency-slow`, `pool-leak`, `error-spike`, `memory-leak`.
 
 ### Tests
 ```bash
@@ -146,6 +171,9 @@ ChronoLens leans on SigNoz across **reads, writes, and both signals**:
 - **Query Builder v5 (traces)** — every p99/RED read is a `queryType:"builder"` traces query (`p99(duration_nano)`), the same shape the SigNoz MCP server executes.
 - **Query Builder v5 (logs)** — CLASSIFY corroborates the `errors` signal with a `count()` logs query (`severity_text='ERROR'`), so classification is cross-checked across two signals.
 - **Grouped traces query → data-driven CASCADE** — p99 grouped by span name finds the *measured* slowest hop, so the blast-path root comes from real traces, not a hardcoded topology.
+- **Service dependency graph** (`/api/v1/dependency_graph`) — the real parent→child call graph SigNoz derives from traces. This is the substrate for the **blast-radius forecast**; the demo store emits spans under three service names (`chronolens-store` → `chronolens-payments` → `chronolens-payments-db`) so the graph has a genuine chain to walk.
+- **Raw traces query (GenAI spans)** — a `requestType: "raw"` traces query pulls the demo agent's `agent.turn` spans with their OpenTelemetry GenAI attributes (`gen_ai.request.model`, `gen_ai.usage.*`, `llm.step_count`, `llm.cost_usd`, `agent.tools`), so **Agent Watch detects drift and cost spirals from telemetry in SigNoz** rather than by calling the agent.
+- **p99 time series** — `requestType: "time_series"` powers the forecast chart and Chrono-Proof's measured arm.
 - **Services / RED stats** — to pick and score services.
 - **Alerts** — a guarding threshold alert on the service p99 (`create_alert`).
 - **Dashboards** — a guard dashboard with a p99 latency panel **and** a panel that reads back ChronoLens's own `chronolens.prevented_total` metric (full-circle).
@@ -163,6 +191,10 @@ chronolens/
 ├── src/chronolens/
 │   ├── config.py  signoz.py  otel_self.py  metrics_self.py
 │   ├── learn.py   foresee.py  cascade.py  playbook.py  prevent.py  guardrails.py
+│   ├── proof.py         # CHRONO-PROOF — the SigNoz-measured counterfactual
+│   ├── blastradius.py   # BLAST-RADIUS — who falls next, in what order, and when
+│   ├── drift.py  loopguard.py  judge.py       # Agent Watch analyzers
+│   ├── slack_bot.py  whatsapp_bot.py  copilot.py   # approve-to-act + NL co-pilot
 │   ├── governance.py  verify.py  cooldown.py  dollars.py  notify.py  llm.py  record.py
 │   ├── loop.py    # learn→foresee→classify→govern→prevent→verify→cooldown→record
 │   └── cli.py

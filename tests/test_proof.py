@@ -66,6 +66,20 @@ def test_projection_follows_the_measured_pre_action_trend():
     assert p.projected_peak_ms > series[3]
 
 
+def test_falling_trend_never_projects_negative_latency():
+    """Regression: a recovering series extrapolated forward went to -65 ms live.
+
+    Latency cannot be negative; the projected arm must flatten at a positive floor.
+    """
+    series = [900, 700, 500, 300, 120, 100, 95, 90, 88, 86]
+    p = build_proof(series, service="payment", slo_ms=SLO, action_index=3, step_s=15.0)
+    assert p.ok
+    projected = [pt.projected_ms for pt in p.points if pt.projected_ms is not None]
+    assert projected, "expected a projected path"
+    assert min(projected) > 0, f"projection went non-positive: {min(projected)}"
+    assert p.projected_peak_ms > 0
+
+
 def test_narrative_and_provenance_note_present():
     series = [200, 280, 360, 450, 300, 240, 220]
     p = build_proof(series, service="payment", slo_ms=SLO, action_index=3)
