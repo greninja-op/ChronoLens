@@ -437,6 +437,25 @@ def get_counterfactual(service: str = "checkout-service"):
     return out
 
 
+@app.get("/api/blast")
+def get_blast_radius(window_seconds: int = 300, step_interval: int = 15):
+    """BLAST-RADIUS FORECAST — which services fall next, in what order, and when.
+
+    Reads SigNoz's service dependency map + each service's p99 series, finds the
+    most-downstream degrading service (the cause, not the symptom), and projects
+    the ordered timeline of downstream victims.
+    """
+    from chronolens.blastradius import blast_radius_from_signoz
+    try:
+        with SigNozClient(cfg) as sn:
+            br = blast_radius_from_signoz(sn, cfg, window_seconds=window_seconds,
+                                          step_interval=step_interval)
+        return br.to_dict()
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"blast radius unavailable: {e}"},
+                            status_code=502)
+
+
 @app.get("/api/proof")
 def get_proof(service: str = "", window_seconds: int = 300, step_interval: int = 15):
     """CHRONO-PROOF — prove the outage that never happened, from real SigNoz data.

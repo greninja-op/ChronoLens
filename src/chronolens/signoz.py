@@ -472,6 +472,68 @@ class SigNozClient:
         except SigNozError:
             return None
 
+    def service_dependency_edges(self, window_seconds: int = 900) -> list[dict[str, Any]]:
+        """SigNoz's own service dependency map: [{parent, child, callCount}, ...].
+
+        This is the *real* topology SigNoz derives from traces — the substrate for
+        the BLAST-RADIUS forecast. SigNoz has moved this endpoint around between
+        versions, so try the known paths and fail open to an empty list (callers
+        then fall back to trace-derived topology).
+        """
+        end_ns = _now_ns()
+        start_ns = end_ns - window_seconds * 1_000_000_000
+        payload = {"start": start_ns, "end": end_ns, "tags": []}
+        for op, path in (
+            ("service_map", "/api/v1/service/map"),
+            ("service_dependency", "/api/v1/dependency_graph"),
+            ("service_map_v2", "/api/v2/service/map"),
+        ):
+            try:
+                body = self._post(op, path, payload)
+            except Exception:
+                continue
+            data = body.get("data", body) if isinstance(body, dict) else body
+            if isinstance(data, list) and data:
+                edges: list[dict[str, Any]] = []
+                for e in data:
+                    if not isinstance(e, dict):
+                        continue
+                    parent = e.get("parent") or e.get("source") or e.get("from")
+                    child = e.get("child") or e.get("target") or e.get("to")
+                    if parent and child:
+                        edges.append({
+                            "parent": str(parent), "child": str(child),
+                            "callCount": float(e.get("callCount") or e.get("calls") or 0),
+                        })
+                if edges:
+                    return edges
+        return []
+
+    def trace_waterfall(self, trace_id: str) -> list[dict[str, Any]]:
+        """Fetch a trace's spans (the waterfall) — evidence for the blast path.
+
+        Tries the known SigNoz trace-detail paths; fails open to an empty list.
+        """
+        if not trace_id:
+            return []
+        for op, path in (
+            ("trace_detail_v2", f"/api/v2/traces/{trace_id}"),
+            ("trace_detail", f"/api/v1/traces/{trace_id}"),
+        ):
+            try:
+                body = self._get(op, path)
+            except Exception:
+                continue
+            data = body.get("data", body) if isinstance(body, dict) else body
+            if isinstance(data, list) and data:
+                return [s for s in data if isinstance(s, dict)]
+            if isinstance(data, dict):
+                for key in ("spans", "result", "events"):
+                    val = data.get(key)
+                    if isinstance(val, list) and val:
+                        return [s for s in val if isinstance(s, dict)]
+        return []
+
     def query_range(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._post("query_range_v5", "/api/v5/query_range", body)
 

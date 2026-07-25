@@ -117,6 +117,31 @@ def cmd_config(_: list[str]) -> int:
     return 0
 
 
+def cmd_blast(_: list[str]) -> int:
+    """BLAST-RADIUS — who falls next, in what order, and when."""
+    from .blastradius import blast_radius_from_signoz
+    cfg = Config.load()
+    with SigNozClient(cfg) as sn:
+        br = blast_radius_from_signoz(sn, cfg)
+    print(f"=== BLAST-RADIUS FORECAST (topology: {br.topology_source}) ===\n")
+    if not br.ok:
+        print("  " + (br.notes[0] if br.notes else "unavailable"))
+        return 1
+    root = br.root_service + (f"  [root hop: {br.root_span}]" if br.root_span else "")
+    print(f"  Root cause: {root}\n")
+    print(f"  {'service':<22}{'p99':>9}{'slope':>10}{'inherit':>9}{'breach in':>12}")
+    for v in br.victims:
+        eta = "NOW" if v.breaching_now else (f"{v.seconds_to_breach:.0f}s"
+                                             if v.seconds_to_breach is not None else "-")
+        tag = " *" if v.is_root else ""
+        print(f"  {v.service[:20]+tag:<22}{v.current_p99_ms:>8.0f}ms"
+              f"{v.slope_ms_per_s:>+9.1f}{v.inherited_ms_per_s:>+9.1f}{eta:>12}")
+    print(f"\n  {br.narrative}")
+    for n in br.notes:
+        print(f"\n  note: {n}")
+    return 0
+
+
 def cmd_proof(args: list[str]) -> int:
     """CHRONO-PROOF — the SigNoz-measured counterfactual for a service."""
     from .proof import proof_from_signoz
@@ -172,13 +197,15 @@ def cmd_slack(args: list[str]) -> int:
 def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m chronolens.cli "
-              "<services|foresee|respond [off]|ab|cooldown|prevented|config|proof [svc]|slack [test]>")
+              "<services|foresee|respond [off]|ab|cooldown|prevented|config|proof [svc]|"
+              "blast|slack [test]>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     dispatch = {
         "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
         "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
         "config": cmd_config, "slack": cmd_slack, "proof": cmd_proof,
+        "blast": cmd_blast,
     }
     fn = dispatch.get(cmd)
     if fn is None:
