@@ -424,9 +424,44 @@ def agent_steer(tool_name: str = "search_store", reason: str = "looping"):
 # --------------------------------------------------------------------------- #
 @app.get("/api/counterfactual")
 def get_counterfactual(service: str = "checkout-service"):
-    """Generate dual timeline data points: Unmitigated breach path vs ChronoLens defused path."""
+    """Dual-timeline chart data (unmitigated vs defused).
+
+    NOTE: this is a **synthetic illustration** — it takes no SigNoz input. For the
+    real, SigNoz-measured counterfactual use `/api/proof` (Chrono-Proof).
+    """
     from chronolens.foresee import generate_counterfactual_projection
-    return generate_counterfactual_projection(service=service, slo_ms=cfg.p99_slo_ms)
+    out = generate_counterfactual_projection(service=service, slo_ms=cfg.p99_slo_ms)
+    out["data_source"] = "synthetic"
+    out["disclaimer"] = ("Illustrative shape only — not measured. Use /api/proof for the "
+                         "SigNoz-measured counterfactual.")
+    return out
+
+
+@app.get("/api/proof")
+def get_proof(service: str = "", window_seconds: int = 300, step_interval: int = 15):
+    """CHRONO-PROOF — prove the outage that never happened, from real SigNoz data.
+
+    Pulls the actual p99 series from SigNoz, fits the trend on the **pre-action**
+    samples only, extrapolates the unmitigated path (+/- band), and overlays the
+    **measured** post-action reality. Returns breach-seconds avoided, peak shaved,
+    and error budget saved — every field labelled measured vs projected.
+    """
+    from chronolens.proof import proof_from_signoz
+    try:
+        with SigNozClient(cfg) as sn:
+            svc = service
+            if not svc:
+                names = [s.get("serviceName") for s in sn.list_services(window_seconds=300)]
+                names = [n for n in names if n and n != "chronolens"]
+                if not names:
+                    return JSONResponse({"ok": False, "error": "no services in SigNoz"},
+                                        status_code=404)
+                svc = max(names, key=lambda n: sn.service_p99_ms(n))
+            p = proof_from_signoz(sn, cfg, svc, window_seconds=window_seconds,
+                                  step_interval=step_interval)
+        return p.to_dict()
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"proof unavailable: {e}"}, status_code=502)
 
 
 @app.post("/api/agent/throttle")

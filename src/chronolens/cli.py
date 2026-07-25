@@ -117,6 +117,39 @@ def cmd_config(_: list[str]) -> int:
     return 0
 
 
+def cmd_proof(args: list[str]) -> int:
+    """CHRONO-PROOF — the SigNoz-measured counterfactual for a service."""
+    from .proof import proof_from_signoz
+    cfg = Config.load()
+    service = args[0] if args else ""
+    with SigNozClient(cfg) as sn:
+        if not service:
+            names = [s.get("serviceName") for s in sn.list_services(window_seconds=300)]
+            names = [n for n in names if n and n != "chronolens"]
+            if not names:
+                print("No services in SigNoz to prove anything about.")
+                return 1
+            service = max(names, key=lambda n: sn.service_p99_ms(n))
+        p = proof_from_signoz(sn, cfg, service)
+
+    print(f"=== CHRONO-PROOF: {p.service} (source: {p.source}) ===\n")
+    if not p.ok:
+        print("  " + (p.notes[0] if p.notes else "no proof available"))
+        return 1
+    print(f"  MEASURED (SigNoz)   peak {p.measured_peak_ms:>7.0f} ms · "
+          f"{p.measured_breach_s:>5.0f}s over SLO · final {p.measured_final_ms:.0f} ms")
+    print(f"  PROJECTED (est.)    peak {p.projected_peak_ms:>7.0f} ms +/-{p.projection_band_ms:.0f} · "
+          f"{p.projected_breach_s:>5.0f}s over SLO · trend {p.projected_slope_ms_per_s:+.1f} ms/s")
+    print(f"\n  Breach avoided      {p.breach_seconds_avoided:.0f}s")
+    print(f"  Peak shaved         {p.peak_ms_avoided:.0f} ms")
+    print(f"  Error budget saved  {p.error_budget_ms_seconds_avoided:.0f} ms·s")
+    print(f"  Prevented           {p.prevented}  (confidence {p.confidence:.0%})")
+    print(f"\n  {p.narrative}")
+    for n in p.notes:
+        print(f"\n  note: {n}")
+    return 0
+
+
 def cmd_slack(args: list[str]) -> int:
     """Slack approve-to-act. 'test' posts a test message; otherwise runs the listener."""
     cfg = Config.load()
@@ -139,13 +172,13 @@ def cmd_slack(args: list[str]) -> int:
 def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m chronolens.cli "
-              "<services|foresee|respond [off]|ab|cooldown|prevented|config|slack [test]>")
+              "<services|foresee|respond [off]|ab|cooldown|prevented|config|proof [svc]|slack [test]>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     dispatch = {
         "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
         "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
-        "config": cmd_config, "slack": cmd_slack,
+        "config": cmd_config, "slack": cmd_slack, "proof": cmd_proof,
     }
     fn = dispatch.get(cmd)
     if fn is None:
