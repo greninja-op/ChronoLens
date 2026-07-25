@@ -434,6 +434,13 @@ def _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
             evidence=evidence,
         )
         ledger.record(case)
+        if getattr(cfg, "stitch_enabled", lambda: False)():
+            try:
+                from .stitch import stream_event_to_stitch
+                stream_event_to_stitch("incident_prevented", case.to_dict(), cfg)
+            except Exception:
+                pass
+
     saved = ""
     if case.scaled_down:
         saved = f" · returned {case.cost_units_returned} units"
@@ -441,6 +448,7 @@ def _finish(ledger, loop_id, timeline, svc, fc, cfg, load_onset_at,
             saved += f" (~${case.dollars_saved:,.2f})"
     timeline.append({"step": "RECORD", "status": "done",
                      "text": f"Case filed ({case.id}): {outcome}{saved}."})
+
 
 
 def _artifact_ref(result, name: str) -> dict:
