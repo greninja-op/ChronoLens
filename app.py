@@ -503,14 +503,21 @@ def get_proof(service: str = "", window_seconds: int = 300, step_interval: int =
 
 @app.post("/api/mcp/chat")
 async def mcp_chat(request: Request):
-    """SigNoz MCP Natural Language Incident Co-Pilot query endpoint."""
+    """Co-pilot: answer a plain-English question via real SigNoz MCP tool calls."""
     from chronolens.copilot import ask_signoz_copilot
     try:
         body = await request.json()
-        user_query = body.get("query", "Why did checkout-service trigger an alert?")
+        user_query = body.get("query") or "Which services are slowest right now?"
     except Exception:
-        user_query = "Summarize recent system reliability"
+        user_query = "Which services are slowest right now?"
     return ask_signoz_copilot(user_query, cfg)
+
+
+@app.get("/api/mcp/status")
+def mcp_status_view():
+    """Live SigNoz MCP server status + the tools it advertises (proof MCP is real)."""
+    from chronolens.mcp import mcp_status
+    return mcp_status(cfg)
 
 
 # --------------------------------------------------------------------------- #

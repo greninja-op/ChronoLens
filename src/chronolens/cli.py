@@ -117,6 +117,44 @@ def cmd_config(_: list[str]) -> int:
     return 0
 
 
+def cmd_mcp(args: list[str]) -> int:
+    """SigNoz MCP: `mcp` lists the server's tools, `mcp <question>` asks the co-pilot."""
+    cfg = Config.load()
+    if not args:
+        from .mcp import mcp_status
+        st = mcp_status(cfg)
+        if not st.get("connected"):
+            print(f"MCP not reachable at {st.get('url')}: {st.get('error')}")
+            return 1
+        print(f"=== SigNoz MCP: {st['server']} {st.get('version','')} "
+              f"(protocol {st['protocol']}) ===")
+        print(f"  endpoint : {st['url']}")
+        print(f"  tools    : {st['tool_count']}\n")
+        for name in st["tools"]:
+            print(f"    - {name}")
+        return 0
+
+    from .copilot import ask_signoz_copilot
+    question = " ".join(args)
+    a = ask_signoz_copilot(question, cfg)
+    print(f"=== CO-PILOT (via {a['via']}) ===\n")
+    print(f"  Q: {a['query']}")
+    print(f"  intent: {a['intent']}\n")
+    print("  MCP tool calls:")
+    for tc in a["tool_calls"]:
+        flag = "ok" if tc["ok"] else "FAIL"
+        print(f"    [{flag}] {tc['tool']}({_short(tc['arguments'])}) -> {tc['rows']} row(s)"
+              + (f"  {tc['error']}" if tc["error"] else ""))
+    print(f"\n  A: {a['answer']}")
+    if a.get("deep_link"):
+        print(f"\n  SigNoz: {a['deep_link']}")
+    return 0 if a.get("mcp_connected") else 1
+
+
+def _short(d: dict) -> str:
+    return ", ".join(f"{k}={v}" for k, v in list(d.items())[:3])
+
+
 def cmd_blast(_: list[str]) -> int:
     """BLAST-RADIUS — who falls next, in what order, and when."""
     from .blastradius import blast_radius_from_signoz
@@ -198,14 +236,14 @@ def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m chronolens.cli "
               "<services|foresee|respond [off]|ab|cooldown|prevented|config|proof [svc]|"
-              "blast|slack [test]>")
+              "blast|mcp [question]|slack [test]>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     dispatch = {
         "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
         "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
         "config": cmd_config, "slack": cmd_slack, "proof": cmd_proof,
-        "blast": cmd_blast,
+        "blast": cmd_blast, "mcp": cmd_mcp,
     }
     fn = dispatch.get(cmd)
     if fn is None:

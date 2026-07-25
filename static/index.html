@@ -280,11 +280,40 @@
       <div class="lrow"><span class="sub" style="margin:0">Currently firing</span><span class="mono" id="s-fire" style="font-size:14px;font-weight:600">—</span></div>
       <div class="lrow"><span class="sub" style="margin:0">Notification channels</span><span class="mono" id="s-chan" style="font-size:14px;font-weight:600">—</span></div>
       <div class="lrow"><span class="sub" style="margin:0">Webhook events received</span><span class="mono" id="s-inbox" style="font-size:14px;font-weight:600">—</span></div>
+      <div class="lrow"><span class="sub" style="margin:0">MCP tools available</span><span class="mono" id="s-mcp" style="font-size:14px;font-weight:600">—</span></div>
       <p class="sub" style="margin-top:var(--s4); font-size:11.5px; color:var(--ink-3);">
         Reads: Query Builder v5 traces, logs, metrics read-back, service dependency map, exemplar traces.
         Writes: threshold alerts, dashboards, saved views, silences, notification channels.
       </p>
     </div>
+  </section>
+
+  <!-- ═══ MCP CO-PILOT ═══ -->
+  <section class="card" style="margin-top:var(--s5);">
+    <div class="card-hd">
+      <div>
+        <h2 class="h-card">Ask SigNoz — MCP co-pilot</h2>
+        <p class="sub">Your question is routed to real <span class="mono">tools/call</span> requests on the
+          SigNoz MCP server. Every tool call is shown, so the answer is auditable.</p>
+      </div>
+      <span id="mcp-src" class="tag">—</span>
+    </div>
+    <form id="mcp-form" style="display:flex; gap:var(--s3); flex-wrap:wrap;">
+      <input id="mcp-q" type="text" value="which services are slowest right now?"
+             aria-label="Ask SigNoz a question"
+             style="flex:1 1 320px; height:38px; padding:0 var(--s4); border-radius:999px;
+                    border:1px solid var(--line); background:var(--card); color:var(--ink);
+                    font-family:inherit; font-size:13px;">
+      <button class="btn btn-primary" type="submit" id="b-ask">Ask</button>
+    </form>
+    <div style="display:flex; gap:var(--s2); flex-wrap:wrap; margin-top:var(--s3);">
+      <button class="btn btn-xs mcp-ex">are any alerts firing?</button>
+      <button class="btn btn-xs mcp-ex">any error logs in the last hour?</button>
+      <button class="btn btn-xs mcp-ex">top operations for chronolens-store</button>
+      <button class="btn btn-xs mcp-ex">list my dashboards</button>
+    </div>
+    <div id="mcp-answer" class="sub" style="margin-top:var(--s4);">Ask a question to call the MCP server.</div>
+    <div id="mcp-calls" style="margin-top:var(--s3);"></div>
   </section>
 </main>
 
@@ -441,6 +470,37 @@ async function loadSignoz(){
       $('s-fire').textContent=s.firing??0; $('s-chan').textContent=(s.channels||[]).length; }
   }catch(e){}
   try{ const ib=await(await fetch('/api/inbox')).json(); $('s-inbox').textContent=ib.count??0; }catch(e){}
+  try{ const m=await(await fetch('/api/mcp/status')).json();
+    $('s-mcp').textContent = m.connected ? m.tool_count : '—';
+    $('mcp-src').innerHTML = m.connected
+      ? `<span class="dot" style="background:var(--ok)"></span>${esc(m.server)} · ${m.tool_count} tools`
+      : 'MCP offline';
+    $('mcp-src').className = 'tag '+(m.connected?'tag-ok':'tag-bad');
+  }catch(e){}
+}
+
+/* ── MCP co-pilot ── */
+async function askMcp(question){
+  $('mcp-answer').textContent='Calling SigNoz MCP tools…';
+  $('mcp-calls').innerHTML='';
+  try{
+    const r = await (await fetch('/api/mcp/chat',{ method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:question}) })).json();
+    $('mcp-answer').innerHTML =
+      `<div style="color:var(--ink); font-size:13.5px; line-height:1.55">${esc(r.answer||'')}</div>`
+      + `<div class="label" style="margin-top:var(--s2)">intent: ${esc(r.intent||'')} · via ${esc(r.via||'')}</div>`;
+    $('mcp-calls').innerHTML = (r.tool_calls||[]).map(t=>{
+      const args = Object.entries(t.arguments||{}).map(([k,v])=>k+'='+v).join(', ');
+      return `<div class="lrow"><div style="min-width:0">
+        <div class="mono" style="font-size:12px;font-weight:600">${esc(t.tool)}</div>
+        <div class="sub" style="font-size:11px;margin-top:2px">${esc(args)||'no arguments'}</div>
+        </div><span class="tag ${t.ok?'tag-ok':'tag-bad'}">${t.ok?t.rows+' rows':'failed'}</span></div>`;
+    }).join('');
+    if(r.deep_link){
+      $('mcp-calls').innerHTML += `<a href="${esc(r.deep_link)}" target="_blank" rel="noopener"
+        class="sub" style="display:inline-block;margin-top:var(--s3);color:var(--blue);font-weight:600">Open in SigNoz →</a>`;
+    }
+  }catch(e){ $('mcp-answer').textContent='MCP co-pilot unavailable.'; }
 }
 
 /* ── agent watch ── */
@@ -492,6 +552,10 @@ $('b-blast').onclick = loadBlast;
 $('b-drift').onclick = checkDrift;
 $('b-loop').onclick  = loopCheck;
 $('b-qual').onclick  = gradeQuality;
+$('mcp-form').onsubmit = e => { e.preventDefault(); askMcp($('mcp-q').value); };
+document.querySelectorAll('.mcp-ex').forEach(b => b.onclick = () => {
+  $('mcp-q').value = b.textContent.trim(); askMcp(b.textContent.trim());
+});
 
 function loadAll(){ loadServices(); loadPrevented(); loadConfig(); loadSignoz(); }
 initChart(); loadAll(); loadProof();
