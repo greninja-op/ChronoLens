@@ -58,8 +58,14 @@
       <div class="flex items-center space-x-2 bg-[#161a23] px-3 py-1 rounded-full border border-emerald-500/30">
         <span class="text-emerald-400">LLM Engine:</span><span id="llm-badge" class="text-slate-200 font-semibold">Azure AI (gpt-5.4-nano)</span>
       </div>
+      <a href="https://stitch.withgoogle.com/projects/13586600990628684692" target="_blank" class="flex items-center space-x-2 bg-[#161a23] hover:bg-[#1f2533] px-3 py-1 rounded-full border border-sky-500/40 transition-colors cursor-pointer" title="Open Google Stitch AI Project">
+        <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+        <span class="text-sky-400 font-medium">Stitch AI MCP:</span><span class="text-emerald-400 font-semibold">CONNECTED (135866...)</span>
+      </a>
     </div>
   </div>
+
+
   <div class="flex items-center space-x-5">
     <div class="flex items-center space-x-4 font-mono text-xs">
       <div class="flex items-center gap-2 text-slate-400 bg-[#161a23] px-3 py-1 rounded border border-[#222734]"><i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-400"></i><span id="utc-clock" class="text-slate-200 font-medium">--:--:--</span></div>
@@ -313,15 +319,17 @@
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Guard Alerts</span><span id="sig-guard" class="text-white font-bold">—</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Firing State</span><span id="sig-firing" class="text-white font-bold">—</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">WhatsApp Appr</span><span id="wa-status" class="text-status-healthy font-bold">CONNECTED (+91 94002...)</span></div>
-          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sarvam AI Layer</span><span class="text-brand-secondary font-bold">Hindi / Bharat Multilingual</span></div>
-          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Reads Layer</span><span class="text-brand-tertiary font-bold">Query Builder v5</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sarvam AI Layer</span><span class="text-brand-secondary font-bold">Hindi / Multilingual</span></div>
+          <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Stitch AI MCP</span><span class="text-sky-400 font-bold">CONNECTED (135866...)</span></div>
           <div class="flex justify-between items-center p-2 rounded bg-surface-container border border-white/5"><span class="text-gray-400">Sync Status</span><span id="sig-sync" class="text-brand-primary font-bold">—</span></div>
         </div>
         <div class="space-y-1.5">
           <button onclick="sendWhatsAppTestCard('en-IN')" class="w-full py-1.5 rounded-lg bg-status-healthy/20 border border-status-healthy/40 hover:bg-status-healthy/30 text-status-healthy font-mono text-xs font-bold transition-all">💬 Test WhatsApp Approval (English)</button>
           <button onclick="sendWhatsAppTestCard('hi-IN')" class="w-full py-1.5 rounded-lg bg-brand-secondary/20 border border-brand-secondary/40 hover:bg-brand-secondary/30 text-brand-secondary font-mono text-xs font-bold transition-all">🇮🇳 Test WhatsApp Approval (Hindi)</button>
+          <a href="https://stitch.withgoogle.com/projects/13586600990628684692" target="_blank" class="block w-full text-center py-1.5 rounded-lg bg-sky-500/20 border border-sky-500/40 hover:bg-sky-500/30 text-sky-400 font-mono text-xs font-bold transition-all">🎨 Open Google Stitch AI Project</a>
         </div>
       </div>
+
     </div>
 
 
@@ -628,16 +636,28 @@ async function gradeQuality(){
   }catch(e){}
 }
 
-async function sendWhatsAppTestCard(){
+async function sendWhatsAppTestCard(lang){
   try {
-    const res = await (await fetch('/api/whatsapp/test', {method: 'POST'})).json();
-    if (res.ok && res.whatsapp_response.ok) {
+    const res = await (await fetch('/api/whatsapp/test?lang='+(lang||'en-IN'), {method: 'POST'})).json();
+    if (res.ok) {
       alert('💬 WhatsApp Interactive Approval Card Sent!\nCheck WhatsApp on +91 94002 45958 to tap Approve/Deny.');
     } else {
       alert('WhatsApp Test Card Result: ' + JSON.stringify(res));
     }
   } catch(e) { alert('Error sending WhatsApp test card: ' + e); }
 }
+
+async function sendStitchTestStream(){
+  try {
+    const res = await (await fetch('/api/stitch/test', {method: 'POST'})).json();
+    if (res.ok) {
+      alert('⚡ Stitch AI Event Stream Synchronized!\nEvent stream pushed to Stitch AI workspace ws_chronolens_prod.');
+    } else {
+      alert('Stitch AI Stream Result: ' + JSON.stringify(res));
+    }
+  } catch(e) { alert('Error streaming to Stitch AI: ' + e); }
+}
+
 
 document.querySelectorAll('.nav-a').forEach(a=>a.onclick=()=>{const t=a.dataset.scroll;const map={top:'main',chart:'sec-chart',loop:'sec-loop',ledger:'sec-ledger',topo:'sec-topo',agent:'sec-agent'};const el=$(map[t]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});
 

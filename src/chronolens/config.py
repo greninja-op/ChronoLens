@@ -93,6 +93,13 @@ class Config:
     sarvam_tts_model: str
     sarvam_tts_speaker: str
 
+    # --- Stitch AI (Google Stitch Data Pipeline & Event Sync) ---
+    stitch_api_key: str
+    stitch_workspace_id: str
+    stitch_webhook_url: str
+    stitch_project_id: str
+    stitch_project_url: str
+
     @classmethod
     def load(cls) -> "Config":
         return cls(
@@ -139,7 +146,13 @@ class Config:
             sarvam_stt_model=os.getenv("SARVAM_STT_MODEL", "saaras:v3"),
             sarvam_tts_model=os.getenv("SARVAM_TTS_MODEL", "bulbul:v3"),
             sarvam_tts_speaker=os.getenv("SARVAM_TTS_SPEAKER", "ritu"),
+            stitch_api_key=os.getenv("STITCH_API_KEY", ""),
+            stitch_workspace_id=os.getenv("STITCH_WORKSPACE_ID", "ws_chronolens_prod"),
+            stitch_webhook_url=os.getenv("STITCH_WEBHOOK_URL", "https://stitch.withgoogle.com/api/v1/projects/13586600990628684692/push"),
+            stitch_project_id=os.getenv("STITCH_PROJECT_ID", "13586600990628684692"),
+            stitch_project_url=os.getenv("STITCH_PROJECT_URL", "https://stitch.withgoogle.com/projects/13586600990628684692"),
         )
+
 
     def slack_enabled(self) -> bool:
         """Slack approve-to-act is live only when both tokens are present."""
@@ -152,6 +165,11 @@ class Config:
     def sarvam_enabled(self) -> bool:
         """Sarvam AI translation & speech layer is active when API key is present."""
         return bool(self.sarvam_api_key)
+
+    def stitch_enabled(self) -> bool:
+        """Stitch AI integration is active when API key or webhook URL is configured."""
+        return bool(self.stitch_api_key or self.stitch_webhook_url)
+
 
 
     def require_signoz(self) -> None:
