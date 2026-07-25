@@ -70,6 +70,9 @@ $$\text{ETA to Breach} = \frac{\text{SLO Wall} - \text{Current P99}}{\text{Slope
 
 If $P99 = 480\text{ms}$, $\text{SLO} = 500\text{ms}$, and $\text{Slope} = +18.5\text{ms/s}$, ChronoLens forecasts an SLO breach in **18.2 seconds** and triggers proactive remediation before any user experiences a failure.
 
+![SigNoz Auto-Created Dashboard showing P99 Latency & SLO Threshold Panel](docs/images/signoz_dashboard.jpg)
+*Figure 1: SigNoz dashboard with real-time P99 latency, error rates, and 500ms SLO threshold metrics.*
+
 ### 2. GenAI Spans & Agent Watch (Track 1 Focus)
 AI agents behave unpredictably: prompt bloat, infinite retry loops, and token cost surges can silently degrade application economics. 
 
@@ -77,7 +80,16 @@ ChronoLens ingests **SigNoz OpenTelemetry GenAI Spans** (`gen_ai.usage.prompt_to
 - **Throttle Agent Context Window**: Truncates history to prevent token explosions.
 - **Pin Baseline Model**: Reverts from expensive models (e.g. GPT-5.4) back to cost-optimized fallback models (e.g. gpt-5.4-nano).
 
-### 3. Verification Loop
+![SigNoz Traces Explorer showing OpenTelemetry GenAI Spans and Attributes](docs/images/signoz_genai_traces.jpg)
+*Figure 2: SigNoz Traces Explorer displaying an LLM request span with OpenTelemetry `gen_ai.*` attributes expanded (`gen_ai.request.model`, token usage, cost per request).*
+
+### 3. Self-Observability (Watching the Watcher)
+ChronoLens emits its own OpenTelemetry spans into SigNoz — one span per predictive cycle step, tagged with stage attributes. The prediction → WhatsApp approval → execution loop is fully traceable within SigNoz right alongside monitored microservices.
+
+![SigNoz Traces showing ChronoLens Loop Self-Observability Spans](docs/images/signoz_self_trace.jpg)
+*Figure 3: ChronoLens self-trace in SigNoz showing the entire execution pipeline.*
+
+### 4. Verification Loop
 Remediation without verification is dangerous. After executing an action (`scale_out`), ChronoLens queries SigNoz to verify that:
 1. P99 latency dropped below the 500ms SLO target.
 2. Error rates did not spike.
