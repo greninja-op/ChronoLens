@@ -66,10 +66,12 @@ def send_whatsapp_text(to: str, text: str, cfg: Config) -> dict[str, Any]:
     }
     payload = {
         "messaging_product": "whatsapp",
+        "recipient_type": "individual",
         "to": to.strip().replace("+", ""),
         "type": "text",
         "text": {"body": text[:4000], "preview_url": False},
     }
+
 
     try:
         resp = httpx.post(url, json=payload, headers=headers, timeout=10.0)
@@ -119,9 +121,11 @@ def post_whatsapp_approval(
     # Meta interactive reply buttons (max 3 buttons, title <= 20 chars)
     payload = {
         "messaging_product": "whatsapp",
+        "recipient_type": "individual",
         "to": to.strip().replace("+", ""),
         "type": "interactive",
         "interactive": {
+
             "type": "button",
             "header": {"type": "text", "text": "🛡️ ChronoLens Reliability Guard"},
             "body": {"text": body_text[:1024]},
