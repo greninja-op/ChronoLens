@@ -150,20 +150,38 @@ Only after SigNoz confirms stabilization does ChronoLens mark the incident as **
 
 ---
 
-## 💬 Multi-Channel Alerting: WhatsApp & Slack
+## 🚀 Two-Way Notification Channels & Integration Layer (WhatsApp, Slack, Sarvam AI)
 
-Alert fatigue is real. SREs receive hundreds of unactionable notifications daily. ChronoLens makes alerts **interactive, multi-channel, and actionable**:
+Alert fatigue is real. SREs receive hundreds of unactionable notifications daily across fragmented channels. ChronoLens unifies on-call notifications into **interactive, multi-channel approve-to-act workflows**:
 
 ![WhatsApp Approve-to-Act Interactive Card](docs/images/whatsapp_approval.png)
 
-1. **Meta WhatsApp Cloud API**:
-   - Interactive Approve-to-Act cards delivered to on-call mobile devices.
-   - `[✅ Approve Fix]` and `[❌ Deny Fix]` reply buttons.
-   - HMAC-SHA256 signature verification on inbound `/webhook/whatsapp` callbacks.
+### Multi-Channel Feature Matrix
+
+| Feature | 📱 WhatsApp (Meta Cloud API) | 💬 Slack (#sre-alerts) | 🎙️ Sarvam AI (Bharat Voice) |
+|---------|------------------------------|------------------------|-----------------------------|
+| **Protocol / Transport** | Meta Graph API v23.0 + Webhook | Incoming Webhook (Block-Kit) | Saarika STT & Bulbul TTS REST |
+| **Interactivity** | `[✅ Approve Fix]` / `[❌ Deny Fix]` Reply Buttons | Real-time Channel Status Cards | Interactive Voice Response (IVR) |
+| **Security** | HMAC-SHA256 (`x-hub-signature-256`) | Secret Webhook Tokens | Bearer API Key Authentication |
+| **Automation** | Conversational Automation (Icebreakers & Slash Commands) | Webhook Channel Dispatch | Multilingual Translation (`hi-IN`) |
+| **Use Case** | On-call Mobile Approve-to-Act | Team Incident Channel Visibility | Critical Voice Escalation Calls |
+
+---
+
+### Channel Deep-Dive
+
+1. **Meta WhatsApp Cloud API (Interactive Approve-to-Act)**:
+   - Delivers interactive cards with `[✅ Approve Fix]` and `[❌ Deny Fix]` buttons directly to on-call mobile devices.
+   - Built-in conversational automation providing tappable starter prompts (*"Check live SRE health"*, *"Trigger incident approval card"*) and slash commands (`/status`, `/approve`, `/agents`, `/test`, `/ledger`, `/loop`, `/help`).
+   - Inbound button taps are validated via HMAC-SHA256 signature checking on `/webhook/whatsapp` and trigger instant closed-loop execution.
+
 2. **Slack Integration (`#sre-alerts`)**:
-   - Simultaneous channel alerts formatted with block-kit payload detailing service, P99 latency, breach ETA, and remediation status.
-3. **Sarvam AI Multilingual Bharat Layer**:
-   - Text translation to Hindi (`hi-IN`) and automated voice call notifications using Saarika STT and Bulbul TTS.
+   - Posts rich Slack Block-Kit formatted alert cards to the `#sre-alerts` channel (`SLACK_WEBHOOK_URL`, channel `C0BKQTT7TL1`).
+   - Displays affected microservice, current P99 latency, slope trajectory, estimated time to breach, and remediation status for full team transparency.
+
+3. **Sarvam AI (Multilingual Voice & Translation Layer)**:
+   - Provides Indian regional language support (`hi-IN` Hindi / `en-IN` English).
+   - Uses **Saarika v2.5 STT** for speech recognition and **Bulbul v3 TTS** (`ritu` speaker voice) for automated voice escalation calls when latency breaches imminent SLO targets.
 
 ---
 
