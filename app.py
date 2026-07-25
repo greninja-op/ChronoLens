@@ -389,6 +389,26 @@ def prevented():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.post("/api/agent/circuit-break")
+def agent_circuit_break(tool_name: str = "search_store"):
+    """Circuit break a degraded AI agent tool."""
+    from chronolens.steerage import ToolCircuitBreaker
+    tb = ToolCircuitBreaker()
+    tb.record_call(tool_name, latency_ms=4000.0, success=False)
+    tb.record_call(tool_name, latency_ms=4000.0, success=False)
+    tb.record_call(tool_name, latency_ms=4000.0, success=False)
+    return {"ok": True, "tool_name": tool_name, "status": tb.get_status()}
+
+
+@app.post("/api/agent/steer")
+def agent_steer(tool_name: str = "search_store", reason: str = "looping"):
+    """Inject dynamic steerage instruction to break an AI agent loop without losing context."""
+    from chronolens.steerage import build_steerage_prompt
+    prompt = build_steerage_prompt(tool_name, reason=reason)
+    return {"ok": True, "steerage_prompt": prompt, "action": "injected_to_context"}
+
+
+
 if __name__ == "__main__":
     import uvicorn
 

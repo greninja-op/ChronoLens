@@ -406,6 +406,27 @@ class SigNozClient:
         val = _first_scalar(body)
         return round(val / 1e6, 1) if val is not None else 0.0
 
+    def query_agent_spans(self, service: str = "cafe-agent", window_seconds: int = 300) -> dict[str, float]:
+        """Query GenAI / Agent spans from SigNoz via Query Builder v5.
+
+        Extracts agent telemetry attributes like gen_ai.tool.name, gen_ai.usage.*,
+        llm.step_count, and llm.cost_usd.
+        """
+        q = build_trace_query(
+            f"service.name = '{service}'",
+            [{"expression": "count()"}],
+            window_seconds=window_seconds,
+            group_by=[
+                {"key": "gen_ai.tool.name"},
+            ],
+            request_type="scalar",
+        )
+        try:
+            body = self.query_range(q)
+            return _series_by_group(body)
+        except Exception:
+            return {}
+
     def service_p99_series(self, service: str, *, window_seconds: int = 180,
                            step_interval: int = 15) -> list[float]:
         """Chronological p99 latency series (ms) for a service — one query, no sleeps.
