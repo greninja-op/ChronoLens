@@ -303,6 +303,105 @@ def build_span_breakdown_query(service: str, *, window_seconds: int = 300) -> di
     }
 
 
+AGENT_TURN_FIELDS = [
+    "gen_ai.request.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens",
+    "llm.step_count", "llm.cost_usd", "agent.tools", "agent.looping",
+]
+
+
+def build_agent_turns_query(service: str, *, window_seconds: int = 900,
+                            limit: int = 50, span_name: str = "agent.turn") -> dict[str, Any]:
+    """Query Builder v5 **raw** traces query for an AI agent's turn spans.
+
+    Returns one row per agent turn carrying the OpenTelemetry GenAI attributes
+    the Agent Watch analyzers need (model, token usage, step count, cost, tools).
+    This is what lets drift / loop detection run off *telemetry in SigNoz* rather
+    than by calling the agent directly.
+    """
+    end = _now_ms()
+    start = end - window_seconds * 1000
+    return {
+        "schemaVersion": "v1",
+        "start": start,
+        "end": end,
+        "requestType": "raw",
+        "compositeQuery": {
+            "queries": [
+                {
+                    "type": "builder_query",
+                    "spec": {
+                        "name": "A",
+                        "signal": "traces",
+                        "filter": {"expression":
+                                   f"service.name = '{service}' AND name = '{span_name}'"},
+                        "selectFields": [{"name": f, "fieldContext": "attribute"}
+                                         for f in AGENT_TURN_FIELDS],
+                        "order": [{"key": {"name": "timestamp"}, "direction": "desc"}],
+                        "limit": limit,
+                    },
+                }
+            ],
+        },
+    }
+
+
+def _as_float(val: Any, default: float = 0.0) -> float:
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_agent_turn_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize a v5 raw-traces response into the turn dicts the analyzers expect.
+
+    Pure function so it can be tested against recorded payloads. v5 wraps rows in
+    a few different containers depending on version, so walk for anything that
+    looks like a row with span attributes.
+    """
+    rows: list[dict[str, Any]] = []
+
+    def _collect(node: Any) -> None:
+        if isinstance(node, dict):
+            # a row is a dict that carries the attributes we selected
+            keys = set(node.keys())
+            if keys & {"agent.tools", "llm.step_count", "gen_ai.request.model"}:
+                rows.append(node)
+                return
+            for key in ("data", "rows", "result", "results", "series", "list", "spans"):
+                if key in node:
+                    _collect(node[key])
+            # v5 sometimes nests the attribute map one level down
+            for key in ("attributes", "data", "span"):
+                val = node.get(key)
+                if isinstance(val, dict) and (set(val.keys()) &
+                                              {"agent.tools", "llm.step_count"}):
+                    rows.append(val)
+        elif isinstance(node, list):
+            for item in node:
+                _collect(item)
+
+    _collect(body)
+
+    turns: list[dict[str, Any]] = []
+    for r in rows:
+        tools_raw = r.get("agent.tools") or ""
+        tools = [t.strip() for t in str(tools_raw).split(",") if t.strip()]
+        steps = int(_as_float(r.get("llm.step_count"), len(tools)))
+        looping = str(r.get("agent.looping", "")).lower() in ("true", "1", "yes")
+        turns.append({
+            "model": r.get("gen_ai.request.model") or "",
+            "tools": tools,
+            "steps": steps or len(tools),
+            "input_tokens": int(_as_float(r.get("gen_ai.usage.input_tokens"))),
+            "output_tokens": int(_as_float(r.get("gen_ai.usage.output_tokens"))),
+            "cost_usd": _as_float(r.get("llm.cost_usd")),
+            "looping": looping,
+            "source": "signoz",
+        })
+    return turns
+
+
 def build_guard_silence(service: str, minutes: int, *, created_by: str = "chronolens") -> dict[str, Any]:
     """AlertManager-style silence body: mute a service's alert while the loop
     is actively remediating, so a human isn't paged for something being handled."""
@@ -472,6 +571,22 @@ class SigNozClient:
         except SigNozError:
             return None
 
+    def agent_turns(self, service: str, *, window_seconds: int = 900,
+                    limit: int = 50, span_name: str = "agent.turn") -> list[dict[str, Any]]:
+        """Read an AI agent's recent turns **from SigNoz** (GenAI spans).
+
+        Newest-first from the query; returned chronological so drift/loop analysis
+        reads them in the order they happened. Fails open to an empty list.
+        """
+        try:
+            body = self.query_range(build_agent_turns_query(
+                service, window_seconds=window_seconds, limit=limit, span_name=span_name))
+        except Exception:
+            return []
+        turns = parse_agent_turn_rows(body)
+        turns.reverse()  # oldest -> newest
+        return turns
+
     def service_dependency_edges(self, window_seconds: int = 900) -> list[dict[str, Any]]:
         """SigNoz's own service dependency map: [{parent, child, callCount}, ...].
 
@@ -482,10 +597,12 @@ class SigNozClient:
         """
         end_ns = _now_ns()
         start_ns = end_ns - window_seconds * 1_000_000_000
-        payload = {"start": start_ns, "end": end_ns, "tags": []}
+        # SigNoz wants nanosecond epochs as *strings* here (numbers are rejected
+        # with "cannot unmarshal number into ... start of type string").
+        payload = {"start": str(start_ns), "end": str(end_ns), "tags": []}
         for op, path in (
-            ("service_map", "/api/v1/service/map"),
             ("service_dependency", "/api/v1/dependency_graph"),
+            ("service_map", "/api/v1/service/map"),
             ("service_map_v2", "/api/v2/service/map"),
         ):
             try:

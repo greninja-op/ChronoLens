@@ -73,3 +73,77 @@ def test_narrative_and_provenance_note_present():
     assert p.source == "signoz"
     # provenance must be stated so projected is never mistaken for measured
     assert any("extrapolation" in n for n in p.notes)
+
+
+# --------------------------------------------------------------------------- #
+# Anchoring the action point to the ledger's recorded action time.             #
+# --------------------------------------------------------------------------- #
+import calendar
+import time
+
+from chronolens.proof import action_index_from_ledger
+
+
+class _FakeLedger:
+    def __init__(self, cases): self._cases = cases
+    def list(self): return self._cases
+
+
+def _stamp(epoch):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch))
+
+
+def test_action_index_derived_from_recorded_action_time():
+    """A case filed 60s ago, 15s steps, 12 samples -> 4 samples back from the end."""
+    now = calendar.timegm((2026, 7, 26, 12, 0, 0, 0, 0, 0))
+    led = _FakeLedger([{ "id":"abc", "service":"payment", "action":"scale", "at":_stamp(now-60) }])
+    idx, why = action_index_from_ledger("payment", led, step_s=15.0, n_samples=12, now=now)
+    assert idx == 12 - 1 - 4
+    assert "ledger case abc" in why
+
+
+def test_non_action_cases_are_ignored():
+    """watch-only / suggested / pre-provision rows never anchor a proof."""
+    now = calendar.timegm((2026, 7, 26, 12, 0, 0, 0, 0, 0))
+    led = _FakeLedger([
+        {"id":"a","service":"payment","action":"none","at":_stamp(now-60)},
+        {"id":"b","service":"payment","action":"pre-provision","at":_stamp(now-55)},
+        {"id":"c","service":"payment","action":"suggest:scale","at":_stamp(now-50)},
+    ])
+    idx, why = action_index_from_ledger("payment", led, step_s=15.0, n_samples=12, now=now)
+    assert idx is None
+    assert "no recent action" in why
+
+
+def test_other_services_are_ignored():
+    now = calendar.timegm((2026, 7, 26, 12, 0, 0, 0, 0, 0))
+    led = _FakeLedger([{ "id":"x", "service":"orders", "action":"scale", "at":_stamp(now-60) }])
+    idx, _ = action_index_from_ledger("payment", led, step_s=15.0, n_samples=12, now=now)
+    assert idx is None
+
+
+def test_action_outside_the_window_is_rejected():
+    """An action 2 hours old can't be anchored inside a 3-minute series."""
+    now = calendar.timegm((2026, 7, 26, 12, 0, 0, 0, 0, 0))
+    led = _FakeLedger([{ "id":"old", "service":"payment", "action":"scale", "at":_stamp(now-7200) }])
+    idx, _ = action_index_from_ledger("payment", led, step_s=15.0, n_samples=12, now=now)
+    assert idx is None
+
+
+def test_newest_action_case_wins():
+    now = calendar.timegm((2026, 7, 26, 12, 0, 0, 0, 0, 0))
+    led = _FakeLedger([
+        {"id":"older","service":"payment","action":"scale","at":_stamp(now-120)},
+        {"id":"newer","service":"payment","action":"pool-resize","at":_stamp(now-45)},
+    ])
+    idx, why = action_index_from_ledger("payment", led, step_s=15.0, n_samples=12, now=now)
+    assert "newer" in why
+    assert idx == 12 - 1 - 3
+
+
+def test_ledger_failure_fails_soft():
+    class _Broken:
+        def list(self): raise RuntimeError("ledger gone")
+    idx, why = action_index_from_ledger("payment", _Broken(), step_s=15.0, n_samples=10)
+    assert idx is None
+    assert "unavailable" in why

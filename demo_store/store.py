@@ -124,20 +124,53 @@ def _dominant_signal(now: float) -> str:
 
 
 # --- OpenTelemetry setup -----------------------------------------------------
+# The store emits spans under SEVERAL service names so SigNoz derives a real
+# service dependency graph from the traces:
+#
+#     <store>  ──▶  <payments>  ──▶  <payments-db>
+#
+# That graph is what BLAST-RADIUS walks: a slowdown in payments-db (the deepest
+# dependency) is the *cause*, and it pushes latency up into payments and then the
+# storefront, which breach later. One service can't demonstrate a cascade — the
+# tiers make the propagation real and measurable instead of hypothetical.
+SVC_PAYMENTS = os.getenv("STORE_PAYMENTS_SERVICE_NAME", "chronolens-payments")
+SVC_PAYMENTS_DB = os.getenv("STORE_PAYMENTS_DB_SERVICE_NAME", "chronolens-payments-db")
+
+_providers: dict[str, TracerProvider] = {}
+
+
+def _tracer_for(service_name: str) -> trace.Tracer:
+    """One TracerProvider per service.name, each exporting to the same collector.
+
+    Spans keep the ambient parent context, so cross-service parent→child edges
+    are preserved and SigNoz can build the dependency map.
+    """
+    provider = _providers.get(service_name)
+    if provider is None:
+        provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+        provider.add_span_processor(
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
+        _providers[service_name] = provider
+    return provider.get_tracer("chronolens.store")
+
+
 def _init_tracer() -> trace.Tracer:
-    provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
-    trace.set_tracer_provider(provider)
-    return trace.get_tracer("chronolens.store")
+    tr = _tracer_for(SERVICE_NAME)
+    # also set the global provider so any auto-instrumentation lands on the store
+    trace.set_tracer_provider(_providers[SERVICE_NAME])
+    return tr
 
 
 tracer = _init_tracer()
 app = FastAPI(title="ChronoLens Demo Store")
 
 
-def _child(name: str, ms: float, err: bool = False) -> None:
-    with tracer.start_as_current_span(name, kind=SpanKind.INTERNAL) as span:
+def _child(name: str, ms: float, err: bool = False, service: str | None = None) -> None:
+    tr = _tracer_for(service) if service else tracer
+    with tr.start_as_current_span(name, kind=SpanKind.INTERNAL) as span:
         span.set_attribute("component", name)
+        if service:
+            span.set_attribute("peer.service", service)
         time.sleep(max(0.0, ms) / 1000.0)
         if err:
             span.set_status(Status(StatusCode.ERROR, "downstream error"))
@@ -156,10 +189,13 @@ def order() -> dict:
         span.set_attribute("store.dominant_signal", _dominant_signal(now))
         _child("cart.lookup", total * 0.15)
         _child("inventory.check", total * 0.15)
-        with tracer.start_as_current_span("payment.charge", kind=SpanKind.INTERNAL):
-            # the dependency fault concentrates in payment.db_query
+        # payments is its own service, and it waits on payments-db (its dependency)
+        with _tracer_for(SVC_PAYMENTS).start_as_current_span(
+                "payment.charge", kind=SpanKind.SERVER) as pay:
+            pay.set_attribute("peer.service", SVC_PAYMENTS_DB)
+            # the dependency fault concentrates in the deepest tier
             dep_extra = sev["dependency"] * DEP_PENALTY_MS
-            _child("payment.db_query", total * 0.35 + dep_extra)
+            _child("payment.db_query", total * 0.35 + dep_extra, service=SVC_PAYMENTS_DB)
         _child("order.db_write", total * 0.20, err=failing)
         if failing or total >= 500.0:
             span.set_status(Status(StatusCode.ERROR, "breach/error (injected)"))

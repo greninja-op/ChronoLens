@@ -24,6 +24,8 @@ arm is an explicitly-labelled projection with an interval, not a fabricated curv
 """
 from __future__ import annotations
 
+import calendar
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -67,6 +69,7 @@ class Proof:
     prevented: bool = False
     confidence: float = 0.0
     narrative: str = ""
+    anchor: str = ""               # how the action point was located (ledger vs peak)
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -190,9 +193,59 @@ def _narrate(p: Proof) -> str:
             f"(peak {p.measured_peak_ms:.0f}ms vs SLO {p.slo_ms:.0f}ms).")
 
 
+def _parse_iso_utc(ts: str) -> float | None:
+    """Parse the ledger's ``%Y-%m-%dT%H:%M:%SZ`` stamp into a UTC epoch second."""
+    if not ts:
+        return None
+    try:
+        return calendar.timegm(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ"))
+    except Exception:
+        return None
+
+
+def action_index_from_ledger(service: str, ledger, *, step_s: float,
+                             n_samples: int, now: float | None = None) -> tuple[int | None, str]:
+    """Locate the sample where the remediation actually landed, from the ledger.
+
+    The p99 series ends "now", so a case filed ``age`` seconds ago sits
+    ``age / step_s`` samples back from the end. Using the *recorded* action time
+    beats guessing the series peak: a still-climbing fault can peak again after
+    the fix, which made the peak heuristic report "the fix didn't hold" when it
+    actually had.
+
+    Returns ``(index, provenance)``; index is None when no usable case is found.
+    """
+    now = now if now is not None else time.time()
+    try:
+        cases = [c for c in ledger.list() if c.get("service") == service]
+    except Exception:
+        return None, "ledger unavailable"
+    # Newest case that actually took an action (skip watch-only / suggested rows).
+    for case in reversed(cases):
+        action = str(case.get("action") or "").strip()
+        if not action or action in ("none", "pre-provision") or action.startswith("suggest:"):
+            continue
+        at = _parse_iso_utc(str(case.get("at") or ""))
+        if at is None:
+            continue
+        age = now - at
+        if age < 0:
+            continue
+        idx = int(round(n_samples - 1 - (age / step_s)))
+        if 1 <= idx <= n_samples - 2:
+            return idx, f"ledger case {case.get('id','?')} ({action}, {age:.0f}s ago)"
+    return None, "no recent action in the ledger for this window"
+
+
 def proof_from_signoz(sn, cfg: Config, service: str, *, window_seconds: int = 300,
-                      step_interval: int = 15, action_index: int | None = None) -> Proof:
-    """Fetch the real p99 series from SigNoz and build the proof. Fails soft."""
+                      step_interval: int = 15, action_index: int | None = None,
+                      ledger=None) -> Proof:
+    """Fetch the real p99 series from SigNoz and build the proof. Fails soft.
+
+    The action point comes from the **ledger's recorded action time** when a
+    matching case exists (precise); otherwise it falls back to the series peak
+    and says so in the notes.
+    """
     try:
         series = sn.service_p99_series(service, window_seconds=window_seconds,
                                       step_interval=step_interval)
@@ -205,11 +258,26 @@ def proof_from_signoz(sn, cfg: Config, service: str, *, window_seconds: int = 30
                      step_s=float(step_interval), action_index=0,
                      notes=["SigNoz returned no p99 samples for this window"])
 
-    # Default: the action landed at the series peak (where remediation kicks in).
+    anchor = ""
     if action_index is None:
-        action_index = max(1, series.index(max(series)))
-        action_index = min(action_index, len(series) - 2) if len(series) >= 3 else action_index
+        if ledger is None:
+            from .record import Ledger
+            ledger = Ledger()
+        idx, why = action_index_from_ledger(service, ledger, step_s=float(step_interval),
+                                           n_samples=len(series))
+        if idx is not None:
+            action_index, anchor = idx, "action time from " + why
+        else:
+            # Fallback: the series peak, where remediation most likely kicked in.
+            action_index = max(1, series.index(max(series)))
+            if len(series) >= 3:
+                action_index = min(action_index, len(series) - 2)
+            anchor = f"action point estimated from the series peak ({why})"
 
-    return build_proof(series, service=service, slo_ms=cfg.p99_slo_ms,
-                       action_index=action_index, step_s=float(step_interval),
-                       source="signoz")
+    proof = build_proof(series, service=service, slo_ms=cfg.p99_slo_ms,
+                        action_index=action_index, step_s=float(step_interval),
+                        source="signoz")
+    if anchor:
+        proof.anchor = anchor
+        proof.notes.append(anchor)
+    return proof

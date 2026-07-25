@@ -146,24 +146,20 @@ def agent_mode(mode: str = "normal"):
 
 
 @app.get("/api/agent/loopcheck")
-def agent_loopcheck():
-    """Drive one agent turn and run the loop guard on it (the cost-spiral breaker),
-    corroborating with live SigNoz agent spans via Query Builder v5."""
+def agent_loopcheck(source: str = "signoz"):
+    """Run the loop / cost-spiral breaker on the agent's most recent turn.
+
+    By default the turn is reconstructed from the agent's **GenAI spans in SigNoz**
+    (`source=signoz`), so the breaker fires on observed telemetry rather than by
+    poking the agent. `source=agent` drives `/chat` directly instead.
+    """
     from chronolens.loopguard import evaluate
-    try:
-        turn = httpx.get(f"{cfg.agent_url}/chat", timeout=12).json()
-    except Exception as e:
-        return JSONResponse({"error": f"agent not reachable: {e}"}, status_code=502)
-
-    # Corroborate with live SigNoz GenAI spans (full-circle agent observability)
-    try:
-        with SigNozClient(cfg) as sn:
-            spans = sn.query_agent_spans(_AGENT_SERVICE, window_seconds=120)
-            if spans:
-                turn["signoz_telemetry"] = spans
-    except Exception:
-        pass
-
+    turns, used = _agent_turns(1, source=source)
+    if not turns:
+        return JSONResponse({"error": "no agent turns available (SigNoz or agent)"},
+                            status_code=502)
+    turn = dict(turns[-1])
+    turn["data_source"] = used
     v = evaluate(turn.get("steps", 0), turn.get("tools", []), turn.get("cost_usd", 0.0),
                  max_steps=cfg.agent_max_steps, cost_budget=cfg.agent_cost_budget_usd,
                  repeat_threshold=cfg.agent_repeat_threshold)
@@ -179,7 +175,8 @@ def agent_loopcheck():
                 cfg, kind=kind, service=_AGENT_SERVICE, detail=detail).ok
         except Exception:
             slack_posted = False
-    return {"turn": turn, "verdict": v.__dict__, "slack_posted": slack_posted}
+    return {"turn": turn, "verdict": v.__dict__, "slack_posted": slack_posted,
+            "data_source": used}
 
 
 def _drive_agent(n: int) -> list[dict]:
@@ -193,28 +190,55 @@ def _drive_agent(n: int) -> list[dict]:
     return turns
 
 
+def _agent_turns(n: int, *, source: str = "signoz") -> tuple[list[dict], str]:
+    """Get recent agent turns, preferring **SigNoz GenAI spans** over driving the agent.
+
+    ``source="signoz"`` reads the agent's ``agent.turn`` spans out of SigNoz — the
+    honest path, because detection then runs on telemetry rather than by poking the
+    agent. Falls back to driving ``/chat`` when SigNoz has no spans yet (fresh
+    stack, agent idle), and always reports which path was used.
+    """
+    if source != "agent":
+        try:
+            with SigNozClient(cfg) as sn:
+                turns = sn.agent_turns(_AGENT_SERVICE, window_seconds=900, limit=max(n, 20))
+            if len(turns) >= 2:
+                return turns[-n:] if n else turns, "signoz"
+        except Exception:
+            pass
+        if source == "signoz-only":
+            return [], "signoz-unavailable"
+    return _drive_agent(n), "agent-driven"
+
+
 @app.post("/api/agent/baseline")
-def agent_baseline(samples: int = 10):
+def agent_baseline(samples: int = 10, source: str = "signoz"):
     """Capture the agent's current behavior as the drift baseline (run in normal mode)."""
     from chronolens.drift import fingerprint, save_baseline
-    turns = _drive_agent(samples)
+    turns, used = _agent_turns(samples, source=source)
     if not turns:
-        return JSONResponse({"error": "agent not reachable"}, status_code=502)
+        return JSONResponse({"error": "no agent turns available (SigNoz or agent)"},
+                            status_code=502)
     fp = fingerprint(turns)
     save_baseline(fp, Ledger().root)
-    return {"captured": fp.__dict__}
+    return {"captured": fp.__dict__, "data_source": used, "turns": len(turns)}
 
 
 @app.get("/api/agent/drift")
-def agent_drift(samples: int = 10):
-    """Compare recent agent behavior to the saved baseline and score the drift."""
+def agent_drift(samples: int = 10, source: str = "signoz"):
+    """Compare recent agent behavior to the saved baseline and score the drift.
+
+    Reads the agent's GenAI spans from SigNoz by default (`source=signoz`);
+    `source=agent` forces driving the agent directly instead.
+    """
     from chronolens.drift import drift_score, fingerprint, load_baseline
     base = load_baseline(Ledger().root)
     if base is None:
         return {"error": "no baseline yet — capture one first (POST /api/agent/baseline)"}
-    turns = _drive_agent(samples)
+    turns, used = _agent_turns(samples, source=source)
     if not turns:
-        return JSONResponse({"error": "agent not reachable"}, status_code=502)
+        return JSONResponse({"error": "no agent turns available (SigNoz or agent)"},
+                            status_code=502)
     recent = fingerprint(turns)
     d = drift_score(base, recent, threshold=cfg.drift_threshold)
     slack_posted = False
@@ -228,18 +252,26 @@ def agent_drift(samples: int = 10):
         except Exception:
             slack_posted = False
     return {"drift": d.__dict__, "baseline": base.__dict__, "recent": recent.__dict__,
-            "slack_posted": slack_posted}
+            "slack_posted": slack_posted, "data_source": used, "turns": len(turns)}
 
 
 @app.get("/api/agent/quality")
 def agent_quality(samples: int = 8):
-    """Grade recent agent answers and trend the quality score (the live judge)."""
+    """Grade recent agent answers and trend the quality score (the live judge).
+
+    Answer *text* is needed to grade, and span attributes only carry a short
+    preview, so this path drives the agent directly — stated plainly rather than
+    implied to be telemetry-driven.
+    """
     from chronolens.judge import grade_batch
     turns = _drive_agent(samples)
     if not turns:
         return JSONResponse({"error": "agent not reachable"}, status_code=502)
     answers = [t.get("answer", "") for t in turns]
-    return grade_batch(answers, cfg)
+    out = grade_batch(answers, cfg)
+    if isinstance(out, dict):
+        out["data_source"] = "agent-driven"
+    return out
 
 
 @app.get("/api/forecast")
