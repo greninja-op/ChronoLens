@@ -7,7 +7,7 @@
 
 <!-- IMAGE: hero — Mission Control dashboard, full window, Chrono-Proof chart visible.
      File: docs/images/dashboard.png  ·  Suggested caption: "ChronoLens Mission Control." -->
-<!-- All 12 image slots in this post have shot-by-shot capture instructions in
+<!-- All 11 image slots in this post have shot-by-shot capture instructions in
      docs/SCREENSHOTS.md — what to run, where to click, what must be visible. -->
 
 **Contents**
@@ -299,11 +299,13 @@ meant a tap on your phone and a tap in Slack didn't do quite the same thing. One
 
 Either one alone is sufficient. They implement the same contract; Slack is the recommended path and
 WhatsApp exists because approving a production fix from a phone lock screen is genuinely useful.
+Everything shown in this post is Slack, deliberately — we'd rather describe the WhatsApp path than
+screenshot one we aren't actively driving.
 
-<!-- IMAGE: Slack approval card before and after tapping Approve (the message rewrite).
-     File: docs/images/slack_approval.png -->
-<!-- IMAGE: WhatsApp interactive approval card on a phone.
-     File: docs/images/whatsapp_approval.png -->
+<!-- IMAGE: Slack approval card, the instant "Applying…" rewrite, and the final verified
+     outcome — three crops stacked. File: docs/images/slack_approval.png -->
+<!-- No WhatsApp screenshot in this post: the integration is in the repo and described
+     above, but Slack is the surface we demo, so we don't show a card we aren't driving. -->
 
 ### A note on the signature check
 

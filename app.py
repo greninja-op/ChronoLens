@@ -527,7 +527,7 @@ def get_blast_radius(window_seconds: int = 300, step_interval: int = 15):
 
 
 @app.get("/api/proof")
-def get_proof(service: str = "", window_seconds: int = 300, step_interval: int = 15):
+def get_proof(service: str = "", window_seconds: int = 0, step_interval: int = 15):
     """CHRONO-PROOF — prove the outage that never happened, from real SigNoz data.
 
     Pulls the actual p99 series from SigNoz, fits the trend on the **pre-action**
@@ -535,7 +535,8 @@ def get_proof(service: str = "", window_seconds: int = 300, step_interval: int =
     **measured** post-action reality. Returns breach-seconds avoided, peak shaved,
     and error budget saved — every field labelled measured vs projected.
     """
-    from chronolens.proof import proof_from_signoz
+    from chronolens.proof import PROOF_WINDOW_S, proof_from_signoz
+    window_seconds = window_seconds or PROOF_WINDOW_S
     try:
         with SigNozClient(cfg) as sn:
             svc = service

@@ -25,6 +25,7 @@ arm is an explicitly-labelled projection with an interval, not a fabricated curv
 from __future__ import annotations
 
 import calendar
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -242,7 +243,17 @@ def action_index_from_ledger(service: str, ledger, *, step_s: float,
     return None, "no recent action in the ledger for this window"
 
 
-def proof_from_signoz(sn, cfg: Config, service: str, *, window_seconds: int = 300,
+#: How far back to pull the p99 series when building a proof.
+#: 5 minutes was too tight: the arc a proof describes is *rise → action → recovery*,
+#: and by the time an operator asks for the proof the rise has often aged out of the
+#: window — leaving a flat series, a zero-slope projection and a truthful but useless
+#: "nothing to prevent in this window". 15 minutes covers the whole arc with room to
+#: spare. Override with CHRONOLENS_PROOF_WINDOW_S.
+PROOF_WINDOW_S = int(os.getenv("CHRONOLENS_PROOF_WINDOW_S", "900"))
+
+
+def proof_from_signoz(sn, cfg: Config, service: str, *,
+                      window_seconds: int = PROOF_WINDOW_S,
                       step_interval: int = 15, action_index: int | None = None,
                       ledger=None) -> Proof:
     """Fetch the real p99 series from SigNoz and build the proof. Fails soft.

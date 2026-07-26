@@ -1,6 +1,6 @@
 # Blog screenshots — what to capture and how
 
-The blog (`CHRONOLENS_BLOG.md`) has **12 image slots**, each marked with an
+The blog (`CHRONOLENS_BLOG.md`) has **11 image slots**, each marked with an
 `<!-- IMAGE: … -->` comment naming the file it expects. This is the shot-by-shot
 capture guide: what has to be running, where to click, and what has to be visible for
 the shot to be worth including.
@@ -148,28 +148,17 @@ the second, the outcome line with the SigNoz-verified p99. The rewrite is the po
 
 ---
 
-## 9 · `whatsapp_approval.png` — the same card on a phone *(optional)*
+## 9 · WhatsApp — **not being captured**
 
-**Skip this one unless the WhatsApp token is fresh.** The demo video films Slack only, and the blog
-reads fine without this image — the WhatsApp section can stand on the Slack shot plus its own prose.
-Only capture it if `POST /api/whatsapp/test` returns `ok: true`; a `401 / code 190` means the Meta
-access token has expired and you need a new one first.
+**Decision: no WhatsApp screenshot in the blog or the video.** The integration is real, tested and
+described in the post; Slack is the surface we demo. Showing a card we aren't actively driving buys
+nothing and risks implying a tap we didn't perform.
 
-**Where:** WhatsApp on your phone (or WhatsApp Web).
-
-1. Message the business number from your phone once — Meta only allows interactive sends
-   inside a 24-hour window the user opens.
-2. `curl -X POST http://localhost:8095/api/whatsapp/test` → expect
-   `whatsapp_response.ok = true`. A `401 / code 190` means the access token has expired;
-   generate a fresh one in the Meta dashboard and update `.env`.
-3. Screenshot the card, then tap **✅ Approve Fix** and screenshot the two replies that follow
-   (the immediate acknowledgement, then the verified outcome).
-4. Crop out your phone number and any other chats.
-
-**Must be visible:** the card header, the forecast numbers, and both buttons. Mirroring the
-phone (Windows **Phone Link**, scrcpy, QuickTime) gives a much cleaner image than a photo.
-The tap only closes the loop if a public callback URL is configured (`ngrok http 8095` →
-set it in the Meta app); without one the card still arrives, but the button does nothing.
+If you ever want it: the outbound send needs a fresh Meta access token (they expire — an expired one
+returns `401 / code 190`) and a 24-hour window opened by messaging the business number from your
+phone; then `curl -X POST http://localhost:8095/api/whatsapp/test`. The *button tap* additionally
+needs a public callback URL (`ngrok http 8095`, set in the Meta app), because the click arrives as a
+Meta webhook to `POST /webhook/whatsapp`.
 
 ---
 
@@ -228,11 +217,11 @@ nothing.
 | 6 | `docs/images/agent_watch.png` | Mission Control |
 | 7 | `docs/images/signoz_genai_traces.jpg` | SigNoz |
 | 8 | `docs/images/slack_approval.png` | Slack |
-| 9 | `docs/images/whatsapp_approval.png` | WhatsApp *(optional — needs a fresh token)* |
+| ~~9~~ | — | WhatsApp — **not captured**, by decision (see above) |
 | 10 | `docs/images/signoz_genai_dashboard.png` | SigNoz |
 | 11 | `docs/images/signoz_anomaly_alert.png` | SigNoz |
 | 12 | `docs/images/mcp_copilot.png` | Mission Control |
 
 Efficient order: run one loop → shots 1, 2, 5, 12 (Mission Control) → switch the fault to
 `dependency-slow` → shots 3, 4 → agent into `loop` mode → shots 6, 7, 10, 11 → restart in
-`suggest` mode → shot 8 (and 9 only if WhatsApp is authenticating).
+`suggest` mode → shot 8.
