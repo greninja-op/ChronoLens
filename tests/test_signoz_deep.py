@@ -64,7 +64,7 @@ def test_guard_dashboard_has_metrics_readback_panel():
     impact = dash["widgets"][1]
     qd = impact["query"]["builder"]["queryData"][0]
     assert qd["dataSource"] == "metrics"
-    assert qd["aggregateAttribute"]["key"] == "chronolens.prevented_total"
+    assert qd["aggregations"][0]["metricName"] == "chronolens.prevented_total"
 
 
 # --------------------------------------------------------------------------- #

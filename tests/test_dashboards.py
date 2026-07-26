@@ -74,4 +74,58 @@ def test_latency_panels_use_nanosecond_units():
     dash = build_guard_dashboard(SERVICE, 500.0)
     latency = dash["widgets"][0]
     assert latency["yAxisUnit"] == "ns"
-    assert latency["thresholds"][0]["value"] == 500.0 * 1e6
+    assert latency["thresholds"][0]["thresholdValue"] == 500.0 * 1e6
+    assert latency["thresholds"][0]["thresholdUnit"] == "ns"
+
+
+# --------------------------------------------------------------------------- #
+# Panels must carry the fields SigNoz's *UI* maps over. The API accepts a panel
+# without them and returns 200; the dashboard then renders blank, which is the
+# single most confusing failure mode in this integration.
+# --------------------------------------------------------------------------- #
+_UI_REQUIRED_PANEL_FIELDS = (
+    "id", "panelTypes", "title", "query", "thresholds",
+    "selectedLogFields", "selectedTracesFields", "contextLinks", "timePreferance",
+)
+
+
+def _all_dashboards():
+    return [build_guard_dashboard(SERVICE, 500.0), build_agent_dashboard(AGENT)]
+
+
+def test_every_panel_carries_the_fields_the_ui_maps_over():
+    for dash in _all_dashboards():
+        for w in dash["widgets"]:
+            for field in _UI_REQUIRED_PANEL_FIELDS:
+                assert field in w, f"{dash['title']} / {w.get('title')} missing {field}"
+            assert w["contextLinks"] == {"linksData": []} or "linksData" in w["contextLinks"]
+            q = w["query"]
+            assert q["promql"] == [] or isinstance(q["promql"], list)
+            assert isinstance(q["clickhouse_sql"], list)
+            # queryFormulas missing means `undefined` in the frontend, not empty.
+            assert isinstance(q["builder"]["queryFormulas"], list)
+
+
+def test_dashboards_declare_variables_and_version():
+    for dash in _all_dashboards():
+        assert dash["variables"] == {}
+        assert dash["version"] == "v5"
+
+
+def test_thresholds_use_the_long_field_names_the_ui_reads():
+    for dash in _all_dashboards():
+        for w in dash["widgets"]:
+            for t in w["thresholds"]:
+                assert "thresholdValue" in t and "thresholdUnit" in t
+                assert t["thresholdOperator"] in (">", "<", ">=", "<=", "=")
+                assert t["thresholdFormat"] in ("Text", "Background")
+                assert t["thresholdColor"].startswith("#")
+                assert "value" not in t, "short threshold form draws no marker"
+
+
+def test_panel_ids_are_deterministic():
+    """Re-exporting must not churn dashboards/*.json."""
+    a = build_agent_dashboard(AGENT)
+    b = build_agent_dashboard(AGENT)
+    assert [w["id"] for w in a["widgets"]] == [w["id"] for w in b["widgets"]]
+    assert [l["i"] for l in a["layout"]] == [w["id"] for w in a["widgets"]]

@@ -89,24 +89,24 @@ def _p99_latency_builder_query(service: str) -> dict[str, Any]:
 
     Shared by the guard alert and the guard dashboard so both watch exactly the
     same signal the loop forecasts on.
+
+    Uses the **v5** panel shape (``aggregations`` + ``filter.expression``), the same
+    one the agent panels use. The older ``aggregateOperator``/``filters.items`` form
+    is still accepted by the API but renders inconsistently in a v5 UI.
     """
     return {
         "queryName": "A",
         "expression": "A",
         "dataSource": "traces",
-        "aggregateOperator": "p99",
-        "aggregateAttribute": {"key": "duration_nano", "dataType": "float64", "type": ""},
-        "filters": {
-            "op": "AND",
-            "items": [
-                {
-                    "key": {"key": "service.name", "dataType": "string", "type": "resource"},
-                    "op": "=",
-                    "value": service,
-                }
-            ],
-        },
+        "legend": "p99",
+        "aggregations": [{"expression": "p99(duration_nano)"}],
+        "filter": {"expression": f"service.name = '{service}'"},
+        "filters": {"op": "AND", "items": []},
         "groupBy": [],
+        "having": {"expression": ""},
+        "orderBy": [],
+        "selectColumns": [],
+        "functions": [],
         "disabled": False,
         "stepInterval": 60,
     }
@@ -220,8 +220,78 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
             f"Keeps the prevented incident watched."
         ),
         "tags": ["chronolens", "guard", service],
+        "version": "v5",
+        "variables": {},
         "widgets": widgets,
         "layout": layout,
+    }
+
+
+#: Threshold colours by role — SigNoz needs an explicit hex, it has no default.
+_THRESHOLD_COLOR = "#F2994A"
+
+
+def _normalise_threshold(t: dict[str, Any], idx: int) -> dict[str, Any]:
+    """Convert our short threshold form into the one SigNoz's UI actually reads.
+
+    The API accepts ``{"index","label","value","unit"}`` without complaint and then
+    the panel draws no marker, because the frontend looks for ``thresholdValue`` /
+    ``thresholdUnit`` / ``thresholdOperator`` / ``thresholdFormat`` / ``thresholdColor``.
+    """
+    if "thresholdValue" in t:                      # already canonical
+        return t
+    return {
+        "index": t.get("index") or f"threshold-{idx}",
+        "keyIndex": idx,
+        "isEditEnabled": False,
+        "selectedGraph": "graph",
+        "thresholdColor": t.get("color", _THRESHOLD_COLOR),
+        "thresholdFormat": "Text",
+        "thresholdLabel": t.get("label", ""),
+        "thresholdOperator": t.get("op", ">"),
+        "thresholdTableOptions": "",
+        "thresholdUnit": t.get("unit", "none"),
+        "thresholdValue": t.get("value"),
+    }
+
+
+def _hydrate_panel(w: dict[str, Any]) -> dict[str, Any]:
+    """Fill in the widget fields SigNoz's UI expects but its API doesn't require.
+
+    A widget can be stored with only ``title``/``query`` and the API returns 200.
+    The dashboard then renders blank, because the frontend maps over fields that
+    aren't there — ``builder.queryFormulas``, ``promql``, ``clickhouse_sql``,
+    ``selectedLogFields``, ``selectedTracesFields``, ``contextLinks.linksData``.
+    Missing means ``undefined``, not empty. So we always send empties.
+    """
+    q = dict(w.get("query") or {})
+    q.setdefault("queryType", "builder")
+    q.setdefault("promql", [])
+    q.setdefault("clickhouse_sql", [])
+    builder = dict(q.get("builder") or {})
+    builder.setdefault("queryData", [])
+    builder.setdefault("queryFormulas", [])
+    q["builder"] = builder
+
+    thresholds = [
+        _normalise_threshold(t, i) for i, t in enumerate(w.get("thresholds") or [])
+    ]
+
+    return {
+        **w,
+        "panelTypes": w.get("panelTypes", "graph"),
+        "timePreferance": w.get("timePreferance", "GLOBAL_TIME"),
+        "query": q,
+        "thresholds": thresholds,
+        "selectedLogFields": w.get("selectedLogFields") or [],
+        "selectedTracesFields": w.get("selectedTracesFields") or [],
+        "contextLinks": w.get("contextLinks") or {"linksData": []},
+        "fillSpans": w.get("fillSpans", False),
+        "isStacked": w.get("isStacked", False),
+        "opacity": w.get("opacity", "1"),
+        "nullZeroValues": w.get("nullZeroValues", "zero"),
+        "softMax": w.get("softMax"),
+        "softMin": w.get("softMin"),
     }
 
 
@@ -242,8 +312,12 @@ def _lay_out(widgets: list[dict[str, Any]], *, per_row: int = 2,
     out_widgets: list[dict[str, Any]] = []
     layout: list[dict[str, Any]] = []
     for i, w in enumerate(widgets):
-        wid = w.get("id") or str(uuid.uuid4())
-        w = {**w, "id": wid}
+        # Deterministic id from the panel title: re-exporting the same dashboard
+        # produces the same JSON, so `dashboards/*.json` doesn't churn in git.
+        wid = w.get("id") or str(
+            uuid.uuid5(uuid.NAMESPACE_URL, f"chronolens-panel:{w.get('title', i)}")
+        )
+        w = _hydrate_panel({**w, "id": wid})
         out_widgets.append(w)
         layout.append({
             "i": wid,
@@ -347,6 +421,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
             "silently changes behaviour while still returning 200 OK."
         ),
         "tags": ["chronolens", "agent-watch", "genai", agent_service],
+        "version": "v5",
+        "variables": {},
         "widgets": widgets,
         "layout": layout,
     }
@@ -496,17 +572,29 @@ def build_anomaly_alert(metric_name: str = "chronolens.agent.cost_usd",
 
 
 def _metric_builder_query(metric_name: str) -> dict[str, Any]:
-    """A Query Builder metrics query for one of ChronoLens's own gauges."""
+    """A Query Builder metrics query for one of ChronoLens's own gauges.
+
+    v5 panel shape: the metric goes in ``aggregations`` as
+    ``{metricName, timeAggregation, spaceAggregation}``, not in ``aggregateAttribute``.
+    """
     return {
         "queryName": "A",
         "expression": "A",
         "dataSource": "metrics",
-        "aggregateOperator": "avg",
-        "aggregateAttribute": {"key": metric_name, "dataType": "float64", "type": "Gauge"},
-        "timeAggregation": "avg",
-        "spaceAggregation": "max",
+        "legend": metric_name,
+        "aggregations": [{
+            "metricName": metric_name,
+            "timeAggregation": "avg",
+            "spaceAggregation": "max",
+            "reduceTo": "last",
+        }],
+        "filter": {"expression": ""},
         "filters": {"op": "AND", "items": []},
         "groupBy": [],
+        "having": {"expression": ""},
+        "orderBy": [],
+        "selectColumns": [],
+        "functions": [],
         "disabled": False,
         "stepInterval": 60,
     }

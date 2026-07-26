@@ -4,6 +4,7 @@ ChronoLens doesn't just *read* SigNoz — it writes back. Every artefact below i
 by code, not clicked together by hand, so a prevented incident stays watched after the
 loop moves on.
 
+- [Import the JSON by hand (where to paste it)](#import-the-json-by-hand-where-to-paste-it)
 - [One-command setup](#one-command-setup)
 - [What gets created](#what-gets-created)
 - [1 · Infra guard (auto-filed by the loop)](#1--infra-guard-auto-filed-by-the-loop)
@@ -12,6 +13,41 @@ loop moves on.
 - [Recreating them by hand](#recreating-them-by-hand-in-the-signoz-ui)
 - [API constraints worth knowing](#api-constraints-worth-knowing)
 - [Housekeeping](#housekeeping)
+
+---
+
+## Import the JSON by hand (where to paste it)
+
+Both dashboards are committed as importable JSON, so you don't need to run ChronoLens to
+get them into SigNoz:
+
+| File | What it shows |
+|---|---|
+| `dashboards/chronolens-agent-watch.json` | GenAI guard — cost per turn, steps vs ceiling, output tokens, tool mix, turn latency |
+| `dashboards/chronolens-guard.json` | Infra guard — service p99 with the SLO marker, plus ChronoLens's own `prevented_total` metric |
+
+**Where to paste it** — in the SigNoz UI:
+
+1. Left sidebar → **Dashboards**.
+2. Click **+ New dashboard** (top right).
+3. In the dialog, choose **Import JSON**.
+4. Paste the whole contents of the `.json` file into the text box (or use **Upload** and pick
+   the file), then confirm the import.
+5. The dashboard appears in the list. Open it and set the time range to **Last 30 minutes**.
+
+That's the only place JSON can be pasted — there's no per-panel import, and Grafana JSON is
+not accepted. Reference: [Import Dashboard in SigNoz](https://signoz.io/docs/dashboards/import-dashboard/).
+*Content rephrased for compliance with licensing restrictions.*
+
+**Regenerate the files** after changing a panel in code, so the committed JSON can't drift:
+
+```bash
+python scripts/export_dashboards.py
+```
+
+**If a dashboard imports but renders empty** ("Welcome to your new dashboard"), the JSON is
+missing `layout` or widget `id`s — see [API constraints](#api-constraints-worth-knowing). The
+exported files always contain both.
 
 ---
 
@@ -150,7 +186,18 @@ Three things cost us rejected payloads, and none of them are in the error messag
    nothing tells you which field is wrong. ChronoLens files anomaly rules through the
    **MCP server's `signoz_create_alert`** tool instead, which handles the version
    difference (and means ChronoLens uses MCP for writes, not just reads).
-3. **Latency thresholds are nanoseconds on dashboards, milliseconds on alerts.**
+3. **A dashboard can store panels and still render nothing.** The API accepts `widgets`
+   without a `layout` array or widget `id`s, and the UI then shows "Welcome to your new
+   dashboard" — it positions panels from `layout` (a react-grid spec keyed by widget id), and
+   there was nothing to place. Same class of failure for fields the frontend maps over but the
+   API doesn't require: `builder.queryFormulas`, `promql`, `clickhouse_sql`,
+   `selectedLogFields`, `selectedTracesFields`, `contextLinks.linksData`, and the dashboard's
+   own `variables`. Missing is `undefined`, not empty. `_hydrate_panel()` in `signoz.py` sends
+   empties for all of them.
+4. **Threshold markers need the long field names.** `{"index","label","value","unit"}` is
+   accepted and silently draws nothing; the UI reads `thresholdValue`, `thresholdUnit`,
+   `thresholdOperator`, `thresholdFormat` and `thresholdColor`.
+5. **Latency thresholds are nanoseconds on dashboards, milliseconds on alerts.**
    Dashboard panels use `yAxisUnit: "ns"` with the marker in ns; alert rules take
    `target` in ms with `targetUnit: "ms"` and SigNoz converts internally.
 

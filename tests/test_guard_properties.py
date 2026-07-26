@@ -40,5 +40,5 @@ def test_dashboard_latency_panel_is_ns(slo_ms):
     dash = build_guard_dashboard("svc", slo_ms)
     panel = dash["widgets"][0]
     assert panel["yAxisUnit"] == "ns"
-    assert panel["thresholds"][0]["value"] == slo_ms * 1e6
-    assert panel["thresholds"][0]["unit"] == "ns"
+    assert panel["thresholds"][0]["thresholdValue"] == slo_ms * 1e6
+    assert panel["thresholds"][0]["thresholdUnit"] == "ns"

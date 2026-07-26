@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import os
 from typing import Any
 
 import httpx
@@ -228,56 +229,91 @@ def post_whatsapp_agent_approval(
 # --------------------------------------------------------------------------- #
 # Webhook Callback Execution
 # --------------------------------------------------------------------------- #
+def _ack(sender_phone: str, text: str, cfg: Config) -> bool:
+    """Reply the instant a button is tapped, before any remediation runs.
+
+    Remediation is a real PREVENT → VERIFY → COOLDOWN cycle and takes tens of
+    seconds. Without this the approver taps a button on their phone and gets
+    silence, which reads as "the tap didn't register" — so they tap again. One
+    immediate acknowledgement removes both the doubt and the double-tap.
+    """
+    try:
+        return bool(send_whatsapp_text(sender_phone, text, cfg).get("ok"))
+    except Exception as exc:  # fail open — never block the action on a reply
+        logger.error(f"WhatsApp ack failed: {exc}")
+        return False
+
+
 def process_whatsapp_button_click(
     button_id: str,
     sender_phone: str,
     cfg: Config,
 ) -> dict[str, Any]:
-    """Execute ChronoLens PREVENT -> VERIFY -> COOLDOWN -> RECORD on WhatsApp button tap."""
+    """Handle a WhatsApp button tap: acknowledge instantly, act, then report back.
+
+    Every branch sends **two** messages — an immediate acknowledgement and a final
+    outcome — and routes through the *same* approval engine Slack uses
+    (``slack_bot.execute_approved`` and friends), tagged ``surface="whatsapp"`` so
+    the ledger receipt records where the decision came from.
+    """
+    from .slack_bot import (
+        execute_agent_break,
+        execute_approved,
+        record_agent_ignore,
+        record_denial,
+    )
+
     button_id = (button_id or "").strip()
+    who = f"WhatsApp +{sender_phone}" if sender_phone else "WhatsApp"
+    default_service = os.getenv("CHRONOLENS_SERVICE", "chronolens-store")
+    agent_service = os.getenv("AGENT_SERVICE_NAME", "chronolens-agent")
 
     if button_id.startswith("wa_appr:"):
         parts = button_id.split(":")
-        svc = parts[1] if len(parts) > 1 else "checkout-service"
+        svc = parts[1] if len(parts) > 1 else default_service
         action = parts[2] if len(parts) > 2 else "scale_out"
-
-        # Execute closed loop against SigNoz
-        from .loop import run_loop
-        from .signoz import SigNozClient
-
+        acked = _ack(sender_phone,
+                     f"⏳ *Approved — working on it.*\n\n"
+                     f"• *Service*: {svc}\n"
+                     f"• *Applying*: {action} (reversible)\n\n"
+                     f"I'll message you the SigNoz-verified result in a moment.", cfg)
         try:
-            with SigNozClient(cfg) as sn:
-                res = run_loop(sn, cfg, managed=True)
-            outcome = res.get("outcome", "completed")
-            confirm_msg = (
-                f"✅ *WhatsApp Approval Executed!*\n\n"
-                f"• *Service*: `{svc}`\n"
-                f"• *Action*: `{action}`\n"
-                f"• *Result*: {outcome}\n"
-                f"• *SigNoz Verification*: Confirmed p99 latency returned under {cfg.p99_slo_ms}ms SLO wall."
-            )
-            send_whatsapp_text(sender_phone, confirm_msg, cfg)
-            return {"ok": True, "action": "executed", "outcome": outcome}
-        except Exception as e:
-            err_msg = f"❌ ChronoLens execution error on WhatsApp approval: {e}"
-            send_whatsapp_text(sender_phone, err_msg, cfg)
-            return {"ok": False, "error": str(e)}
+            result = execute_approved(cfg, {"service": svc, "action": action},
+                                      approver=who, surface="whatsapp")
+        except Exception as exc:
+            send_whatsapp_text(sender_phone, f"❌ *ChronoLens hit an error*: {exc}", cfg)
+            return {"ok": False, "acked": acked, "error": str(exc)}
+        send_whatsapp_text(sender_phone, result, cfg)
+        return {"ok": True, "acked": acked, "action": "executed", "result": result}
 
-    elif button_id.startswith("wa_deny:"):
-        send_whatsapp_text(sender_phone, "❌ *ChronoLens Action Denied*: Fix cancelled by user.", cfg)
-        return {"ok": True, "action": "denied"}
+    if button_id.startswith("wa_deny:"):
+        parts = button_id.split(":")
+        svc = parts[1] if len(parts) > 1 else default_service
+        action = parts[2] if len(parts) > 2 else "scale_out"
+        acked = _ack(sender_phone, "✋ *Denied — standing down.* Recording your decision…", cfg)
+        result = record_denial(cfg, {"service": svc, "action": action},
+                               approver=who, surface="whatsapp")
+        send_whatsapp_text(sender_phone, result, cfg)
+        return {"ok": True, "acked": acked, "action": "denied", "result": result}
 
-    elif button_id == "wa_agent_break":
-        # Pin demo agent back to baseline
-        try:
-            httpx.get(f"{cfg.agent_url}/admin/mode?mode=normal", timeout=2.0)
-        except Exception:
-            pass
-        send_whatsapp_text(sender_phone, "🛑 *Agent Watch*: Agent pinned back to normal baseline.", cfg)
-        return {"ok": True, "action": "agent_pinned"}
+    if button_id == "wa_agent_break":
+        acked = _ack(sender_phone,
+                     "⏳ *Breaking the agent.* Pinning it back to its last-good "
+                     "baseline and checking the next turn…", cfg)
+        result = execute_agent_break(cfg, {"kind": "loop", "service": agent_service},
+                                     approver=who, surface="whatsapp")
+        send_whatsapp_text(sender_phone, result, cfg)
+        return {"ok": True, "acked": acked, "action": "agent_pinned", "result": result}
 
-    elif button_id == "wa_agent_ignore":
-        send_whatsapp_text(sender_phone, "ℹ️ *Agent Watch*: Alert ignored.", cfg)
-        return {"ok": True, "action": "agent_ignored"}
+    if button_id == "wa_agent_ignore":
+        acked = _ack(sender_phone, "ℹ️ *Ignoring.* Recording that you let it ride…", cfg)
+        result = record_agent_ignore(cfg, {"kind": "loop", "service": agent_service},
+                                     approver=who, surface="whatsapp")
+        send_whatsapp_text(sender_phone, result, cfg)
+        return {"ok": True, "acked": acked, "action": "agent_ignored", "result": result}
 
+    # Unknown taps still get an answer — silence looks like a broken integration.
+    _ack(sender_phone,
+         "🤔 I didn't recognise that button. It may belong to an older message — "
+         "wait for the next ChronoLens card.", cfg)
     return {"ok": False, "error": f"Unknown button_id '{button_id}'"}

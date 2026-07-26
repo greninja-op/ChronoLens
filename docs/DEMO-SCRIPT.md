@@ -283,19 +283,22 @@ Timestamps inside a direction are moments *within* that beat.
   story, so don't rush past it.
 - **0:14:** tap **✅ Approve Fix** on the phone **if your tunnel is up**. If it isn't, tap
   **Approve** in Slack instead and keep the phone in frame as the card, not as the click.
-- **0:16:** stay on whichever surface you tapped for ~3 seconds and let the message **rewrite
-  itself in place** with the outcome — acted, verified against SigNoz, p99 back under the SLO.
-  That in-place edit is the proof the loop closed; cut away too early and you lose it.
+- **0:15:** **the reply is instant** — before any remediation runs. On Slack the card is
+  replaced with "⏳ Applying `scale_out`…"; on WhatsApp a message arrives saying it's working on
+  it. Stay on that for a beat: it's what tells the approver the tap registered.
+- **0:18:** then the **final outcome** lands on the same surface — acted, verified against
+  SigNoz, p99 back under the SLO. On Slack it's the same message rewritten in place; on WhatsApp
+  it's a second reply. Cut away too early and you lose the payoff.
 - **0:20:** cut back to tab 1 and point at the newest row in the **Prevention ledger** — the
   receipt carries who approved it and on which surface.
 - **Don't:** show both taps. One approval, one surface, then say the other exists.
 
 > Reversible or not, this is a live system, so the trust ladder can hold it back: suggest, earn, or
-> auto. Here it's suggesting — and this is the part I like. It's three in the morning, you're not
-> at your laptop, no VPN, no dashboard. The forecast, the action and the rollback arrive on your
-> phone, and one tap approves it. ChronoLens acts, verifies against SigNoz, and rewrites the
-> message with the outcome. Slack for the team, WhatsApp for the person actually on call — and the
-> ledger records who approved it. *(85 words)*
+> auto. Here it's suggesting — and this is the part I like. It's three in the morning, you're not at
+> your laptop, no VPN, no dashboard. The forecast, the action and the rollback arrive on your phone,
+> and one tap approves it. You get an answer immediately, then the verified outcome once SigNoz
+> confirms p99 is back under the SLO. Slack for the team, WhatsApp for whoever's actually on call —
+> same engine, and the ledger records which surface approved it. *(90 words)*
 
 ---
 

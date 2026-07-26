@@ -7,6 +7,8 @@
 
 <!-- IMAGE: hero — Mission Control dashboard, full window, Chrono-Proof chart visible.
      File: docs/images/dashboard.png  ·  Suggested caption: "ChronoLens Mission Control." -->
+<!-- All 12 image slots in this post have shot-by-shot capture instructions in
+     docs/SCREENSHOTS.md — what to run, where to click, what must be visible. -->
 
 ---
 
@@ -257,6 +259,18 @@ Tapping **Approve** runs the real PREVENT → VERIFY → COOLDOWN → RECORD pat
 same message** with the SigNoz-verified outcome ("p99 back to 53.5 ms — breach avoided"). Deny
 records the decision and stands down. Agent anomalies get their own card with
 **Break / pin baseline**, which pins the agent to its last-good baseline and verifies the next turn.
+
+**Every tap answers twice.** Remediation is a real verify cycle, so it takes tens of seconds — and a
+button that goes quiet for half a minute reads as a button that didn't work, so people tap it again.
+Each tap now gets an immediate acknowledgement ("⏳ Applying `scale_out`…") and then the verified
+outcome once SigNoz has confirmed it. On Slack that's one message rewritten twice; on WhatsApp it's
+two replies. Unrecognised taps get an answer too — silence is indistinguishable from a broken
+integration.
+
+Both surfaces call the **same approval engine**, tagged with the surface it came from, so an approval
+means exactly the same thing wherever it arrives and the ledger receipt records *which* surface
+decided. WhatsApp previously re-ran the whole loop instead of executing the approved action, which
+meant a tap on your phone and a tap in Slack didn't do quite the same thing. One engine, two doors.
 
 **Do you need both?** No — and we're explicit about it:
 

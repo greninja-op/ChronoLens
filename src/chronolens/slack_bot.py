@@ -129,12 +129,17 @@ def post_approval(cfg: Config, *, service: str, signal: str, action: str, why: s
 # --------------------------------------------------------------------------- #
 # Execute an approved action: the real PREVENT → VERIFY → COOLDOWN → RECORD.   #
 # --------------------------------------------------------------------------- #
-def execute_approved(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+def execute_approved(cfg: Config, payload: dict, *, approver: str = "a teammate",
+                     surface: str = "slack") -> str:
     """Run the reversible action a human approved, verify it, and record it.
 
-    Mirrors the loop's may-act path (minus the SigNoz guard/silence extras) so a
-    Slack approval drives the *same* remediation code the autonomous loop uses.
-    Returns a short human-readable outcome line for the Slack message.
+    Mirrors the loop's may-act path (minus the SigNoz guard/silence extras) so an
+    approval drives the *same* remediation code the autonomous loop uses.
+    Returns a short human-readable outcome line to send back to the approver.
+
+    ``surface`` is just provenance — ``slack`` or ``whatsapp``. Both surfaces call
+    this one engine so an approval means the same thing wherever it came from, and
+    the ledger receipt records which surface it arrived on.
     """
     from .cooldown import cool_down
     from .dollars import units_to_dollars
@@ -158,7 +163,8 @@ def execute_approved(cfg: Config, payload: dict, *, approver: str = "a teammate"
         if rem.blocked:
             _record(ledger, new_case, service, cfg, p99_at, eta_s, rem,
                     verified=False, final=p99_at, peak=p99_at, outcome="held",
-                    confidence=confidence, dollars=0.0, approver=approver)
+                    confidence=confidence, dollars=0.0, approver=approver,
+                    surface=surface)
             return f"✋ Held by guardrails — {rem.block_reason}. No change made."
         if not rem.applied:
             return f"⚠️ Couldn't apply `{rem.action}` on {service}: {rem.error or 'unknown error'}."
@@ -170,7 +176,8 @@ def execute_approved(cfg: Config, payload: dict, *, approver: str = "a teammate"
             _record(ledger, new_case, service, cfg, p99_at, eta_s, rem,
                     verified=True, final=v.final_p99_ms, peak=v.peak_p99_ms,
                     outcome="breach avoided", confidence=confidence,
-                    dollars=dollars, approver=approver, cooldown=cd)
+                    dollars=dollars, approver=approver, cooldown=cd,
+                    surface=surface)
             msg = build_message(service=service, outcome="breach avoided",
                                 action=rem.action, eta_s=eta_s, p99_before=p99_at,
                                 p99_after=v.final_p99_ms, dollars_saved=dollars)
@@ -183,14 +190,16 @@ def execute_approved(cfg: Config, payload: dict, *, approver: str = "a teammate"
         rolled = rollback(cfg, rem)
         _record(ledger, new_case, service, cfg, p99_at, eta_s, rem,
                 verified=False, final=v.final_p99_ms, peak=v.peak_p99_ms,
-                outcome="escalated", confidence=confidence, dollars=0.0, approver=approver)
+                outcome="escalated", confidence=confidence, dollars=0.0,
+                approver=approver, surface=surface)
         return (f"🚨 Applied `{rem.action}` but p99 didn't recover ({v.final_p99_ms:.0f} ms). "
                 f"{'Rolled back. ' if rolled else ''}Escalating to a human.")
 
 
 def _record(ledger, new_case, service, cfg, p99_at, eta_s, rem, *, verified,
-            final, peak, outcome, confidence, dollars, approver, cooldown=None):
-    """File a case for a Slack-approved decision (LEARN's memory next time)."""
+            final, peak, outcome, confidence, dollars, approver, cooldown=None,
+            surface: str = "slack"):
+    """File a case for a human-approved decision (LEARN's memory next time)."""
     case = new_case(
         service=service, predicted_breach_in_s=eta_s, p99_at_prediction_ms=p99_at,
         slo_ms=cfg.p99_slo_ms, action=rem.action, rollback=rem.rollback,
@@ -199,14 +208,15 @@ def _record(ledger, new_case, service, cfg, p99_at, eta_s, rem, *, verified,
         autonomy_mode=cfg.autonomy, dollars_saved=dollars,
         scaled_down=bool(cooldown and cooldown.scaled_down),
         cost_units_returned=cooldown.cost_units_returned if cooldown else 0.0,
-        explanation=f"Approved via Slack by {approver}.",
-        explanation_source="slack-approval",
-        evidence={"approved_via": "slack", "approver": approver},
+        explanation=f"Approved via {surface.title()} by {approver}.",
+        explanation_source=f"{surface}-approval",
+        evidence={"approved_via": surface, "approver": approver},
     )
     ledger.record(case)
 
 
-def record_denial(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+def record_denial(cfg: Config, payload: dict, *, approver: str = "a teammate",
+                  surface: str = "slack") -> str:
     """Record that a human declined the suggested action."""
     from .record import Ledger, new_case
     service = payload.get("service", "?")
@@ -220,9 +230,10 @@ def record_denial(cfg: Config, payload: dict, *, approver: str = "a teammate") -
         signal=payload.get("signal", "load"), why=payload.get("why", ""),
         confidence=float(payload.get("confidence", 1.0) or 1.0),
         autonomy_mode=cfg.autonomy,
-        explanation=f"Suggested `{payload.get('action')}` declined via Slack by {approver}.",
-        explanation_source="slack-approval",
-        evidence={"approved_via": "slack", "approver": approver, "decision": "deny"},
+        explanation=(f"Suggested `{payload.get('action')}` declined via "
+                     f"{surface.title()} by {approver}."),
+        explanation_source=f"{surface}-approval",
+        evidence={"approved_via": surface, "approver": approver, "decision": "deny"},
     )
     ledger.record(case)
     return f"✋ Declined by {approver}. ChronoLens stood down — no action taken on {service}."
@@ -269,7 +280,8 @@ def post_agent_approval(cfg: Config, *, kind: str, service: str, detail: str) ->
         return PostResult(False, reason=f"post failed: {exc}")
 
 
-def execute_agent_break(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+def execute_agent_break(cfg: Config, payload: dict, *, approver: str = "a teammate",
+                        surface: str = "slack") -> str:
     """Pin the agent to its last-good baseline (mode=normal), verify one turn, record."""
     import httpx
 
@@ -297,9 +309,9 @@ def execute_agent_break(cfg: Config, payload: dict, *, approver: str = "a teamma
         outcome="breach avoided" if verified else "escalated",
         signal=f"agent-{kind}", why="agent anomaly caught from GenAI spans",
         autonomy_mode=cfg.autonomy,
-        explanation=f"Agent {kind} — pinned to baseline via Slack by {approver}.",
-        explanation_source="slack-approval",
-        evidence={"approved_via": "slack", "approver": approver, "agent_kind": kind},
+        explanation=f"Agent {kind} — pinned to baseline via {surface.title()} by {approver}.",
+        explanation_source=f"{surface}-approval",
+        evidence={"approved_via": surface, "approver": approver, "agent_kind": kind},
     ))
     if verified:
         return (f"✅ Approved by {approver}. Agent pinned to baseline — next turn back to normal "
@@ -308,7 +320,8 @@ def execute_agent_break(cfg: Config, payload: dict, *, approver: str = "a teamma
             f"recovery from the next turn yet.")
 
 
-def record_agent_ignore(cfg: Config, payload: dict, *, approver: str = "a teammate") -> str:
+def record_agent_ignore(cfg: Config, payload: dict, *, approver: str = "a teammate",
+                        surface: str = "slack") -> str:
     """Record that a human chose to let the agent anomaly ride."""
     from .record import Ledger, new_case
     kind = payload.get("kind", "loop")
@@ -318,9 +331,9 @@ def record_agent_ignore(cfg: Config, payload: dict, *, approver: str = "a teamma
         slo_ms=cfg.p99_slo_ms, action="none", rollback="", verified=False,
         final_p99_ms=0.0, peak_p99_ms=0.0, outcome="declined",
         signal=f"agent-{kind}", why="agent anomaly", autonomy_mode=cfg.autonomy,
-        explanation=f"Agent {kind} ignored via Slack by {approver}.",
-        explanation_source="slack-approval",
-        evidence={"approved_via": "slack", "approver": approver, "decision": "ignore",
+        explanation=f"Agent {kind} ignored via {surface.title()} by {approver}.",
+        explanation_source=f"{surface}-approval",
+        evidence={"approved_via": surface, "approver": approver, "decision": "ignore",
                   "agent_kind": kind},
     ))
     return f"✋ {approver} chose to ignore the {kind} on {service}. No change made."

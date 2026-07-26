@@ -128,12 +128,12 @@ def test_build_guard_dashboard_latency_panel_uses_ns():
     panel = dash["widgets"][0]
     assert panel["yAxisUnit"] == "ns" == LATENCY_Y_AXIS_UNIT
     # Threshold marker is also in nanoseconds.
-    assert panel["thresholds"][0]["value"] == 500.0 * 1e6
-    assert panel["thresholds"][0]["unit"] == "ns"
-    # Panel queries the same p99 latency signal for the service.
+    assert panel["thresholds"][0]["thresholdValue"] == 500.0 * 1e6
+    assert panel["thresholds"][0]["thresholdUnit"] == "ns"
+    # Panel queries the same p99 latency signal for the service (v5 shape).
     qd = panel["query"]["builder"]["queryData"][0]
-    assert qd["aggregateOperator"] == "p99"
-    assert qd["aggregateAttribute"]["key"] == "duration_nano"
+    assert qd["aggregations"] == [{"expression": "p99(duration_nano)"}]
+    assert qd["filter"]["expression"] == "service.name = 'checkout'"
 
 
 # --------------------------------------------------------------------------- #

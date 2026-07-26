@@ -1,0 +1,368 @@
+{
+  "title": "ChronoLens Agent Watch - chronolens-agent",
+  "description": "Auto-created by ChronoLens. GenAI-native view of the watched agent: tokens, cost per turn, steps and tool mix \u2014 the signals that move when an agent silently changes behaviour while still returning 200 OK.",
+  "tags": [
+    "chronolens",
+    "agent-watch",
+    "genai",
+    "chronolens-agent"
+  ],
+  "version": "v5",
+  "variables": {},
+  "widgets": [
+    {
+      "title": "Cost per turn (USD, budget $0.05)",
+      "description": "llm.cost_usd \u2014 real money per turn. The loop/cost breaker fires on this budget, not on a clock.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "expression": "A",
+              "dataSource": "traces",
+              "aggregateOperator": "noop",
+              "aggregations": [
+                {
+                  "expression": "avg(llm.cost_usd)"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = 'chronolens-agent'"
+              },
+              "filters": {
+                "op": "AND",
+                "items": []
+              },
+              "groupBy": [],
+              "orderBy": [],
+              "selectColumns": [],
+              "functions": [],
+              "disabled": false,
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "promql": [],
+        "clickhouse_sql": []
+      },
+      "thresholds": [
+        {
+          "index": "budget",
+          "keyIndex": 0,
+          "isEditEnabled": false,
+          "selectedGraph": "graph",
+          "thresholdColor": "#F2994A",
+          "thresholdFormat": "Text",
+          "thresholdLabel": "budget $0.05",
+          "thresholdOperator": ">",
+          "thresholdTableOptions": "",
+          "thresholdUnit": "none",
+          "thresholdValue": 0.05
+        }
+      ],
+      "id": "963680ca-baa4-50db-95b5-f8c687a0a599",
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "contextLinks": {
+        "linksData": []
+      },
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "nullZeroValues": "zero",
+      "softMax": null,
+      "softMin": null
+    },
+    {
+      "title": "Steps per turn (ceiling 6)",
+      "description": "llm.step_count \u2014 a rising step count with no new tools is a loop.",
+      "panelTypes": "graph",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "expression": "A",
+              "dataSource": "traces",
+              "aggregateOperator": "noop",
+              "aggregations": [
+                {
+                  "expression": "max(llm.step_count)"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = 'chronolens-agent'"
+              },
+              "filters": {
+                "op": "AND",
+                "items": []
+              },
+              "groupBy": [],
+              "orderBy": [],
+              "selectColumns": [],
+              "functions": [],
+              "disabled": false,
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "promql": [],
+        "clickhouse_sql": []
+      },
+      "thresholds": [
+        {
+          "index": "ceiling",
+          "keyIndex": 0,
+          "isEditEnabled": false,
+          "selectedGraph": "graph",
+          "thresholdColor": "#F2994A",
+          "thresholdFormat": "Text",
+          "thresholdLabel": "ceiling 6",
+          "thresholdOperator": ">",
+          "thresholdTableOptions": "",
+          "thresholdUnit": "short",
+          "thresholdValue": 6.0
+        }
+      ],
+      "id": "a43c675c-6890-5c2a-ab13-e3a12badfa55",
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "contextLinks": {
+        "linksData": []
+      },
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "nullZeroValues": "zero",
+      "softMax": null,
+      "softMin": null
+    },
+    {
+      "title": "Token usage per turn (output)",
+      "description": "gen_ai.usage.output_tokens \u2014 answer length in tokens; a silent jump here is how behaviour drift usually shows up first.",
+      "panelTypes": "graph",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "expression": "A",
+              "dataSource": "traces",
+              "aggregateOperator": "noop",
+              "aggregations": [
+                {
+                  "expression": "avg(gen_ai.usage.output_tokens)"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = 'chronolens-agent'"
+              },
+              "filters": {
+                "op": "AND",
+                "items": []
+              },
+              "groupBy": [],
+              "orderBy": [],
+              "selectColumns": [],
+              "functions": [],
+              "disabled": false,
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "promql": [],
+        "clickhouse_sql": []
+      },
+      "id": "1dba3edd-307a-577a-a238-3f1ad953962e",
+      "timePreferance": "GLOBAL_TIME",
+      "thresholds": [],
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "contextLinks": {
+        "linksData": []
+      },
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "nullZeroValues": "zero",
+      "softMax": null,
+      "softMin": null
+    },
+    {
+      "title": "Tool calls by name",
+      "description": "tool.execute spans grouped by tool.name \u2014 reveals a tool the agent never used before, or one it now calls repeatedly.",
+      "panelTypes": "graph",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "expression": "A",
+              "dataSource": "traces",
+              "aggregateOperator": "noop",
+              "aggregations": [
+                {
+                  "expression": "count()"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = 'chronolens-agent'"
+              },
+              "filters": {
+                "op": "AND",
+                "items": []
+              },
+              "groupBy": [
+                {
+                  "key": "tool.name",
+                  "dataType": "string",
+                  "type": "tag"
+                }
+              ],
+              "orderBy": [],
+              "selectColumns": [],
+              "functions": [],
+              "disabled": false,
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "promql": [],
+        "clickhouse_sql": []
+      },
+      "id": "d7b0362d-41e4-5004-91fb-13440c49d59a",
+      "timePreferance": "GLOBAL_TIME",
+      "thresholds": [],
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "contextLinks": {
+        "linksData": []
+      },
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "nullZeroValues": "zero",
+      "softMax": null,
+      "softMin": null
+    },
+    {
+      "title": "Turn latency p99",
+      "description": "For contrast: latency can stay flat while behaviour drifts \u2014 which is exactly why the panels above exist.",
+      "panelTypes": "graph",
+      "yAxisUnit": "ns",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "queryName": "A",
+              "expression": "A",
+              "dataSource": "traces",
+              "legend": "p99",
+              "aggregations": [
+                {
+                  "expression": "p99(duration_nano)"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = 'chronolens-agent'"
+              },
+              "filters": {
+                "op": "AND",
+                "items": []
+              },
+              "groupBy": [],
+              "having": {
+                "expression": ""
+              },
+              "orderBy": [],
+              "selectColumns": [],
+              "functions": [],
+              "disabled": false,
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "promql": [],
+        "clickhouse_sql": []
+      },
+      "id": "1a14358e-7899-5d5a-b146-b26d35e745d0",
+      "timePreferance": "GLOBAL_TIME",
+      "thresholds": [],
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "contextLinks": {
+        "linksData": []
+      },
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "nullZeroValues": "zero",
+      "softMax": null,
+      "softMin": null
+    }
+  ],
+  "layout": [
+    {
+      "i": "963680ca-baa4-50db-95b5-f8c687a0a599",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 6,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "a43c675c-6890-5c2a-ab13-e3a12badfa55",
+      "x": 6,
+      "y": 0,
+      "w": 6,
+      "h": 6,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "1dba3edd-307a-577a-a238-3f1ad953962e",
+      "x": 0,
+      "y": 6,
+      "w": 6,
+      "h": 6,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "d7b0362d-41e4-5004-91fb-13440c49d59a",
+      "x": 6,
+      "y": 6,
+      "w": 6,
+      "h": 6,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "1a14358e-7899-5d5a-b146-b26d35e745d0",
+      "x": 0,
+      "y": 12,
+      "w": 6,
+      "h": 6,
+      "moved": false,
+      "static": false
+    }
+  ]
+}
