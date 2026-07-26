@@ -214,7 +214,7 @@ Three analyzers read those spans:
 | --- | --- |
 | **Behaviour drift** | After a prompt tweak or model swap the agent still returns 200 OK with normal latency, but it now calls a tool it never used, takes more steps, or writes far longer answers. A fingerprint (tool distribution, model mix, avg steps, avg tokens) is scored against a saved baseline. |
 | **Loop / cost breaker** | The agent reasons in circles, calling the same tool repeatedly, burning tokens with no crash. It fires on **no progress** and on a **cost budget**, not just a clock — so a long but genuinely productive turn is left alone. |
-| **Answer quality** | Grades recent answers (rule-based, optionally LLM-assisted) to separate *changed* from *worse* — drift is a change signal, not a verdict. |
+| **Answer quality** | Grades recent answers to separate *changed* from *worse* — drift is a change signal, not a verdict. The answers are read from **SigNoz logs**: the agent emits each full response as an OTel log record, because span attributes only carry a truncated preview and you cannot grade what you cannot read. |
 
 ### Detecting from SigNoz, not by poking the agent
 
@@ -229,9 +229,12 @@ turns read FROM SIGNOZ: 16
 ```
 
 Every response now reports `data_source: "signoz"`, and falls back to driving the agent only when
-SigNoz has no spans yet (a cold stack) — saying so when it does. Answer-quality grading still drives
-the agent, because span attributes only carry a short preview of the response text and you cannot
-grade what you cannot read. We state that rather than implying it's telemetry-driven.
+SigNoz has no spans yet (a cold stack) — saying so when it does.
+
+Quality grading was the last hold-out, and fixing it needed a second signal rather than a cleverer
+query: the agent now emits its **complete response as an OTel log record**, and the judge reads those
+bodies back with a `requestType:"raw"` logs query. So the drift and loop analyzers read *traces*,
+the judge reads *logs*, and all three are telemetry-driven — verified live on 8 graded answers.
 
 <!-- IMAGE: Agent Watch section showing drift %, loop verdict and quality score.
      File: docs/images/agent_watch.png -->
@@ -432,8 +435,11 @@ Fewer features, each of which survives being read. That's the trade we'd make ag
 - The **projected** arm of Chrono-Proof is a linear extrapolation of a measured trend, not a
   measurement. Real systems plateau under saturation, so a long projection is an upper bound. Every
   field is labelled by provenance and the confidence score falls as the pre-action trend gets noisier.
-- **Answer-quality grading drives the agent**, because span attributes carry only a short preview of
-  the response text. The drift and loop analyzers read SigNoz; this one can't yet.
+- All three Agent Watch analyzers now read SigNoz. Grading was the last hold-out: span attributes
+  carry only a truncated preview of the response, so the agent ships each **full answer as an OTel
+  log record** and the judge reads it back with a `requestType:"raw"` logs query
+  (`data_source: "signoz"`, verified on 8 graded answers). If the logs pipeline is cold it falls
+  back to driving the agent *and labels itself* `agent-driven` rather than implying telemetry.
 - The **agent is simulated by default** (see above).
 - The blast radius is only as good as the dependency graph — with a single service there is nothing
   to chain, and it says `topology_source: unavailable` rather than inventing edges.

@@ -256,21 +256,41 @@ def agent_drift(samples: int = 10, source: str = "signoz"):
 
 
 @app.get("/api/agent/quality")
-def agent_quality(samples: int = 8):
-    """Grade recent agent answers and trend the quality score (the live judge).
+def agent_quality(samples: int = 8, source: str = "signoz"):
+    """Grade recent agent answers — reading the answers from SigNoz **logs**.
 
-    Answer *text* is needed to grade, and span attributes only carry a short
-    preview, so this path drives the agent directly — stated plainly rather than
-    implied to be telemetry-driven.
+    Grading needs the whole answer and span attributes only carry a truncated
+    preview, so the agent ships each full response as an OTel log record and this
+    reads them back via the Query Builder. If SigNoz has no log bodies yet (a cold
+    stack, or the logs pipeline is down) it falls back to driving the agent and says
+    so in ``data_source`` — never implying telemetry it didn't use.
     """
     from chronolens.judge import grade_batch
-    turns = _drive_agent(samples)
-    if not turns:
-        return JSONResponse({"error": "agent not reachable"}, status_code=502)
-    answers = [t.get("answer", "") for t in turns]
+
+    answers: list[str] = []
+    data_source = "unavailable"
+    if source != "agent":
+        try:
+            with SigNozClient(cfg) as sn:
+                answers = sn.agent_response_bodies(_AGENT_SERVICE, limit=max(1, samples))
+            if answers:
+                data_source = "signoz"
+        except Exception:
+            answers = []
+
+    if not answers:
+        turns = _drive_agent(samples)
+        if not turns:
+            return JSONResponse(
+                {"error": "no agent responses in SigNoz logs and the agent is unreachable"},
+                status_code=502)
+        answers = [t.get("answer", "") for t in turns]
+        data_source = "agent-driven (no response logs in SigNoz yet)"
+
     out = grade_batch(answers, cfg)
     if isinstance(out, dict):
-        out["data_source"] = "agent-driven"
+        out["data_source"] = data_source
+        out["graded"] = len(answers)
     return out
 
 

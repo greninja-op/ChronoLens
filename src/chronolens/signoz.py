@@ -651,6 +651,36 @@ class SigNozClient:
                         return [s for s in val if isinstance(s, dict)]
         return []
 
+    def agent_response_bodies(self, service: str, *, window_seconds: int = 900,
+                              limit: int = 20) -> list[str]:
+        """Recent agent **response texts**, read from SigNoz logs.
+
+        The quality judge needs the whole answer, and span attributes only carry a
+        truncated preview — so the agent ships each full response as an OTel log
+        record and this reads them back. That makes answer grading telemetry-driven
+        instead of re-driving the agent. Fails open to an empty list.
+        """
+        body = {
+            "schemaVersion": "v1",
+            "start": _now_ms() - window_seconds * 1000,
+            "end": _now_ms(),
+            "requestType": "raw",
+            "compositeQuery": {"queries": [{
+                "type": "builder_query",
+                "spec": {
+                    "name": "A", "signal": "logs", "disabled": False,
+                    "limit": max(1, int(limit)),
+                    "filter": {"expression": f"service.name = '{service}'"},
+                    "order": [{"key": {"name": "timestamp"}, "direction": "desc"}],
+                },
+            }]},
+        }
+        try:
+            resp = self.query_range(body)
+        except Exception:
+            return []
+        return _log_bodies(resp, limit=limit)
+
     def query_range(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._post("query_range_v5", "/api/v5/query_range", body)
 
@@ -877,3 +907,50 @@ def _series_values(body: Any) -> list[float]:
         return []
     pairs.sort(key=lambda p: p[0])
     return [v for _, v in pairs]
+
+
+def _log_bodies(resp: dict[str, Any], *, limit: int = 20) -> list[str]:
+    """Pull log message bodies out of a v5 ``requestType:"raw"`` logs response.
+
+    The v5 raw shape nests rows under ``data.results[].rows[].data``, and the message
+    lives under ``body`` (with ``gen_ai.response.text`` as a richer attribute when the
+    producer sets it). Shapes vary between SigNoz builds, so this walks defensively
+    and returns whatever readable strings it finds.
+    """
+    out: list[str] = []
+
+    def take(row: Any) -> None:
+        if len(out) >= limit or not isinstance(row, dict):
+            return
+        data = row.get("data") if isinstance(row.get("data"), dict) else row
+        if not isinstance(data, dict):
+            return
+        # prefer the explicit full-text attribute, then the log body
+        for key in ("gen_ai.response.text", "body", "message"):
+            val = data.get(key)
+            if isinstance(val, str) and val.strip():
+                out.append(val.strip())
+                return
+        attrs = data.get("attributes") or data.get("attributes_string")
+        if isinstance(attrs, dict):
+            val = attrs.get("gen_ai.response.text")
+            if isinstance(val, str) and val.strip():
+                out.append(val.strip())
+
+    def walk(node: Any) -> None:
+        if len(out) >= limit:
+            return
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif isinstance(node, dict):
+            rows = node.get("rows")
+            if isinstance(rows, list):
+                for r in rows:
+                    take(r)
+                return
+            for value in node.values():
+                walk(value)
+
+    walk(resp.get("data", resp))
+    return out[:limit]

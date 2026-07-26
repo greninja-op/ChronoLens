@@ -21,6 +21,8 @@ import os
 import random
 import time
 
+import logging
+
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -48,7 +50,37 @@ def _init_tracer() -> trace.Tracer:
     return trace.get_tracer("chronolens.agent")
 
 
+def _init_logger() -> logging.Logger:
+    """Emit the agent's **full response text** as an OTel log record.
+
+    Span attributes only carry a short preview (`gen_ai.response.preview`), and you
+    cannot grade an answer you cannot read. Shipping the complete response as a log
+    lets the quality judge score from SigNoz telemetry instead of re-driving the
+    agent. Fails open: if the logs SDK/exporter isn't available the agent still runs
+    and the judge falls back to driving /chat.
+    """
+    log = logging.getLogger("chronolens.agent.response")
+    log.setLevel(logging.INFO)
+    try:
+        from opentelemetry._logs import set_logger_provider
+        from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+        from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+
+        provider = LoggerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
+        provider.add_log_record_processor(
+            BatchLogRecordProcessor(OTLPLogExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
+        set_logger_provider(provider)
+        log.addHandler(LoggingHandler(level=logging.INFO, logger_provider=provider))
+        log.propagate = False
+        print(f"OTel logs -> {OTLP_ENDPOINT} (full agent responses)")
+    except Exception as exc:  # pragma: no cover - optional path
+        print(f"OTel logs unavailable ({exc}); responses will not ship to SigNoz logs")
+    return log
+
+
 tracer = _init_tracer()
+response_log = _init_logger()
 app = FastAPI(title="ChronoLens Demo Agent (café assistant)")
 
 
@@ -129,6 +161,20 @@ def chat(msg: str = "a latte and a croissant please", max_tokens_override: int |
             with tracer.start_as_current_span("tool.execute", kind=SpanKind.INTERNAL) as ts:
                 ts.set_attribute("tool.name", t)
                 time.sleep(0.005)
+
+    # Ship the FULL response to SigNoz logs so the quality judge can grade from
+    # telemetry — span attributes only carry a truncated preview.
+    try:
+        response_log.info(answer, extra={
+            "gen_ai.response.text": answer,
+            "gen_ai.request.model": model,
+            "agent.mode": _state["mode"],
+            "agent.steps": steps,
+            "llm.cost_usd": cost,
+            "chronolens.record": "agent_response",
+        })
+    except Exception:
+        pass
 
     return {"mode": _state["mode"], "model": model, "tools": tools, "steps": steps,
             "input_tokens": tin, "output_tokens": tout, "cost_usd": cost,
