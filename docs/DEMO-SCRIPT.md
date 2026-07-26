@@ -237,21 +237,33 @@ fiddliest thing in this script.
 
 ### [1:32 – 1:48] · runs 16s · Blast radius
 
-**On screen**
+**A minute before you record**, run this and leave it running:
 
-- **Window:** tab 1, scrolled so the **Blast radius** card ("who falls next, and when") holds the
-  right half of the frame. It sits beside **Closed loop**, so this is a small scroll, not a jump.
-- **Before this beat:** the fault must be the dependency one or you'll get a single victim. Fire
-  `curl -X POST "http://localhost:8090/admin/fault?mode=dependency-slow&level=40"` about a minute
-  earlier and leave it running.
-- **0:03:** click **Forecast**. The root line repaints, then the victim rows fill in.
-- **0:06:** point at the **root line** — `chronolens-payments-db`, hop `payment.db_query` — and
-  hold there.
-- **0:09:** walk down the victim rows in order, one per name: `chronolens-payments`, then
-  `chronolens-store`.
-- **0:13:** move to the **`signoz-service-map`** tag and stay there for the last sentence.
-- **If it shows 1 victim or `topology_source: unavailable`:** don't record. Wrong fault, or the
-  service map hasn't refreshed. Wait 30s, click **Forecast** again.
+```bash
+curl -X POST "http://localhost:8090/admin/fault?mode=dependency-slow&level=40"
+```
+
+This one matters. With the traffic ramp instead, the *entry* service is what's degrading, so there's
+nothing upstream to cascade to and you'll get a single victim.
+
+**On screen — do exactly this**
+
+1. On Mission Control, scroll down until the box titled **Blast radius** is on screen. It sits next
+   to **Closed loop**, so it's a small scroll, not a tab switch.
+2. Say your first sentence. Don't click yet.
+3. Click **Forecast** in that box.
+4. Wait about 2 seconds for the list to fill in.
+5. Put the cursor on the **top line** — it should read `chronolens-payments-db`, hop
+   `payment.db_query` — and leave it there while you say "payments-db is the root".
+6. Move the cursor down the list one name at a time as you say each one: `chronolens-payments`, then
+   `chronolens-store`.
+7. Move the cursor onto the small grey tag that reads **`signoz-service-map`** and leave it there for
+   your last sentence. That tag is the whole point of the beat.
+8. Stop. Beat over.
+
+**Bad take, don't use it:** if step 4 shows only one name, or the words
+`topology_source: unavailable`, the fault is wrong or the service map hasn't refreshed yet. Wait 30
+seconds, click **Forecast** again.
 
 > One service breaching is a symptom. ChronoLens reads SigNoz's own dependency map and forecasts the
 > order of failure: payments-db is the root, payments follows, then the storefront, each inheriting
