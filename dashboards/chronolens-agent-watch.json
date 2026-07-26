@@ -23,7 +23,7 @@
               "queryName": "A",
               "expression": "A",
               "dataSource": "traces",
-              "aggregateOperator": "noop",
+              "legend": "cost per turn",
               "aggregations": [
                 {
                   "expression": "avg(llm.cost_usd)"
@@ -37,6 +37,9 @@
                 "items": []
               },
               "groupBy": [],
+              "having": {
+                "expression": ""
+              },
               "orderBy": [],
               "selectColumns": [],
               "functions": [],
@@ -91,7 +94,7 @@
               "queryName": "A",
               "expression": "A",
               "dataSource": "traces",
-              "aggregateOperator": "noop",
+              "legend": "steps",
               "aggregations": [
                 {
                   "expression": "max(llm.step_count)"
@@ -105,6 +108,9 @@
                 "items": []
               },
               "groupBy": [],
+              "having": {
+                "expression": ""
+              },
               "orderBy": [],
               "selectColumns": [],
               "functions": [],
@@ -159,7 +165,7 @@
               "queryName": "A",
               "expression": "A",
               "dataSource": "traces",
-              "aggregateOperator": "noop",
+              "legend": "output tokens",
               "aggregations": [
                 {
                   "expression": "avg(gen_ai.usage.output_tokens)"
@@ -173,6 +179,9 @@
                 "items": []
               },
               "groupBy": [],
+              "having": {
+                "expression": ""
+              },
               "orderBy": [],
               "selectColumns": [],
               "functions": [],
@@ -213,14 +222,14 @@
               "queryName": "A",
               "expression": "A",
               "dataSource": "traces",
-              "aggregateOperator": "noop",
+              "legend": "{{tool.name}}",
               "aggregations": [
                 {
                   "expression": "count()"
                 }
               ],
               "filter": {
-                "expression": "service.name = 'chronolens-agent'"
+                "expression": "service.name = 'chronolens-agent' AND tool.name EXISTS"
               },
               "filters": {
                 "op": "AND",
@@ -229,10 +238,19 @@
               "groupBy": [
                 {
                   "key": "tool.name",
+                  "name": "tool.name",
                   "dataType": "string",
-                  "type": "tag"
+                  "type": "tag",
+                  "fieldContext": "attribute",
+                  "fieldDataType": "string",
+                  "signal": "traces",
+                  "isColumn": false,
+                  "isJSON": false
                 }
               ],
+              "having": {
+                "expression": ""
+              },
               "orderBy": [],
               "selectColumns": [],
               "functions": [],

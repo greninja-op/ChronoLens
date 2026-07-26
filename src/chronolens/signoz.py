@@ -332,17 +332,27 @@ def _lay_out(widgets: list[dict[str, Any]], *, per_row: int = 2,
 
 
 def _agent_traces_query(agent_service: str, expression: str, *, name: str = "A",
-                        group_by: list[dict] | None = None) -> dict[str, Any]:
-    """A Query Builder traces query over the agent's GenAI spans."""
+                        group_by: list[dict] | None = None,
+                        extra_filter: str = "", legend: str = "") -> dict[str, Any]:
+    """A Query Builder traces query over the agent's GenAI spans.
+
+    ``extra_filter`` is ANDed onto the service filter — used by the tool-mix panel to
+    drop spans that carry no ``tool.name`` (the turn and chat spans), which otherwise
+    render as an unlabelled series alongside the real tools.
+    """
+    expr = f"service.name = '{agent_service}'"
+    if extra_filter:
+        expr = f"{expr} AND {extra_filter}"
     return {
         "queryName": name,
         "expression": name,
         "dataSource": "traces",
-        "aggregateOperator": "noop",
+        "legend": legend,
         "aggregations": [{"expression": expression}],
-        "filter": {"expression": f"service.name = '{agent_service}'"},
+        "filter": {"expression": expr},
         "filters": {"op": "AND", "items": []},
         "groupBy": group_by or [],
+        "having": {"expression": ""},
         "orderBy": [],
         "selectColumns": [],
         "functions": [],
@@ -368,7 +378,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "panelTypes": "graph",
         "yAxisUnit": "short",
         "query": {"queryType": "builder", "builder": {"queryData": [
-            _agent_traces_query(agent_service, "avg(gen_ai.usage.output_tokens)")]}},
+            _agent_traces_query(agent_service, "avg(gen_ai.usage.output_tokens)",
+                                legend="output tokens")]}},
     }
     cost_panel = {
         "title": f"Cost per turn (USD, budget ${cost_budget})",
@@ -377,7 +388,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "panelTypes": "graph",
         "yAxisUnit": "none",
         "query": {"queryType": "builder", "builder": {"queryData": [
-            _agent_traces_query(agent_service, "avg(llm.cost_usd)")]}},
+            _agent_traces_query(agent_service, "avg(llm.cost_usd)",
+                                legend="cost per turn")]}},
         "thresholds": [{"index": "budget", "label": f"budget ${cost_budget}",
                         "value": float(cost_budget), "unit": "none"}],
     }
@@ -387,7 +399,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "panelTypes": "graph",
         "yAxisUnit": "short",
         "query": {"queryType": "builder", "builder": {"queryData": [
-            _agent_traces_query(agent_service, "max(llm.step_count)")]}},
+            _agent_traces_query(agent_service, "max(llm.step_count)",
+                                legend="steps")]}},
         "thresholds": [{"index": "ceiling", "label": f"ceiling {max_steps}",
                         "value": float(max_steps), "unit": "short"}],
     }
@@ -400,7 +413,14 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "query": {"queryType": "builder", "builder": {"queryData": [
             _agent_traces_query(
                 agent_service, "count()",
-                group_by=[{"key": "tool.name", "dataType": "string", "type": "tag"}])]}},
+                # Only tool.execute spans carry tool.name; without this the turn and
+                # chat spans land in an unnamed series that dwarfs the real tools.
+                extra_filter="tool.name EXISTS",
+                legend="{{tool.name}}",
+                group_by=[{"key": "tool.name", "name": "tool.name",
+                           "dataType": "string", "type": "tag",
+                           "fieldContext": "attribute", "fieldDataType": "string",
+                           "signal": "traces", "isColumn": False, "isJSON": False}])]}},
     }
     latency_panel = {
         "title": "Turn latency p99",
