@@ -80,8 +80,53 @@ def _init_logger() -> logging.Logger:
     return log
 
 
+_metric_last: dict[str, float] = {}
+
+
+def _init_metrics() -> bool:
+    """Emit per-turn agent **metrics** (cost, steps, output tokens) to SigNoz.
+
+    Traces answer "what happened in this turn"; metrics give a continuous series an
+    **anomaly rule** can learn a seasonal baseline from. SigNoz only allows anomaly
+    alerts on metrics (not on span aggregations), so cost-per-turn has to exist as a
+    metric for "abnormal spend for this hour" to be alertable at all. Fails open.
+    """
+    try:
+        from opentelemetry import metrics
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+        from opentelemetry.metrics import Observation
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+
+        reader = PeriodicExportingMetricReader(
+            OTLPMetricExporter(endpoint=OTLP_ENDPOINT, insecure=True),
+            export_interval_millis=10_000)
+        provider = MeterProvider(
+            resource=Resource.create({"service.name": SERVICE_NAME}),
+            metric_readers=[reader])
+        metrics.set_meter_provider(provider)
+        meter = metrics.get_meter("chronolens.agent")
+
+        def obs(key):
+            return lambda _o: [Observation(_metric_last.get(key, 0.0))]
+
+        for name, unit, desc in (
+            ("chronolens.agent.cost_usd", "usd", "cost of the latest agent turn"),
+            ("chronolens.agent.steps", "1", "tool steps in the latest agent turn"),
+            ("chronolens.agent.output_tokens", "1", "output tokens in the latest turn"),
+        ):
+            meter.create_observable_gauge(name, callbacks=[obs(name)], unit=unit,
+                                         description=desc)
+        print(f"OTel metrics -> {OTLP_ENDPOINT} (agent cost/steps/tokens)")
+        return True
+    except Exception as exc:  # pragma: no cover - optional path
+        print(f"OTel metrics unavailable ({exc}); anomaly alerting will have no baseline")
+        return False
+
+
 tracer = _init_tracer()
 response_log = _init_logger()
+_metrics_on = _init_metrics()
 app = FastAPI(title="ChronoLens Demo Agent (café assistant)")
 
 
@@ -162,6 +207,12 @@ def chat(msg: str = "a latte and a croissant please", max_tokens_override: int |
             with tracer.start_as_current_span("tool.execute", kind=SpanKind.INTERNAL) as ts:
                 ts.set_attribute("tool.name", t)
                 time.sleep(0.005)
+
+    # Publish this turn's shape as metrics, so an anomaly rule has a series to
+    # learn a baseline from (SigNoz anomaly rules require metrics, not spans).
+    _metric_last["chronolens.agent.cost_usd"] = float(cost)
+    _metric_last["chronolens.agent.steps"] = float(steps)
+    _metric_last["chronolens.agent.output_tokens"] = float(tout)
 
     # Ship the FULL response to SigNoz logs so the quality judge can grade from
     # telemetry — span attributes only carry a truncated preview.

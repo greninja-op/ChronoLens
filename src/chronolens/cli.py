@@ -117,6 +117,58 @@ def cmd_config(_: list[str]) -> int:
     return 0
 
 
+def _file_anomaly_via_mcp(cfg, channels: list[str], agent: str) -> None:
+    """File the anomaly rule through the SigNoz MCP server (see signoz.py for why)."""
+    from .mcp import MCPClient
+    from .signoz import build_anomaly_alert_mcp_args
+    args = build_anomaly_alert_mcp_args("chronolens.agent.cost_usd", channels,
+                                        label=f"{agent} cost per turn")
+    with MCPClient(cfg) as mcp:
+        res = mcp.call("signoz_create_alert", args)
+    if not res.ok:
+        raise RuntimeError(res.error or "MCP signoz_create_alert failed")
+
+
+def cmd_guard(_: list[str]) -> int:
+    """File the GenAI guard dashboard + agent cost alert + p99 anomaly rule in SigNoz."""
+    import os
+
+    from .signoz import (
+        build_agent_cost_alert,
+        build_agent_dashboard,
+        build_anomaly_alert,
+    )
+    cfg = Config.load()
+    agent = os.getenv("AGENT_SERVICE_NAME", "chronolens-agent")
+    filed, failed = [], []
+    with SigNozClient(cfg) as sn:
+        try:
+            channels = [c.get("name") for c in sn.list_channels()
+                        if isinstance(c, dict) and c.get("name")]
+        except Exception:
+            channels = []
+        jobs = [
+            ("GenAI guard dashboard",
+             lambda: sn.create_dashboard(build_agent_dashboard(
+                 agent, max_steps=cfg.agent_max_steps,
+                 cost_budget=cfg.agent_cost_budget_usd))),
+            ("agent cost alert",
+             lambda: sn.create_alert(build_agent_cost_alert(
+                 agent, cfg.agent_cost_budget_usd, channels))),
+            ("cost anomaly alert (via MCP)", lambda: _file_anomaly_via_mcp(cfg, channels, agent)),
+        ]
+        for name, fn in jobs:
+            try:
+                fn()
+                filed.append(name)
+                print(f"  [ok]   {name}")
+            except Exception as exc:
+                failed.append(name)
+                print(f"  [FAIL] {name}: {str(exc)[:180]}")
+    print(f"\nfiled {len(filed)}/{len(filed) + len(failed)} artefact(s) in SigNoz")
+    return 1 if failed else 0
+
+
 def cmd_mcp(args: list[str]) -> int:
     """SigNoz MCP: `mcp` lists the server's tools, `mcp <question>` asks the co-pilot."""
     cfg = Config.load()
@@ -236,14 +288,14 @@ def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m chronolens.cli "
               "<services|foresee|respond [off]|ab|cooldown|prevented|config|proof [svc]|"
-              "blast|mcp [question]|slack [test]>")
+              "blast|mcp [question]|guard|slack [test]>")
         return 2
     cmd, rest = sys.argv[1], sys.argv[2:]
     dispatch = {
         "services": cmd_services, "foresee": cmd_foresee, "respond": cmd_respond,
         "ab": cmd_ab, "cooldown": cmd_cooldown, "prevented": cmd_prevented,
         "config": cmd_config, "slack": cmd_slack, "proof": cmd_proof,
-        "blast": cmd_blast, "mcp": cmd_mcp,
+        "blast": cmd_blast, "mcp": cmd_mcp, "guard": cmd_guard,
     }
     fn = dispatch.get(cmd)
     if fn is None:

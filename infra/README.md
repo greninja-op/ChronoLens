@@ -1,5 +1,17 @@
 # ChronoLens on AWS (serverless scaffold)
 
+> ## ⚠️ Status: scaffold — **not deployed**
+>
+> This is a complete, reviewable SAM template, **but it has never been deployed to a
+> live AWS account.** ChronoLens was built and demoed entirely against a local,
+> Foundry-installed SigNoz stack, and `LLM_PROVIDER` defaults to a rule-based
+> explainer that needs no cloud at all.
+>
+> We're labelling it rather than implying an AWS deployment that doesn't exist. If you
+> deploy it, expect the usual first-run friction (IAM permissions, Bedrock model access
+> per region, VPC egress to reach your SigNoz). The `Bedrock` path additionally requires
+> `LLM_PROVIDER=bedrock` plus credentials and an enabled Anthropic model in your region.
+
 This runs the ChronoLens loop **without a server** — a scheduled Lambda pulls
 SigNoz, forecasts, prevents, verifies, and records to DynamoDB. Everything is
 pay-per-use, which fits the hackathon's serverless / ~$100 budget rule.

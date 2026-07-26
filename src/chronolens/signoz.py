@@ -222,6 +222,241 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
     }
 
 
+def _agent_traces_query(agent_service: str, expression: str, *, name: str = "A",
+                        group_by: list[dict] | None = None) -> dict[str, Any]:
+    """A Query Builder traces query over the agent's GenAI spans."""
+    return {
+        "queryName": name,
+        "expression": name,
+        "dataSource": "traces",
+        "aggregateOperator": "noop",
+        "aggregations": [{"expression": expression}],
+        "filter": {"expression": f"service.name = '{agent_service}'"},
+        "filters": {"op": "AND", "items": []},
+        "groupBy": group_by or [],
+        "orderBy": [],
+        "selectColumns": [],
+        "functions": [],
+        "disabled": False,
+        "stepInterval": 60,
+    }
+
+
+def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
+                          cost_budget: float = 0.05) -> dict[str, Any]:
+    """Build a **GenAI guard dashboard** for the watched AI agent.
+
+    The infra guard dashboard watches p99 for a service; this is its agent-side
+    counterpart, built from the OTel **GenAI semantic-convention attributes** the
+    agent emits (`gen_ai.usage.*`, `llm.step_count`, `llm.cost_usd`). It answers
+    the questions latency dashboards can't: how much is each turn costing, is the
+    agent taking more steps than it used to, and which tools is it actually calling.
+    """
+    tokens_panel = {
+        "title": "Token usage per turn (output)",
+        "description": "gen_ai.usage.output_tokens — answer length in tokens; a silent "
+                       "jump here is how behaviour drift usually shows up first.",
+        "panelTypes": "graph",
+        "yAxisUnit": "short",
+        "query": {"queryType": "builder", "builder": {"queryData": [
+            _agent_traces_query(agent_service, "avg(gen_ai.usage.output_tokens)")]}},
+    }
+    cost_panel = {
+        "title": f"Cost per turn (USD, budget ${cost_budget})",
+        "description": "llm.cost_usd — real money per turn. The loop/cost breaker "
+                       "fires on this budget, not on a clock.",
+        "panelTypes": "graph",
+        "yAxisUnit": "none",
+        "query": {"queryType": "builder", "builder": {"queryData": [
+            _agent_traces_query(agent_service, "avg(llm.cost_usd)")]}},
+        "thresholds": [{"index": "budget", "label": f"budget ${cost_budget}",
+                        "value": float(cost_budget), "unit": "none"}],
+    }
+    steps_panel = {
+        "title": f"Steps per turn (ceiling {max_steps})",
+        "description": "llm.step_count — a rising step count with no new tools is a loop.",
+        "panelTypes": "graph",
+        "yAxisUnit": "short",
+        "query": {"queryType": "builder", "builder": {"queryData": [
+            _agent_traces_query(agent_service, "max(llm.step_count)")]}},
+        "thresholds": [{"index": "ceiling", "label": f"ceiling {max_steps}",
+                        "value": float(max_steps), "unit": "short"}],
+    }
+    tools_panel = {
+        "title": "Tool calls by name",
+        "description": "tool.execute spans grouped by tool.name — reveals a tool the "
+                       "agent never used before, or one it now calls repeatedly.",
+        "panelTypes": "graph",
+        "yAxisUnit": "short",
+        "query": {"queryType": "builder", "builder": {"queryData": [
+            _agent_traces_query(
+                agent_service, "count()",
+                group_by=[{"key": "tool.name", "dataType": "string", "type": "tag"}])]}},
+    }
+    latency_panel = {
+        "title": "Turn latency p99",
+        "description": "For contrast: latency can stay flat while behaviour drifts — "
+                       "which is exactly why the panels above exist.",
+        "panelTypes": "graph",
+        "yAxisUnit": LATENCY_Y_AXIS_UNIT,
+        "query": {"queryType": "builder", "builder": {"queryData": [
+            _p99_latency_builder_query(agent_service)]}},
+    }
+    return {
+        "title": f"ChronoLens Agent Watch - {agent_service}",
+        "description": (
+            "Auto-created by ChronoLens. GenAI-native view of the watched agent: tokens, "
+            "cost per turn, steps and tool mix — the signals that move when an agent "
+            "silently changes behaviour while still returning 200 OK."
+        ),
+        "tags": ["chronolens", "agent-watch", "genai", agent_service],
+        "widgets": [cost_panel, steps_panel, tokens_panel, tools_panel, latency_panel],
+    }
+
+
+def build_agent_cost_alert(agent_service: str, cost_budget: float,
+                           channels: list[str] | None = None) -> dict[str, Any]:
+    """Threshold alert on the agent's **cost per turn** — a runaway-spend guard."""
+    return {
+        "schemaVersion": "v2alpha1",
+        "version": "v5",
+        "alert": f"ChronoLens guard - {agent_service} cost per turn",
+        "alertType": "TRACES_BASED_ALERT",
+        "ruleType": "threshold_rule",
+        "condition": {
+            "compositeQuery": {
+                "queries": [{"type": "builder_query", "spec": {
+                    "name": "A", "signal": "traces", "disabled": False,
+                    "stepInterval": 60,
+                    "aggregations": [{"expression": "avg(llm.cost_usd)"}],
+                    "filter": {"expression": f"service.name = '{agent_service}'"},
+                    "groupBy": [],
+                }}],
+                "panelType": "graph", "queryType": "builder", "unit": "none",
+            },
+            "selectedQueryName": "A",
+            "thresholds": {"kind": "basic", "spec": [{
+                "name": "warning",
+                "target": float(cost_budget),
+                "targetUnit": "none",
+                "recoveryTarget": None,
+                "matchType": "at_least_once",
+                "op": "above",
+                "channels": channels or [],
+            }]},
+        },
+        "evaluation": {"kind": "rolling", "spec": {"evalWindow": "5m0s", "frequency": "1m0s"}},
+        "notificationSettings": {"renotify": {"enabled": False, "interval": "30m"}},
+        "disabled": False,
+        "source": "chronolens",
+        "labels": {"severity": "warning", "chronolens": "guard",
+                   "guard_kind": "agent-cost", "service": agent_service},
+        "annotations": {
+            "summary": f"{agent_service} average cost per turn exceeded ${cost_budget}",
+            "description": "Auto-filed by ChronoLens Agent Watch (runaway-spend guard).",
+        },
+    }
+
+
+def build_anomaly_alert_mcp_args(metric_name: str = "chronolens.agent.cost_usd",
+                                 channels: list[str] | None = None, *,
+                                 z_score: float = 2.0,
+                                 seasonality: str = "daily",
+                                 label: str = "") -> dict[str, Any]:
+    """Arguments for creating the anomaly rule via the **SigNoz MCP** ``signoz_create_alert``.
+
+    Why MCP rather than our REST client: the anomaly rule uses the older v1 rule
+    schema, and this SigNoz build rejects it on the REST ``/api/v2/rules`` and
+    ``/api/v1/rules`` endpoints with ``validation failed`` and an *empty* error list —
+    no field named, nothing to correct. The MCP server accepts the same logical rule
+    and performs the version handling itself, so we let the tool own that quirk.
+
+    It also means ChronoLens uses MCP for **writes**, not only reads.
+    """
+    rule = build_anomaly_alert(metric_name, channels, z_score=z_score,
+                              seasonality=seasonality, label=label)
+    return {
+        "alert": rule["alert"],
+        "alertType": rule["alertType"],
+        "ruleType": rule["ruleType"],
+        "evalWindow": rule["evalWindow"],
+        "frequency": rule["frequency"],
+        "condition": rule["condition"],
+        "labels": rule["labels"],
+        "annotations": rule["annotations"],
+        "preferredChannels": rule.get("preferredChannels") or [],
+    }
+
+
+def build_anomaly_alert(metric_name: str = "chronolens.agent.cost_usd",
+                        channels: list[str] | None = None, *,
+                        z_score: float = 2.0,
+                        seasonality: str = "daily",
+                        label: str = "") -> dict[str, Any]:
+    """Build an **anomaly** alert rule — a learned baseline, not a fixed threshold.
+
+    A static SLO can't catch "normal-looking but abnormal for this hour": a metric
+    that usually sits low and drifts upward may still be under its fixed limit yet
+    clearly wrong. SigNoz's anomaly rules compare against a learned seasonal
+    baseline instead.
+
+    Two schema constraints, both learned the hard way against a live server:
+
+    1. **Anomaly rules only accept ``METRIC_BASED_ALERT``.** Pointing one at a traces
+       query is rejected (``anomaly_rule can only be used with METRIC_BASED_ALERT``),
+       so this alerts on an emitted *metric*, not on a span aggregation.
+    2. It uses the **v1 rule schema** — top-level ``evalWindow``/``frequency`` and
+       ``condition.op``/``matchType``/``target``/``algorithm``/``seasonality``, with
+       the ``anomaly`` function on the query. Sending the v2alpha1 threshold shape
+       here fails validation with an empty error list, which is unhelpfully quiet.
+    """
+    subject = label or metric_name
+    return {
+        # `version: v5` is required even though `schemaVersion` must be omitted for
+        # anomaly rules — leaving it out fails validation with an empty error list.
+        "version": "v5",
+        "alert": f"ChronoLens anomaly - {subject} deviates from its baseline",
+        "alertType": "METRIC_BASED_ALERT",
+        "ruleType": "anomaly_rule",
+        "evalWindow": "5m",
+        "frequency": "1m",
+        "condition": {
+            "compositeQuery": {
+                "queries": [{"type": "builder_query", "spec": {
+                    "name": "A",
+                    "signal": "metrics",
+                    "disabled": False,
+                    "stepInterval": 60,
+                    "aggregations": [{
+                        "metricName": metric_name,
+                        "timeAggregation": "avg",
+                        "spaceAggregation": "max",
+                    }],
+                    "functions": [{"name": "anomaly",
+                                   "args": [{"name": "z_score_threshold", "value": z_score}]}],
+                }}],
+                "panelType": "graph", "queryType": "builder", "unit": "none",
+            },
+            "selectedQueryName": "A",
+            "op": "above",
+            "matchType": "at_least_once",
+            "target": float(z_score),
+            "algorithm": "standard",
+            "seasonality": seasonality,
+        },
+        "disabled": False,
+        "source": "chronolens",
+        "preferredChannels": channels or [],
+        "labels": {"severity": "info", "chronolens": "guard",
+                   "guard_kind": "anomaly", "metric": metric_name},
+        "annotations": {
+            "summary": f"{subject} is anomalous versus its {seasonality} baseline",
+            "description": ("Auto-filed by ChronoLens. Catches 'abnormal for this hour' "
+                            "even while still inside the fixed limit."),
+        },
+    }
+
+
 def _metric_builder_query(metric_name: str) -> dict[str, Any]:
     """A Query Builder metrics query for one of ChronoLens's own gauges."""
     return {
@@ -716,6 +951,20 @@ class SigNozClient:
         body = self.query_range(q)
         groups = _series_by_group(body)
         return next(iter(groups), None) if groups else None
+
+    def create_alert_compat(self, rule: dict[str, Any]) -> dict[str, Any]:
+        """Create a rule, tolerating SigNoz's two rule endpoints.
+
+        Threshold rules use the v2alpha1 schema and POST to ``/api/v2/rules``.
+        **Anomaly rules use the older v1 schema**, which some builds only accept on
+        ``/api/v1/rules`` — the v2 endpoint rejects them with ``validation failed``
+        and an empty error list. Try v2 first, then fall back to v1 rather than
+        making the caller know which vintage a rule is.
+        """
+        try:
+            return self._post("create_alert", "/api/v2/rules", rule)
+        except SigNozError:
+            return self._post("create_alert_v1", "/api/v1/rules", rule)
 
     def create_alert(self, rule: dict[str, Any]) -> dict[str, Any]:
         return self._post("create_alert", "/api/v2/rules", rule)

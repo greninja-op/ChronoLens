@@ -319,6 +319,38 @@ everything it concludes is written back to SigNoz.
 | **Saved views** | A pinned Traces-explorer view for the guarded service |
 | **Silences** | Muted while the loop actively remediates, lifted after VERIFY — nobody is paged for a fix already in flight |
 | **Notification channels** | Discovered and reused, so ChronoLens routes its notes through the same channel an alert would |
+| **GenAI guard dashboard** | Auto-filed for the watched agent: cost per turn, steps vs ceiling, output tokens, tool-call mix, and turn latency for contrast |
+| **Anomaly alert rule** | A *learned* baseline on agent cost per turn, not a fixed threshold — catches "abnormal for this hour" while still inside the budget |
+
+### Two things the alert API taught us
+
+Filing the agent-side guards took three rejected payloads, and both causes are worth
+writing down because the error messages don't say either of them.
+
+**Anomaly rules only accept `METRIC_BASED_ALERT`.** Pointing one at a traces query —
+`p99(duration_nano)` grouped by service — is rejected outright:
+`anomaly_rule can only be used with METRIC_BASED_ALERT`. So "alert when this service's
+latency is weird for a Tuesday" isn't directly expressible on spans. The fix was to make
+the agent emit its per-turn shape as **metrics** (`chronolens.agent.cost_usd`,
+`.steps`, `.output_tokens`) alongside its spans, and anomaly-alert on the metric. That's
+a better design anyway: traces answer "what happened in this turn", a metric gives the
+continuous series a seasonal baseline can be learned from.
+
+**The v2 REST endpoint rejects the v1 rule schema silently.** Anomaly rules use the older
+v1 shape (top-level `evalWindow`/`frequency`, `condition.op`/`matchType`/`target`/
+`algorithm`/`seasonality`) and our `POST /api/v2/rules` returned
+`{"message":"validation failed","errors":[]}` — an empty error list, no field named.
+Rather than keep guessing, we filed it through the **MCP server's `signoz_create_alert`
+tool**, which owns that version handling. It worked first time, and it upgraded our MCP
+usage from read-only to **read *and* write**.
+
+The anomaly rule went to `state: firing` within a minute of creation — it had already
+noticed the cost-per-turn spike from the loop-mode demo.
+
+<!-- IMAGE: the auto-created GenAI guard dashboard in SigNoz (cost/turn, steps, tokens, tool mix).
+     File: docs/images/signoz_genai_dashboard.png -->
+<!-- IMAGE: the anomaly alert in SigNoz showing state=firing on agent cost per turn.
+     File: docs/images/signoz_anomaly_alert.png -->
 
 ### MCP: calling the server, not just resembling it
 
@@ -443,6 +475,10 @@ Fewer features, each of which survives being read. That's the trade we'd make ag
 - The **agent is simulated by default** (see above).
 - The blast radius is only as good as the dependency graph — with a single service there is nothing
   to chain, and it says `topology_source: unavailable` rather than inventing edges.
+- The **AWS serverless template is a scaffold that has never been deployed.** It's a complete,
+  reviewable SAM stack (Lambda + EventBridge + DynamoDB + Bedrock), and `infra/README.md` says
+  plainly that it's unproven — ChronoLens was built and demoed entirely against a local
+  Foundry-installed SigNoz, with a rule-based explainer that needs no cloud.
 
 ---
 

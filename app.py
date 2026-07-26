@@ -533,6 +533,61 @@ async def mcp_chat(request: Request):
     return ask_signoz_copilot(user_query, cfg)
 
 
+@app.post("/api/guard/agent")
+def install_agent_guard():
+    """File the **GenAI guard dashboard** + agent cost alert + a p99 anomaly rule.
+
+    The loop already auto-files an infra guard (p99 dashboard + threshold alert) on a
+    prevented incident. This is the agent-side counterpart, plus an anomaly rule that
+    catches "abnormal for this hour" while still under the fixed SLO. Fails soft per
+    artefact so one rejected payload doesn't lose the others.
+    """
+    from chronolens.mcp import MCPClient
+    from chronolens.signoz import (
+        build_agent_cost_alert,
+        build_agent_dashboard,
+        build_anomaly_alert_mcp_args,
+    )
+
+    def _anomaly_via_mcp(channels: list[str]) -> None:
+        args = build_anomaly_alert_mcp_args("chronolens.agent.cost_usd", channels,
+                                           label=f"{_AGENT_SERVICE} cost per turn")
+        with MCPClient(cfg) as mcp:
+            res = mcp.call("signoz_create_alert", args)
+        if not res.ok:
+            raise RuntimeError(res.error or "MCP signoz_create_alert failed")
+
+    out: dict[str, object] = {"filed": [], "failed": []}
+    try:
+        with SigNozClient(cfg) as sn:
+            channels = []
+            try:
+                channels = [c.get("name") for c in sn.list_channels()
+                            if isinstance(c, dict) and c.get("name")]
+            except Exception:
+                pass
+
+            artefacts = [
+                ("agent_dashboard", lambda: sn.create_dashboard(build_agent_dashboard(
+                    _AGENT_SERVICE, max_steps=cfg.agent_max_steps,
+                    cost_budget=cfg.agent_cost_budget_usd))),
+                ("agent_cost_alert", lambda: sn.create_alert(build_agent_cost_alert(
+                    _AGENT_SERVICE, cfg.agent_cost_budget_usd, channels))),
+                ("anomaly_alert_via_mcp",
+                 lambda: _anomaly_via_mcp(channels)),
+            ]
+            for name, fn in artefacts:
+                try:
+                    fn()
+                    out["filed"].append(name)
+                except Exception as exc:
+                    out["failed"].append({"artefact": name, "error": str(exc)[:200]})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
+    out["ok"] = bool(out["filed"])
+    return out
+
+
 @app.get("/api/mcp/status")
 def mcp_status_view():
     """Live SigNoz MCP server status + the tools it advertises (proof MCP is real)."""
