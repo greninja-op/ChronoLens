@@ -74,16 +74,26 @@ This is the beat most likely to fail on camera, so set it up first and test it.
 
 ## Pace check
 
-The narration is written to a budget, because 3:00 is roughly **430 spoken words at 150 wpm** —
-and pauses eat into that. Each beat carries its word count. If you find yourself rushing, cut a
-whole beat (the cut list is at the bottom); don't speed-read, it reads as panic on camera.
+Every beat below is budgeted at **150 words per minute (2.5 words a second)**, which is a clear,
+unhurried pace on camera. The deliberate silences — the CASCADE and VERIFY pauses, the tooltip hold,
+the Slack rewrite — are counted separately, because they eat real seconds. That's why some beats run
+longer than their word count alone would need.
 
-| Act | Window | Words |
-|---|---|---|
-| 1 · About | 0:00 – 0:18 | 45 |
-| 2 · Tech stack + architecture | 0:18 – 0:42 | 60 |
-| 3 · Live demo | 0:42 – 2:42 | 300 |
-| 4 · Learning | 2:42 – 2:55 | 30 |
+| # | Beat | Window | Runs | Speech | Pauses | Words |
+|---|---|---|---|---|---|---|
+| 1 | The claim | 0:00 – 0:16 | 16s | 16s | — | 40 |
+| 2 | How it's wired | 0:16 – 0:38 | 22s | 22s | — | 55 |
+| 3 | Chrono-Proof | 0:38 – 1:04 | 26s | 24s | 2s (tooltip hold) | 60 |
+| 4 | The loop, live | 1:04 – 1:32 | 28s | 24s | 4s (CASCADE, VERIFY) | 60 |
+| 5 | Blast radius | 1:32 – 1:48 | 16s | 16s | — | 40 |
+| 6 | Agent Watch | 1:48 – 2:04 | 16s | 16s | — | 40 |
+| 7 | Approve-to-act | 2:04 – 2:30 | 26s | 22s | 4s (card read, rewrite) | 55 |
+| 8 | SigNoz writes back | 2:30 – 2:44 | 14s | 14s | — | 35 |
+| 9 | Close | 2:44 – 2:55 | 11s | 11s | — | 28 |
+| | **Total** | | **2:55** | 2:45 | 10s | **413** |
+
+If you find yourself rushing, cut a whole beat (the cut list is at the bottom). Don't speed-read —
+it reads as panic on camera, and it's the fastest way to sound like you're hiding something.
 
 Each beat below gives the **stage direction** first — window, scroll position, which element the
 cursor touches, and when — then the **narration as one paragraph** you read straight through.
@@ -93,7 +103,7 @@ Timestamps inside a direction are moments *within* that beat.
 
 ## Act 1 · About the project
 
-### [0:00 – 0:18] The claim
+### [0:00 – 0:16] · runs 16s · The claim
 
 **On screen**
 
@@ -105,20 +115,22 @@ Timestamps inside a direction are moments *within* that beat.
 - **In frame:** logo + "Predictive SRE · SigNoz closed loop"; the pills `SigNoz`, `MODE auto`,
   `SLO 500ms`; the two gradient chips (**Breach avoided**, **Incidents prevented**) and the two
   light cards (**Live p99**, **Capacity returned**).
-- **Cursor:** parked off to the side, completely still, for all 18 seconds. This is a held frame.
+- **Cursor:** parked off to the side, completely still, for all 16 seconds. This is a held frame.
+- **0:13:** begin a slow scroll so the Chrono-Proof card is entering frame as you finish the last
+  sentence.
 - **Don't:** read the KPIs out loud, name the panels, or say "dashboard". The claim comes first;
   the UI tour never happens.
 
-> Every reliability tool tells you an outage happened. ChronoLens tells you one was about to — it
-> takes a reversible action to stop it, and then proves from your own telemetry that it never
-> landed. It's a closed loop, built entirely on SigNoz, and it watches both your infrastructure
-> and your AI agents. *(45 words)*
+> Every reliability tool tells you an outage happened. ChronoLens tells you one was about to, takes a
+> reversible action to stop it, and then proves from your own telemetry that it never landed. It's a
+> closed loop built entirely on SigNoz, watching your infrastructure and your AI agents.
+> *(40 words · 16s)*
 
 ---
 
 ## Act 2 · Tech stack and architecture
 
-### [0:18 – 0:42] How it's wired
+### [0:16 – 0:38] · runs 22s · How it's wired
 
 There's **a built architecture slide for this beat** — one page, no editor, nothing to scroll:
 
@@ -139,13 +151,13 @@ real `casting.yaml` on the right. You are only pointing at things.
 - **0:04:** point at the **left box** ("3 demo services + 1 LLM agent") as you say "everything is
   OpenTelemetry", then slide right along the **OTLP arrow** into the dark **SigNoz + MCP** box.
 - **0:12:** continue right along the **READS arrow** into the blue **ChronoLens** box.
-- **0:18:** drop to the **write-back rail** (the pale blue strip that starts "↩ and it writes back")
+- **0:15:** drop to the **write-back rail** (the pale blue strip that starts "↩ and it writes back")
   and hold there while you say "and writes back — dashboards, alerts, saved views, silences". This
   is the sentence that separates this project from a dashboard tour, so give it the extra beat.
-- **0:22:** move to the **`casting.yaml` panel** on the right for the last sentence. No scrolling —
+- **0:19:** move to the **`casting.yaml` panel** on the right for the last sentence. No scrolling —
   the manifest is short enough to be fully visible, including `mcp: enabled: true`.
-- **0:24:** switch back to **tab 1** so Act 3 opens on Mission Control.
-- **Don't:** open your editor, a file tree, or a terminal in this act. 24 seconds disappears fast,
+- **0:22:** switch back to **tab 1** so Act 3 opens on Mission Control.
+- **Don't:** open your editor, a file tree, or a terminal in this act. 22 seconds disappears fast,
   and a `docker compose` scroll adds nothing a judge can read at speed.
 
 **If you'd rather not use the slide,** the fallback is your editor full-screened on the architecture
@@ -153,17 +165,17 @@ block in `README.md` (the `demo store ──OTel──▶ SigNoz + MCP (Foundry)
 in the same window — same pointing order. The slide exists because switching files mid-take is the
 fiddliest thing in this script.
 
-> Everything is OpenTelemetry. A three-service demo store and an LLM agent export traces, metrics
-> and logs to SigNoz. ChronoLens reads them back through Query Builder v5 and the MCP server, and
-> writes back — dashboards, alerts, saved views, silences. It's Python and FastAPI, it's itself
-> instrumented, so its own loop shows up in SigNoz. SigNoz and its MCP server come up through
-> Foundry from this committed `casting.yaml`. *(60 words)*
+> Everything is OpenTelemetry. A three-service store and an LLM agent export traces, metrics and logs
+> to SigNoz. ChronoLens reads them back through Query Builder v5 and the MCP server, and writes back —
+> dashboards, alerts, saved views, silences. Python and FastAPI, instrumented itself, so its own loop
+> shows up in SigNoz. And SigNoz comes up through Foundry from this committed `casting.yaml`.
+> *(55 words · 22s)*
 
 ---
 
 ## Act 3 · Live demo
 
-### [0:42 – 1:08] Chrono-Proof — proving a negative
+### [0:38 – 1:04] · runs 26s (24s speech + a 2s tooltip hold) · Chrono-Proof — proving a negative
 
 **On screen**
 
@@ -183,18 +195,18 @@ fiddliest thing in this script.
 - **0:22:** rest on the note line under the stats for the closing sentence.
 - **Don't:** click **Refresh** mid-shot. It blanks the chart for a second or two.
 
-> Here's the problem with prevention: when it works, nothing happens. The solid blue line is
-> measured — real p99 from SigNoz. The amber dashed line is projected: we fit the trend on the
-> samples from before we acted and extrapolate with a confidence band. Log scale, so you see both.
-> The gap is what the fix bought: ninety seconds of breach avoided, four and a half seconds off
-> the peak. Every field is labelled measured or projected. *(70 words)*
+> Here's the problem with prevention: when it works, nothing happens. The solid blue line is measured,
+> real p99 from SigNoz. The amber dashed line is projected — we fit the trend from before we acted and
+> extrapolate it with a confidence band. The gap between them is what the fix bought: ninety seconds of
+> breach avoided, four and a half seconds off the peak. Every field says measured or projected.
+> *(60 words · 24s)*
 
 *Verified run for reference: projected peak 4474ms ±1108, measured peak 48ms, 90s breach avoided,
 4427ms peak shaved, confidence 71%. **Use your own numbers.***
 
 ---
 
-### [1:08 – 1:36] The loop, acting live
+### [1:04 – 1:32] · runs 28s (24s speech + two 2s pauses) · The loop, acting live
 
 **On screen**
 
@@ -211,20 +223,19 @@ fiddliest thing in this script.
   land silently.
 - **Pause on VERIFY** (~2s): let `loop-state` settle to its final value before you say the p99
   number.
-- **0:24:** scroll up so **Capacity returned** is in frame — it now holds a dollar value.
+- **0:25:** scroll up so **Capacity returned** is in frame — it now holds a dollar value.
 - **Don't:** click **Run baseline (no fix)** or **Reset**. Baseline re-runs the whole thing and
   costs you 40 seconds.
 
-> Now watch it work. It forecasts the breach — p99 climbing eight milliseconds a second — behind a
-> confidence guard, so it won't act on jitter. It names the root hop from real trace data,
-> `payment.charge`, and hands you the exemplar trace. It picks a reversible action: scale, because
-> the signal is load; a slow dependency would be circuit-broken, a bad deploy rolled back. Then it
-> asks SigNoz whether the breach was actually avoided — p99 back to fifty-three milliseconds,
-> confirmed — and cooldown hands the capacity back. *(80 words)*
+> Now watch it work. It forecasts the breach behind a confidence guard, so it won't act on jitter. It
+> names the root hop from real trace data and hands you the exemplar trace. It picks a reversible
+> action — scale, because the signal is load; a slow dependency would be circuit-broken instead. Then
+> it asks SigNoz whether the breach was actually avoided. Confirmed. And cooldown hands the capacity
+> back. *(60 words · 24s)*
 
 ---
 
-### [1:36 – 1:52] Blast radius
+### [1:32 – 1:48] · runs 16s · Blast radius
 
 **On screen**
 
@@ -242,14 +253,14 @@ fiddliest thing in this script.
 - **If it shows 1 victim or `topology_source: unavailable`:** don't record. Wrong fault, or the
   service map hasn't refreshed. Wait 30s, click **Forecast** again.
 
-> One service breaching is a symptom. ChronoLens reads SigNoz's own service dependency map and
-> forecasts the order of failure: payments-db is the root, payments follows, then the storefront,
-> each inheriting latency from the tier below. And that topology is SigNoz's, derived from traces —
-> we didn't hardcode it. *(45 words)*
+> One service breaching is a symptom. ChronoLens reads SigNoz's own dependency map and forecasts the
+> order of failure: payments-db is the root, payments follows, then the storefront, each inheriting
+> latency from the tier below. That topology is SigNoz's, derived from traces — not hardcoded.
+> *(40 words · 16s)*
 
 ---
 
-### [1:52 – 2:10] Agent Watch
+### [1:48 – 2:04] · runs 16s · Agent Watch
 
 **On screen**
 
@@ -267,14 +278,13 @@ fiddliest thing in this script.
 - **Don't:** click **Grade**. It's slower and the narration already covers it.
 
 > Agents fail in ways an HTTP status code never captures, so the same loop watches an LLM agent.
-> Caught: sixteen calls to `get_menu`, no progress, sixteen steps against a six-step ceiling. And
-> this badge matters — that verdict came from reading the agent's GenAI spans out of SigNoz. Drift
-> and the breaker read traces; the quality judge reads full answers out of SigNoz logs, because
-> spans only carry a truncated preview. *(60 words)*
+> Caught: sixteen calls to `get_menu`, no progress, sixteen steps against a six-step ceiling. And this
+> badge is the point — that verdict came from reading the agent's GenAI spans out of SigNoz, and the
+> quality judge reads full answers out of SigNoz logs. *(40 words · 16s)*
 
 ---
 
-### [2:10 – 2:32] Approve-to-act (Slack)
+### [2:04 – 2:30] · runs 26s (22s speech + ~4s letting the card and the rewrite land) · Approve-to-act (Slack)
 
 **On screen**
 
@@ -299,16 +309,15 @@ fiddliest thing in this script.
   names the approver, so the decision is auditable after the fact.
 - **Don't:** switch to any other messaging surface. One card, one tap, one channel.
 
-> Reversible or not, this is a live system, so the trust ladder can hold it back: suggest, earn, or
-> auto. Here it's suggesting, and this is the part I like. It's three in the morning, you're not at
-> your laptop, no VPN, no dashboard open. The forecast, the proposed fix and the rollback come to
-> you, and one tap approves it. You get an answer immediately, then the verified outcome once SigNoz
-> confirms p99 is back under the SLO. No console, no runbook, no waking anyone else up — and the
-> ledger keeps the receipt with the approver's name on it. *(90 words)*
+> This is a live system, so the trust ladder can hold it back: suggest, earn, or auto. Here it's
+> suggesting — and this is the part I like. It's three in the morning, you're not at your laptop, no
+> VPN, no dashboard. The forecast, the fix and the rollback come to you, and one tap approves it. You
+> get an answer instantly, then the verified outcome once SigNoz confirms p99 is back under the SLO.
+> *(55 words · 22s)*
 
 ---
 
-### [2:32 – 2:42] SigNoz depth — it writes back
+### [2:30 – 2:44] · runs 14s · SigNoz depth — it writes back
 
 **On screen**
 
@@ -323,15 +332,15 @@ fiddliest thing in this script.
 - **Don't:** open a panel's edit view or the Query Builder. It looks like you're building it live,
   which undercuts the auto-filed claim.
 
-> None of this was clicked together by hand. ChronoLens filed this GenAI dashboard, a cost
-> threshold, and this anomaly rule against a learned baseline — already firing, because the cost
-> spike from that loop was still inside budget but abnormal for this hour. *(45 words)*
+> None of this was clicked together by hand. ChronoLens filed this GenAI dashboard, a cost threshold,
+> and this anomaly rule against a learned baseline — already firing, because that cost spike was still
+> inside budget but abnormal for this hour. *(35 words · 14s)*
 
 ---
 
 ## Act 4 · Learning and growth
 
-### [2:42 – 2:55] Close
+### [2:44 – 2:55] · runs 11s · Close
 
 **On screen**
 
@@ -341,25 +350,25 @@ fiddliest thing in this script.
 - **Cursor:** still. Hold the frame through the last sentence and for ~1 second after, so the
   video doesn't end on your mouse travelling to the stop button.
 
-> The hard part wasn't predicting anything — it was proving a prevented outage without inventing
-> the curve. That's why every field on that chart says measured or projected. One command brings
-> the whole stack up through Foundry. Thanks for watching. *(40 words)*
+> The hard part wasn't predicting anything — it was proving a prevented outage without inventing the
+> curve. That's why every field says measured or projected. One command brings the whole stack up
+> through Foundry. Thanks for watching. *(28 words · 11s)*
 
 ---
 
 ## Shot list at a glance
 
-| Time | Act | Screen | Action | The one thing to land |
-|---|---|---|---|---|
-| 0:00 | 1 | Mission Control, top | held frame | prevention, not postmortems |
-| 0:18 | 2 | tab 6 · architecture slide | point along the arrows | OTel in, SigNoz out, **writes back** |
-| 0:42 | 3 | Chrono-Proof card | hover the crossover | measured vs projected, labelled |
-| 1:08 | 3 | Demo row → Closed loop | Inject, Run | reversible action, SigNoz-verified |
-| 1:36 | 3 | Blast radius | Forecast | root cause from SigNoz's service map |
-| 1:52 | 3 | Agent Watch | loop → Check | `data_source: signoz` |
-| 2:10 | 3 | Slack (full screen) | one tap Approve | 3am, no laptop, one tap → instant ack → verified |
-| 2:32 | 3 | SigNoz Dashboards → Alerts | click through | it *writes*; anomaly `firing` |
-| 2:42 | 4 | Mission Control, top | held frame | proving a negative, honestly |
+| In | Runs | Act | Screen | Action | The one thing to land |
+|---|---|---|---|---|---|
+| 0:00 | 16s | 1 | Mission Control, top | held frame | prevention, not postmortems |
+| 0:16 | 22s | 2 | tab 6 · architecture slide | point along the arrows | OTel in, SigNoz out, **writes back** |
+| 0:38 | 26s | 3 | Chrono-Proof card | hover the crossover | measured vs projected, labelled |
+| 1:04 | 28s | 3 | Demo row → Closed loop | Inject, Run | reversible action, SigNoz-verified |
+| 1:32 | 16s | 3 | Blast radius | Forecast | root cause from SigNoz's service map |
+| 1:48 | 16s | 3 | Agent Watch | loop → Check | `data_source: signoz` |
+| 2:04 | 26s | 3 | Slack (full screen) | one tap Approve | 3am, no laptop → instant ack → verified |
+| 2:30 | 14s | 3 | SigNoz Dashboards → Alerts | click through | it *writes*; anomaly `firing` |
+| 2:44 | 11s | 4 | Mission Control, top | held frame | proving a negative, honestly |
 
 ---
 
@@ -386,9 +395,10 @@ Keep only: the Chrono-Proof chart (measured vs projected, breach-seconds avoided
 run ending on VERIFY, the Slack one-tap approval, and the auto-created SigNoz dashboard with the
 firing anomaly alert. Drop Act 2, blast radius and Agent Watch.
 
-**If the full cut runs long, drop in this order:** blast radius (1:36) → the `casting.yaml` panel in
-Act 2 (say the Foundry line over the diagram instead) → Agent Watch (1:52). Never drop Chrono-Proof,
-the approval tap, or the SigNoz writes — those are the three scored moments.
+**If the full cut runs long, drop in this order:** blast radius (1:32, buys 16s) → the `casting.yaml`
+panel in Act 2 (say the Foundry line over the diagram instead, buys ~4s) → Agent Watch (1:48, buys
+16s). Never drop Chrono-Proof, the approval tap, or the SigNoz writes — those are the three scored
+moments.
 
 ---
 
