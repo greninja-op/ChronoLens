@@ -95,9 +95,9 @@ longer than their word count alone would need.
 If you find yourself rushing, cut a whole beat (the cut list is at the bottom). Don't speed-read —
 it reads as panic on camera, and it's the fastest way to sound like you're hiding something.
 
-Each beat below gives the **stage direction** first — window, scroll position, which element the
-cursor touches, and when — then the **narration as one paragraph** you read straight through.
-Timestamps inside a direction are moments *within* that beat.
+Every beat is laid out the same way: **Say this** — one paragraph, read straight through — then
+**Do this**, numbered steps in order, with the words you should be saying at each step quoted inline.
+Read the paragraph once to get the shape, then just work down the steps.
 
 ---
 
@@ -105,26 +105,25 @@ Timestamps inside a direction are moments *within* that beat.
 
 ### [0:00 – 0:16] · runs 16s · The claim
 
-**On screen**
-
-- **Window:** tab 1 (Mission Control), 125% zoom, **scrolled fully to top** so the header and the
-  four KPI chips are the only things in frame.
-- **Before you talk:** hard-refresh (`Ctrl+Shift+R`) so the KPIs animate in from `—` instead of
-  sitting there pre-filled. Wait for the header **SigNoz** pill to go green; if it's grey, SigNoz
-  is unreachable and nothing below will populate.
-- **In frame:** logo + "Predictive SRE · SigNoz closed loop"; the pills `SigNoz`, `MODE auto`,
-  `SLO 500ms`; the two gradient chips (**Breach avoided**, **Incidents prevented**) and the two
-  light cards (**Live p99**, **Capacity returned**).
-- **Cursor:** parked off to the side, completely still, for all 16 seconds. This is a held frame.
-- **0:13:** begin a slow scroll so the Chrono-Proof card is entering frame as you finish the last
-  sentence.
-- **Don't:** read the KPIs out loud, name the panels, or say "dashboard". The claim comes first;
-  the UI tour never happens.
+**Say this**
 
 > Every reliability tool tells you an outage happened. ChronoLens tells you one was about to, takes a
 > reversible action to stop it, and then proves from your own telemetry that it never landed. It's a
 > closed loop built entirely on SigNoz, watching your infrastructure and your AI agents.
 > *(40 words · 16s)*
+
+**Do this**
+
+1. Before you hit record: open Mission Control, zoom to 125%, scroll to the very top, and
+   hard-refresh (`Ctrl` + `Shift` + `R`) so the numbers animate in instead of sitting there.
+2. Check the **SigNoz** pill in the header is green. Grey means SigNoz is unreachable — fix that
+   before recording anything.
+3. Start recording. Don't move the mouse. Read the whole paragraph over this held frame.
+4. On the last sentence, start scrolling down slowly so the **Chrono-Proof** card is coming into
+   frame as you finish.
+
+**Don't** read the numbers out loud, name any panel, or say the word "dashboard". The claim comes
+first; the UI tour never happens.
 
 ---
 
@@ -143,27 +142,7 @@ already contains everything this beat claims: the four instrumented services, th
 SigNoz, the reads arrow out to ChronoLens, the write-back rail underneath, the stack table, and the
 real `casting.yaml` on the right. You are only pointing at things.
 
-**On screen**
-
-- **0:00:** switch to **tab 6** (the architecture slide). Whole page in frame — it's built to fit
-  one screen at 125% zoom, so you should never need to scroll. If it doesn't fit, drop the zoom to
-  100%.
-- **0:04:** point at the **left box** ("3 demo services + 1 LLM agent") as you say "everything is
-  OpenTelemetry", then slide right along the **OTLP arrow** into the dark **SigNoz + MCP** box.
-- **0:12:** continue right along the **READS arrow** into the blue **ChronoLens** box.
-- **0:15:** drop to the **write-back rail** (the pale blue strip that starts "↩ and it writes back")
-  and hold there while you say "and writes back — dashboards, alerts, saved views, silences". This
-  is the sentence that separates this project from a dashboard tour, so give it the extra beat.
-- **0:19:** move to the **`casting.yaml` panel** on the right for the last sentence. No scrolling —
-  the manifest is short enough to be fully visible, including `mcp: enabled: true`.
-- **0:22:** switch back to **tab 1** so Act 3 opens on Mission Control.
-- **Don't:** open your editor, a file tree, or a terminal in this act. 22 seconds disappears fast,
-  and a `docker compose` scroll adds nothing a judge can read at speed.
-
-**If you'd rather not use the slide,** the fallback is your editor full-screened on the architecture
-block in `README.md` (the `demo store ──OTel──▶ SigNoz + MCP (Foundry)` diagram), then `casting.yaml`
-in the same window — same pointing order. The slide exists because switching files mid-take is the
-fiddliest thing in this script.
+**Say this**
 
 > Everything is OpenTelemetry. A three-service store and an LLM agent export traces, metrics and logs
 > to SigNoz. ChronoLens reads them back through Query Builder v5 and the MCP server, and writes back —
@@ -171,35 +150,65 @@ fiddliest thing in this script.
 > shows up in SigNoz. And SigNoz comes up through Foundry from this committed `casting.yaml`.
 > *(55 words · 22s)*
 
+**Do this**
+
+1. Switch to **tab 6** (the architecture slide). The whole page should be in frame without scrolling.
+   If it doesn't fit, drop the browser zoom to 100%.
+2. Put the cursor on the **left box** ("3 demo services + 1 LLM agent") — say *"everything is
+   OpenTelemetry. A three-service store and an LLM agent export traces, metrics and logs to SigNoz."*
+3. Slide right along the **OTLP** arrow into the dark **SigNoz + MCP** box, then keep going right
+   along the **READS** arrow into the blue **ChronoLens** box — say *"ChronoLens reads them back
+   through Query Builder v5 and the MCP server…"*
+4. Drop the cursor onto the pale blue strip that starts **"↩ and it writes back"** and leave it there
+   — say *"…and writes back: dashboards, alerts, saved views, silences."* Give this one an extra
+   beat; it's the line that separates this from a dashboard tour.
+5. Move the cursor onto the **`casting.yaml`** panel on the right for the last sentence. No scrolling
+   needed — `mcp: enabled: true` is already visible.
+6. Switch back to **tab 1** so the next beat opens on Mission Control.
+
+**Don't** open your editor, a file tree, or a terminal here. 22 seconds goes fast, and a
+`docker compose` scroll gives a judge nothing they can read at that speed.
+
+**Fallback if you'd rather not use the slide:** your editor full-screened on the architecture block in
+`README.md` (the `demo store ──OTel──▶ SigNoz + MCP (Foundry)` diagram), then `casting.yaml` in the
+same window — same pointing order. The slide exists because switching files mid-take is the fiddliest
+thing in this script.
+
 ---
 
 ## Act 3 · Live demo
 
 ### [0:38 – 1:04] · runs 26s (24s speech + a 2s tooltip hold) · Chrono-Proof — proving a negative
 
-**On screen**
-
-- **Window:** tab 1. Scroll so the **Chrono-Proof — the outage that never happened** card fills
-  the frame: title, the measured/projected legend, the chart, and the five stats underneath
-  (**Measured peak · Projected peak · Breach avoided · Peak shaved · Confidence**) all visible at
-  once. If the stats are cut off, scroll two more notches — the stats are the payoff.
-- **Check the source pill** top-right of the card reads `signoz` before you talk. If not, click
-  **Refresh** and wait.
-- **0:04:** trace the **solid blue line** left-to-right as you say "measured".
-- **0:08:** lift to the **amber dashed line** and trace it up and right as you say "projected".
-  Leave the shaded confidence band visible — don't cover it with the pointer.
-- **0:12:** hover and **hold** where the two lines separate, ~3 seconds, so the navy tooltip
-  renders and both series read at the same timestamp. Don't jiggle; the tooltip flickers.
-- **0:17:** drop to the **Breach avoided** stat as you say "ninety seconds", then one stat right
-  to **Peak shaved**.
-- **0:22:** rest on the note line under the stats for the closing sentence.
-- **Don't:** click **Refresh** mid-shot. It blanks the chart for a second or two.
+**Say this**
 
 > Here's the problem with prevention: when it works, nothing happens. The solid blue line is measured,
 > real p99 from SigNoz. The amber dashed line is projected — we fit the trend from before we acted and
 > extrapolate it with a confidence band. The gap between them is what the fix bought: ninety seconds of
 > breach avoided, four and a half seconds off the peak. Every field says measured or projected.
 > *(60 words · 24s)*
+
+**Do this**
+
+1. Before recording: scroll so the **Chrono-Proof** card fills the frame — you need the chart *and*
+   the five numbers under it (Measured peak · Projected peak · Breach avoided · Peak shaved ·
+   Confidence) visible at the same time. The numbers are the payoff; if they're cut off, scroll two
+   more notches.
+2. Check the small tag at the card's top-right says `signoz`. If not, click **Refresh** and wait for
+   it before you record.
+3. Say *"Here's the problem with prevention: when it works, nothing happens."* Cursor still.
+4. Trace the **solid blue line** left to right — say *"the solid blue line is measured, real p99 from
+   SigNoz."*
+5. Trace the **amber dashed line** up and to the right — say *"the amber dashed line is projected…"*
+   Don't cover the shaded band around it with the pointer.
+6. Hover the point where the two lines separate and **hold it still for ~3 seconds** so the tooltip
+   appears. Don't jiggle the mouse or it flickers.
+7. Drop the cursor to the **Breach avoided** number — say *"ninety seconds of breach avoided"* — then
+   move one number right to **Peak shaved** — *"four and a half seconds off the peak."*
+8. Move to the grey text line under the numbers for the last sentence: *"every field says measured or
+   projected."*
+
+**Don't** click **Refresh** once you're recording — it blanks the chart for a second or two.
 
 *Verified run for reference: projected peak 4474ms ±1108, measured peak 48ms, 90s breach avoided,
 4427ms peak shaved, confidence 71%. **Use your own numbers.***
@@ -208,30 +217,33 @@ fiddliest thing in this script.
 
 ### [1:04 – 1:32] · runs 28s (24s speech + two 2s pauses) · The loop, acting live
 
-**On screen**
-
-- **Window:** tab 1. Settle so the **Demo** button row *and* the **Closed loop** card are both in
-  frame — click and consequence in one shot, no cut.
-- **0:00:** click **Inject rising load**.
-- **0:02:** click **Run ChronoLens** (the filled navy button), then scroll two notches so the
-  stage pills and the `loop-state` pill are readable — it flips `idle` → `running`.
-- **Then stop touching the mouse.** Cursor parked beside the card, never over the log (hovering
-  scroll-hijacks it).
-- **Read against the pills as they light:** LEARN → FORECAST → CASCADE → DECIDE → ACT → VERIFY →
-  COOLDOWN. Pace to the pills, not to your reading speed.
-- **Pause on CASCADE** (~2s): it prints the root hop and an exemplar trace ID. Let the trace ID
-  land silently.
-- **Pause on VERIFY** (~2s): let `loop-state` settle to its final value before you say the p99
-  number.
-- **0:25:** scroll up so **Capacity returned** is in frame — it now holds a dollar value.
-- **Don't:** click **Run baseline (no fix)** or **Reset**. Baseline re-runs the whole thing and
-  costs you 40 seconds.
+**Say this**
 
 > Now watch it work. It forecasts the breach behind a confidence guard, so it won't act on jitter. It
 > names the root hop from real trace data and hands you the exemplar trace. It picks a reversible
 > action — scale, because the signal is load; a slow dependency would be circuit-broken instead. Then
 > it asks SigNoz whether the breach was actually avoided. Confirmed. And cooldown hands the capacity
 > back. *(60 words · 24s)*
+
+**Do this**
+
+1. Scroll so the **Demo** button row *and* the **Closed loop** box are both on screen. You want the
+   click and what it causes in the same shot.
+2. Say *"Now watch it work."* Click **Inject rising load**.
+3. Click **Run ChronoLens** (the dark filled button). Scroll down two notches so the stage pills and
+   the status pill are readable — it flips from `idle` to `running`.
+4. **Take your hand off the mouse.** Don't hover the log area; it hijacks the scroll.
+5. Read the rest of the paragraph *against the pills as they light up*: LEARN → FORECAST → CASCADE →
+   DECIDE → ACT → VERIFY → COOLDOWN. Pace yourself to the pills, not to your reading speed.
+6. **Stop talking for ~2 seconds when CASCADE lights.** It prints the root hop and a trace ID — let
+   that land in silence.
+7. **Stop talking for ~2 seconds when VERIFY lights.** Wait for the status pill to settle before you
+   say *"Confirmed."*
+8. On the last sentence, scroll up so the **Capacity returned** number is in frame — it now shows a
+   dollar value.
+
+**Don't** click **Run baseline (no fix)** or **Reset**. Baseline re-runs everything and costs you 40
+seconds you don't have.
 
 ---
 
@@ -246,80 +258,69 @@ curl -X POST "http://localhost:8090/admin/fault?mode=dependency-slow&level=40"
 This one matters. With the traffic ramp instead, the *entry* service is what's degrading, so there's
 nothing upstream to cascade to and you'll get a single victim.
 
-**On screen — do exactly this**
-
-1. On Mission Control, scroll down until the box titled **Blast radius** is on screen. It sits next
-   to **Closed loop**, so it's a small scroll, not a tab switch.
-2. Say your first sentence. Don't click yet.
-3. Click **Forecast** in that box.
-4. Wait about 2 seconds for the list to fill in.
-5. Put the cursor on the **top line** — it should read `chronolens-payments-db`, hop
-   `payment.db_query` — and leave it there while you say "payments-db is the root".
-6. Move the cursor down the list one name at a time as you say each one: `chronolens-payments`, then
-   `chronolens-store`.
-7. Move the cursor onto the small grey tag that reads **`signoz-service-map`** and leave it there for
-   your last sentence. That tag is the whole point of the beat.
-8. Stop. Beat over.
-
-**Bad take, don't use it:** if step 4 shows only one name, or the words
-`topology_source: unavailable`, the fault is wrong or the service map hasn't refreshed yet. Wait 30
-seconds, click **Forecast** again.
+**Say this**
 
 > One service breaching is a symptom. ChronoLens reads SigNoz's own dependency map and forecasts the
 > order of failure: payments-db is the root, payments follows, then the storefront, each inheriting
 > latency from the tier below. That topology is SigNoz's, derived from traces — not hardcoded.
 > *(40 words · 16s)*
 
+**Do this**
+
+1. Scroll down until the box titled **Blast radius** is on screen. It sits next to **Closed loop**,
+   so it's a small scroll, not a tab switch.
+2. Say *"One service breaching is a symptom."* Don't click yet.
+3. Click **Forecast** in that box. Wait ~2 seconds for the list to fill in.
+4. Put the cursor on the **top line** (`chronolens-payments-db`, hop `payment.db_query`) and leave it
+   there — say *"ChronoLens reads SigNoz's own dependency map and forecasts the order of failure:
+   payments-db is the root…"*
+5. Move the cursor down the list one name at a time as you name them — *"payments follows, then the
+   storefront, each inheriting latency from the tier below."*
+6. Move the cursor onto the small grey tag that reads **`signoz-service-map`** and leave it there —
+   say *"that topology is SigNoz's, derived from traces, not hardcoded."* This tag is the whole point
+   of the beat.
+7. Stop. Beat over.
+
+**Bad take, don't use it:** if step 3 shows only one name, or the words
+`topology_source: unavailable`, the fault is wrong or the service map hasn't refreshed yet. Wait 30
+seconds, click **Forecast** again.
+
 ---
 
 ### [1:48 – 2:04] · runs 16s · Agent Watch
 
-**On screen**
-
-- **Window:** tab 1, whole **Agent Watch** card in frame — the `normal` / `drift` / `loop` mode
-  buttons in the header and all three tiles (**Behaviour drift**, **Loop / cost breaker**,
-  **Answer quality**).
-- **Before this beat:** leave the agent in `normal` so the mode flip is visible on camera.
-- **0:00:** click **loop**. The mode pill flips. Talk through the opening sentence while it runs —
-  the breaker needs ~10 seconds of looping turns in SigNoz before it has anything to read.
-- **0:10:** click **Check** on **Loop / cost breaker**.
-- **0:12:** point at the numbers as you say them — the repeated tool `get_menu`, the repeat share,
-  and steps-against-ceiling (`16 / 6`).
-- **0:15:** move to the **`signoz`** badge and hold. If it reads `agent-driven` the logs are cold —
-  say so out loud rather than glossing it, or re-record after the agent has run another minute.
-- **Don't:** click **Grade**. It's slower and the narration already covers it.
+**Say this**
 
 > Agents fail in ways an HTTP status code never captures, so the same loop watches an LLM agent.
 > Caught: sixteen calls to `get_menu`, no progress, sixteen steps against a six-step ceiling. And this
 > badge is the point — that verdict came from reading the agent's GenAI spans out of SigNoz, and the
 > quality judge reads full answers out of SigNoz logs. *(40 words · 16s)*
 
+**Do this**
+
+1. Before this beat: leave the agent in **normal** mode, so the flip is visible on camera.
+2. Scroll so the whole **Agent Watch** box is on screen — the `normal` / `drift` / `loop` buttons at
+   the top and the three tiles below.
+3. Click **loop**. Say the first sentence while it runs: *"Agents fail in ways an HTTP status code
+   never captures, so the same loop watches an LLM agent."* The breaker needs about 10 seconds of
+   looping turns before it has anything to read, so don't rush to step 4.
+4. Click **Check** on the **Loop / cost breaker** tile.
+5. Point at the numbers as you say them: *"sixteen calls to get_menu, no progress, sixteen steps
+   against a six-step ceiling."*
+6. Move the cursor onto the **`signoz`** badge and leave it there for the last sentence: *"that
+   verdict came from reading the agent's GenAI spans out of SigNoz, and the quality judge reads full
+   answers out of SigNoz logs."*
+
+**If the badge says `agent-driven`** instead of `signoz`, the logs are cold. Either say so out loud
+rather than glossing over it, or wait a minute for the agent to run and re-check.
+
+**Don't** click **Grade** — it's slower and the paragraph already covers it.
+
 ---
 
 ### [2:04 – 2:30] · runs 26s (22s speech + ~4s letting the card and the rewrite land) · Approve-to-act (Slack)
 
-**On screen**
-
-- **Setup, before this take:** Mission Control restarted with `CHRONOLENS_AUTONOMY=suggest`, Slack
-  listener alive, Slack full-screened on the ChronoLens channel. This is a separate take from the
-  autonomous loop beat — splice them.
-- **0:00:** on tab 1, click **Inject rising load** then **Run ChronoLens**. The stage stream stops
-  at **GOVERN** and the `loop-state` pill shows it's waiting on a human instead of acting. Point at
-  that for one second — it's the honest half of the trust ladder.
-- **0:05:** cut to **Slack**. The approval card is arriving: service, current p99, slope, ETA to
-  breach, the proposed reversible action and its rollback, with **✅ Approve** and **✋ Deny**. Hold
-  it for ~3 seconds and let the viewer actually read the card — this is the shot that sells the
-  story, so don't rush it.
-- **0:11:** click **✅ Approve**.
-- **0:12:** the reply is **instant**, before any remediation runs — the card is replaced with
-  "⏳ Applying `scale_out` on chronolens-store (approved by @you)…". Stay on it for a beat: that's
-  what tells an approver the tap registered.
-- **0:16:** the **same message rewrites itself again** with the final outcome — applied, SigNoz
-  confirms p99 back under the SLO, breach avoided, rollback still available. Two rewrites of one
-  message, no new notifications. Cut away too early and you lose the payoff.
-- **0:24:** cut back to tab 1 and point at the newest row in the **Prevention ledger** — the receipt
-  names the approver, so the decision is auditable after the fact.
-- **Don't:** switch to any other messaging surface. One card, one tap, one channel.
+**Say this**
 
 > This is a live system, so the trust ladder can hold it back: suggest, earn, or auto. Here it's
 > suggesting — and this is the part I like. It's three in the morning, you're not at your laptop, no
@@ -327,26 +328,56 @@ seconds, click **Forecast** again.
 > get an answer instantly, then the verified outcome once SigNoz confirms p99 is back under the SLO.
 > *(55 words · 22s)*
 
+**Do this**
+
+1. Before this take: set `CHRONOLENS_AUTONOMY=suggest` in `.env`, **restart Mission Control**, start
+   the Slack listener, and full-screen Slack on the ChronoLens channel. This is a separate take from
+   the loop beat — you'll splice them.
+2. On Mission Control, click **Inject rising load**, then **Run ChronoLens**. Say *"This is a live
+   system, so the trust ladder can hold it back: suggest, earn, or auto."*
+3. The stage stream stops at **GOVERN** and the status pill shows it's waiting on a human instead of
+   acting. Point at that for a second — say *"here it's suggesting."*
+4. Cut to **Slack**. The approval card has arrived. Hold it for ~3 seconds so a viewer can actually
+   read it, and say the story line: *"It's three in the morning, you're not at your laptop, no VPN, no
+   dashboard. The forecast, the fix and the rollback come to you…"*
+5. Click **✅ Approve** — say *"…and one tap approves it."*
+6. The card is instantly replaced with "⏳ Applying `scale_out` on chronolens-store (approved by
+   @you)…". Stay on it — say *"you get an answer instantly."*
+7. Wait. The **same message rewrites itself again** with the outcome: applied, SigNoz confirms p99
+   back under the SLO, breach avoided, rollback available. Say *"then the verified outcome once SigNoz
+   confirms p99 is back under the SLO."* Don't cut away before this rewrite — it's the payoff.
+8. Cut back to Mission Control and point at the newest row in the **Prevention ledger**. The receipt
+   names the approver, so the decision is auditable afterwards.
+
+**Don't** switch to any other messaging app. One card, one tap, one channel.
+
 ---
 
 ### [2:30 – 2:44] · runs 14s · SigNoz depth — it writes back
 
-**On screen**
-
-- **0:00:** switch to tab 4 (SigNoz **Dashboards**), list already on screen, and click
-  **ChronoLens Agent Watch - chronolens-agent**. Five panels render: cost per turn, steps per
-  turn, output tokens, tool calls by name, turn latency p99. Point at **Tool calls by name** —
-  the grouped-by-`tool.name` bars show the loop you just triggered.
-- **0:06:** switch to tab 5 (SigNoz **Alerts**) and point at the row starting
-  **`ChronoLens anomaly -`**, specifically its state column reading **`firing`**. Hold there for
-  the closing sentence. This is the strongest frame in the beat: SigNoz's own UI confirming a rule
-  ChronoLens wrote through MCP.
-- **Don't:** open a panel's edit view or the Query Builder. It looks like you're building it live,
-  which undercuts the auto-filed claim.
+**Say this**
 
 > None of this was clicked together by hand. ChronoLens filed this GenAI dashboard, a cost threshold,
 > and this anomaly rule against a learned baseline — already firing, because that cost spike was still
 > inside budget but abnormal for this hour. *(35 words · 14s)*
+
+**Do this**
+
+1. Switch to **tab 4** (SigNoz **Dashboards**), with the dashboard list already on screen. Say *"None
+   of this was clicked together by hand."*
+2. Click **ChronoLens Agent Watch - chronolens-agent**. Five panels render. Say *"ChronoLens filed
+   this GenAI dashboard, a cost threshold…"* while pointing at **Tool calls by name** — those grouped
+   bars are the loop you triggered earlier.
+3. Switch to **tab 5** (SigNoz **Alerts**). Point at the row starting **`ChronoLens anomaly -`**,
+   specifically the state column reading **`firing`**, and hold there for the last sentence: *"…and
+   this anomaly rule against a learned baseline, already firing, because that cost spike was still
+   inside budget but abnormal for this hour."*
+
+That `firing` row is the strongest frame in the beat — SigNoz's own UI confirming a rule ChronoLens
+wrote through MCP.
+
+**Don't** open a panel's edit view or the Query Builder. It looks like you're building it live, which
+undercuts the whole "auto-filed" claim.
 
 ---
 
@@ -354,17 +385,20 @@ seconds, click **Forecast** again.
 
 ### [2:44 – 2:55] · runs 11s · Close
 
-**On screen**
-
-- **0:00:** back to tab 1, scrolled to the very top so the frame matches the cold open — same
-  header, same four KPI chips, except **Breach avoided**, **Incidents prevented** and **Capacity
-  returned** now hold real numbers instead of `—`.
-- **Cursor:** still. Hold the frame through the last sentence and for ~1 second after, so the
-  video doesn't end on your mouse travelling to the stop button.
+**Say this**
 
 > The hard part wasn't predicting anything — it was proving a prevented outage without inventing the
 > curve. That's why every field says measured or projected. One command brings the whole stack up
 > through Foundry. Thanks for watching. *(28 words · 11s)*
+
+**Do this**
+
+1. Switch back to **tab 1** and scroll to the very top, so the frame matches your cold open — same
+   header, same four chips, except **Breach avoided**, **Incidents prevented** and **Capacity
+   returned** now hold real numbers.
+2. Read the paragraph. Don't move the mouse.
+3. Hold the frame for ~1 second after "thanks for watching" before you stop the recording, so the
+   video doesn't end on your cursor travelling to the stop button.
 
 ---
 
