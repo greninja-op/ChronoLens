@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChronoLens · Architecture</title>
+<link rel="icon" type="image/png" href="/static/assets/chronolens-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tokens lifted verbatim from Mission Control (static/index.html) — this slide is
+     the same product, so it uses the same system rather than a second look. */
+  :root{
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+    --bg:#EEF1F5; --card:#FFFFFF; --line:#E3E8EF; --line-soft:#EDF1F6;
+    --ink:#16233D; --ink-2:#5E6E85; --ink-3:#94A1B2;
+    --navy:#1B2A4A; --blue:#2E7CD6; --sky:#7FB6DD; --pale:#E4EFF9;
+    --ok:#12996B; --ok-bg:#E4F5EE; --proj:#D98A15;
+    --r-lg:18px; --r-md:12px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(22,35,61,.04), 0 6px 20px rgba(22,35,61,.06);
+    --shadow-chip:0 4px 14px rgba(27,42,74,.18);
+  }
+  *{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; box-sizing:border-box; }
+  html,body{ background:var(--bg); }
+  body{ margin:0; color:var(--ink); font-family:'Inter',system-ui,sans-serif; letter-spacing:-0.011em; }
+
+  .mono{ font-family:'JetBrains Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .label{ font-size:11px; font-weight:600; letter-spacing:0.02em; color:var(--ink-3);
+          text-transform:uppercase; }
+  .sub{ font-size:12.5px; line-height:1.5; color:var(--ink-2); margin:var(--s1) 0 0; }
+
+  .wrap{ max-width:1280px; margin:0 auto; padding:var(--s6) var(--s6) var(--s7); }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
+         box-shadow:var(--shadow); padding:var(--s5); }
+
+  /* ── header ── */
+  header{ display:flex; align-items:center; gap:var(--s3); margin-bottom:var(--s6); }
+  header img{ width:36px; height:36px; border-radius:11px; object-fit:cover; box-shadow:var(--shadow); }
+  h1{ font-size:19px; font-weight:680; letter-spacing:-0.025em; margin:0; line-height:1.2; }
+
+  /* ── the flow: three lanes, one return arrow ── */
+  .flow{ display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:stretch;
+         gap:var(--s4); }
+  .node{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
+         padding:var(--s4); box-shadow:var(--shadow); }
+  .node-strong{ background:linear-gradient(160deg,#22355C,#16233D); border-color:#16233D;
+                color:#fff; box-shadow:var(--shadow-chip); }
+  .node-strong .sub, .node-strong .label{ color:rgba(255,255,255,.72); }
+  .node-accent{ background:linear-gradient(160deg,#3C8BE0,#2569B4); border-color:#2569B4;
+                color:#fff; box-shadow:var(--shadow-chip); }
+  .node-accent .sub, .node-accent .label{ color:rgba(255,255,255,.76); }
+  .node h2{ font-size:14px; font-weight:650; letter-spacing:-0.015em; margin:var(--s2) 0 0; }
+  .node ul{ margin:var(--s3) 0 0; padding-left:15px; font-size:11.5px; line-height:1.65;
+            color:var(--ink-2); }
+  .node-strong ul, .node-accent ul{ color:rgba(255,255,255,.82); }
+
+  .arrow{ align-self:center; text-align:center; min-width:104px; }
+  .arrow .line{ height:1px; background:linear-gradient(90deg,var(--sky),var(--blue));
+                position:relative; }
+  .arrow .line::after{ content:''; position:absolute; right:-1px; top:-3.5px;
+        border-left:7px solid var(--blue); border-top:4px solid transparent;
+        border-bottom:4px solid transparent; }
+  .arrow .cap{ font-size:10.5px; font-weight:600; color:var(--blue); margin-bottom:6px;
+               letter-spacing:0.01em; }
+  .arrow .note{ font-size:10px; color:var(--ink-3); margin-top:6px; }
+
+  /* the return arrow gets its own full-width rail underneath */
+  .writeback{ margin-top:var(--s4); border:1px dashed #CBDCEF; border-radius:var(--r-md);
+              background:var(--pale); padding:var(--s3) var(--s4);
+              display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
+  .writeback strong{ font-size:12.5px; font-weight:650; color:#1D5FA8; }
+  .writeback span{ font-size:11.5px; color:#33628F; }
+
+  /* ── two-column detail ── */
+  .cols{ display:grid; grid-template-columns:1.15fr 1fr; gap:var(--s5); margin-top:var(--s5); }
+  .rows{ margin-top:var(--s3); }
+  .row{ display:flex; align-items:baseline; justify-content:space-between; gap:var(--s4);
+        padding:7px 0; border-bottom:1px solid var(--line-soft); }
+  .row:last-child{ border-bottom:0; }
+  .row .k{ font-size:12px; font-weight:550; }
+  .row .v{ font-size:11px; color:var(--ink-2); text-align:right; }
+
+  pre{ margin:var(--s3) 0 0; background:#16233D; color:#DCE6F2; border-radius:var(--r-md);
+       padding:var(--s4); font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px;
+       line-height:1.65; overflow-x:auto; }
+  pre b{ color:#7FB6DD; font-weight:500; }
+  .tag{ display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',ui-monospace,monospace;
+        font-size:10.5px; font-weight:500; padding:3px var(--s2); border-radius:999px;
+        background:#F1F5F9; color:var(--ink-2); border:1px solid var(--line); }
+  .tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--s3); }
+
+  @media (max-width:1100px){
+    .flow{ grid-template-columns:1fr; }
+    .arrow{ transform:rotate(90deg); margin:var(--s2) auto; }
+    .cols{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="/static/assets/chronolens-logo.png" alt="">
+    <div>
+      <h1>ChronoLens — architecture</h1>
+      <p class="sub">OpenTelemetry in · SigNoz as the only source of truth · reversible action out</p>
+    </div>
+  </header>
+
+  <!-- ═══ the flow ═══ -->
+  <section class="card">
+    <div class="flow">
+
+      <div class="node">
+        <span class="label">Instrumented</span>
+        <h2>3 demo services + 1 LLM agent</h2>
+        <ul>
+          <li><span class="mono">chronolens-store</span></li>
+          <li><span class="mono">chronolens-payments</span></li>
+          <li><span class="mono">chronolens-payments-db</span></li>
+          <li><span class="mono">chronolens-agent</span> — GenAI spans</li>
+        </ul>
+      </div>
+
+      <div class="arrow">
+        <div class="cap">OTLP</div>
+        <div class="line"></div>
+        <div class="note">traces · metrics · logs<br>gRPC :4317</div>
+      </div>
+
+      <div class="node node-strong">
+        <span class="label">Source of truth</span>
+        <h2>SigNoz + MCP server</h2>
+        <ul>
+          <li>installed by Foundry from <span class="mono">casting.yaml</span></li>
+          <li>Query Builder v5 · service map</li>
+          <li>MCP server on <span class="mono">:8000/mcp</span> — 41 tools</li>
+        </ul>
+      </div>
+
+      <div class="arrow">
+        <div class="cap">READS</div>
+        <div class="line"></div>
+        <div class="note">p99 series · exemplars<br>dependency graph · log bodies</div>
+      </div>
+
+      <div class="node node-accent">
+        <span class="label">The loop</span>
+        <h2>ChronoLens</h2>
+        <ul>
+          <li>LEARN → FORECAST → CASCADE → DECIDE</li>
+          <li>ACT → VERIFY → COOLDOWN → RECORD</li>
+          <li>self-instrumented: its own loop is a trace</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="writeback">
+      <strong>↩ and it writes back</strong>
+      <span>dashboards · threshold + anomaly alert rules · saved views · alert silences ·
+        its own metrics (<span class="mono">chronolens.prevented_total</span>) — all created by code,
+        none clicked by hand</span>
+    </div>
+  </section>
+
+  <!-- ═══ detail ═══ -->
+  <div class="cols">
+
+    <section class="card">
+      <span class="label">Stack</span>
+      <div class="rows">
+        <div class="row"><span class="k">Observability</span>
+          <span class="v">SigNoz · OpenTelemetry SDK + Collector · SigNoz MCP</span></div>
+        <div class="row"><span class="k">ChronoLens</span>
+          <span class="v">Python 3.9+ · FastAPI · zero-dependency JSON-RPC MCP client</span></div>
+        <div class="row"><span class="k">Mission Control</span>
+          <span class="v">server-rendered HTML + SSE stream · Chart.js (vendored)</span></div>
+        <div class="row"><span class="k">Human-in-the-loop</span>
+          <span class="v">Slack Socket Mode approve-to-act</span></div>
+        <div class="row"><span class="k">Reproducibility</span>
+          <span class="v">Foundry <span class="mono">casting.yaml</span> + <span class="mono">.lock</span></span></div>
+        <div class="row"><span class="k">Explanations</span>
+          <span class="v">rule-based by default · optional OpenAI / Bedrock / Gemini</span></div>
+      </div>
+      <div class="tags">
+        <span class="tag">traces</span><span class="tag">metrics</span><span class="tag">logs</span>
+        <span class="tag">service map</span><span class="tag">exemplars</span>
+        <span class="tag">dashboards</span><span class="tag">alerts</span>
+        <span class="tag">saved views</span><span class="tag">silences</span><span class="tag">MCP</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <span class="label">One command, committed</span>
+      <pre><b># casting.yaml — read by Foundry</b>
+apiVersion: v1alpha1
+kind: Installation
+metadata:
+  name: signoz
+spec:
+  deployment:
+    flavor: compose
+    mode: docker
+  <b>mcp:</b>
+    spec:
+      <b>enabled: true</b>
+
+<b>$</b> foundryctl cast -f casting.yaml</pre>
+      <p class="sub">Brings up SigNoz UI, the OTel Collector, ClickHouse, Postgres and the MCP
+        server together — so the deployment this was built against is reproducible, not described.</p>
+    </section>
+
+  </div>
+</div>
+</body>
+</html>

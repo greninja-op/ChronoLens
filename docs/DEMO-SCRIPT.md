@@ -43,12 +43,13 @@ python -m chronolens.cli proof        # want: prevented=True, a non-zero "breach
 
 - One Chrome window, tabs left to right: `1` Mission Control `localhost:8095` ·
   `2` SigNoz **Services** · `3` SigNoz **Traces** · `4` SigNoz **Dashboards** ·
-  `5` SigNoz **Alerts**.
+  `5` SigNoz **Alerts** · `6` the architecture slide
+  `localhost:8095/static/architecture.html` (Act 2 only).
 - Pre-open the **Agent Watch** dashboard once so it's warm, then go back to the dashboard list.
   Set every SigNoz time picker to **Last 30 minutes**.
 - Slack in its own window, on the ChronoLens channel, nothing else in frame.
 - Zoom Chrome to **125%**. Judges watch on laptops.
-- Your editor open on `casting.yaml` for Act 2, and on the architecture block of `README.md`.
+- No editor needed. Act 2 uses the architecture slide in tab 6.
 
 **Approve-to-act prep (Slack)**
 
@@ -119,19 +120,38 @@ Timestamps inside a direction are moments *within* that beat.
 
 ### [0:18 – 0:42] How it's wired
 
+There's **a built architecture slide for this beat** — one page, no editor, nothing to scroll:
+
+```
+http://localhost:8095/static/architecture.html
+```
+
+Open it as **tab 6** before you record. It's the same visual language as Mission Control, and it
+already contains everything this beat claims: the four instrumented services, the OTLP arrow into
+SigNoz, the reads arrow out to ChronoLens, the write-back rail underneath, the stack table, and the
+real `casting.yaml` on the right. You are only pointing at things.
+
 **On screen**
 
-- **0:00:** cut to your editor showing the **architecture block in `README.md`** — the
-  `demo store ──OTel──▶ SigNoz + MCP (Foundry)` diagram. Full-screen the editor; no file tree, no
-  terminal.
-- **0:06:** trace the arrows with the cursor as you name them: store → OTel → SigNoz, then SigNoz
-  → ChronoLens, then ChronoLens back into SigNoz. The *back into* arrow is the one that matters —
-  linger there.
-- **0:14:** switch to `casting.yaml` in the same editor window. Scroll once so it's obviously a
-  real manifest, not a stub.
-- **0:20:** cut back to tab 1 so Act 3 opens on Mission Control.
-- **Don't:** open a terminal and run anything here. Act 2 is 24 seconds; a `docker compose` scroll
-  will eat all of it.
+- **0:00:** switch to **tab 6** (the architecture slide). Whole page in frame — it's built to fit
+  one screen at 125% zoom, so you should never need to scroll. If it doesn't fit, drop the zoom to
+  100%.
+- **0:04:** point at the **left box** ("3 demo services + 1 LLM agent") as you say "everything is
+  OpenTelemetry", then slide right along the **OTLP arrow** into the dark **SigNoz + MCP** box.
+- **0:12:** continue right along the **READS arrow** into the blue **ChronoLens** box.
+- **0:18:** drop to the **write-back rail** (the pale blue strip that starts "↩ and it writes back")
+  and hold there while you say "and writes back — dashboards, alerts, saved views, silences". This
+  is the sentence that separates this project from a dashboard tour, so give it the extra beat.
+- **0:22:** move to the **`casting.yaml` panel** on the right for the last sentence. No scrolling —
+  the manifest is short enough to be fully visible, including `mcp: enabled: true`.
+- **0:24:** switch back to **tab 1** so Act 3 opens on Mission Control.
+- **Don't:** open your editor, a file tree, or a terminal in this act. 24 seconds disappears fast,
+  and a `docker compose` scroll adds nothing a judge can read at speed.
+
+**If you'd rather not use the slide,** the fallback is your editor full-screened on the architecture
+block in `README.md` (the `demo store ──OTel──▶ SigNoz + MCP (Foundry)` diagram), then `casting.yaml`
+in the same window — same pointing order. The slide exists because switching files mid-take is the
+fiddliest thing in this script.
 
 > Everything is OpenTelemetry. A three-service demo store and an LLM agent export traces, metrics
 > and logs to SigNoz. ChronoLens reads them back through Query Builder v5 and the MCP server, and
@@ -332,7 +352,7 @@ Timestamps inside a direction are moments *within* that beat.
 | Time | Act | Screen | Action | The one thing to land |
 |---|---|---|---|---|
 | 0:00 | 1 | Mission Control, top | held frame | prevention, not postmortems |
-| 0:18 | 2 | editor: README + `casting.yaml` | trace the arrows | OTel in, SigNoz out, writes back |
+| 0:18 | 2 | tab 6 · architecture slide | point along the arrows | OTel in, SigNoz out, **writes back** |
 | 0:42 | 3 | Chrono-Proof card | hover the crossover | measured vs projected, labelled |
 | 1:08 | 3 | Demo row → Closed loop | Inject, Run | reversible action, SigNoz-verified |
 | 1:36 | 3 | Blast radius | Forecast | root cause from SigNoz's service map |
@@ -366,9 +386,9 @@ Keep only: the Chrono-Proof chart (measured vs projected, breach-seconds avoided
 run ending on VERIFY, the Slack one-tap approval, and the auto-created SigNoz dashboard with the
 firing anomaly alert. Drop Act 2, blast radius and Agent Watch.
 
-**If the full cut runs long, drop in this order:** blast radius (1:36) → the `casting.yaml` half
-of Act 2 → Agent Watch (1:52). Never drop Chrono-Proof, the approval tap, or the SigNoz writes —
-those are the three scored moments.
+**If the full cut runs long, drop in this order:** blast radius (1:36) → the `casting.yaml` panel in
+Act 2 (say the Foundry line over the diagram instead) → Agent Watch (1:52). Never drop Chrono-Proof,
+the approval tap, or the SigNoz writes — those are the three scored moments.
 
 ---
 
