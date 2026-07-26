@@ -15,6 +15,7 @@ Endpoints (SigNoz v0.x):
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any
 
 import httpx
@@ -211,6 +212,7 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
             "builder": {"queryData": [_metric_builder_query("chronolens.prevented_total")]},
         },
     }
+    widgets, layout = _lay_out([panel, impact_panel])
     return {
         "title": f"ChronoLens guard - {service}",
         "description": (
@@ -218,8 +220,41 @@ def build_guard_dashboard(service: str, slo_ms: float) -> dict[str, Any]:
             f"Keeps the prevented incident watched."
         ),
         "tags": ["chronolens", "guard", service],
-        "widgets": [panel, impact_panel],
+        "widgets": widgets,
+        "layout": layout,
     }
+
+
+def _lay_out(widgets: list[dict[str, Any]], *, per_row: int = 2,
+             height: int = 6) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Give every widget a stable ``id`` and build the matching grid ``layout``.
+
+    This is the difference between a dashboard that *stores* panels and one that
+    *shows* them. SigNoz persists ``widgets`` happily without either field, then the
+    UI renders "Welcome to your new dashboard" because it positions panels from
+    ``layout`` (a react-grid spec keyed by widget id) and there was nothing to place.
+    Nothing errors — you just get an empty dashboard, which is a genuinely confusing
+    failure mode.
+
+    Grid is 12 columns wide; ``per_row=2`` gives two half-width panels per row.
+    """
+    span = max(1, 12 // max(1, per_row))
+    out_widgets: list[dict[str, Any]] = []
+    layout: list[dict[str, Any]] = []
+    for i, w in enumerate(widgets):
+        wid = w.get("id") or str(uuid.uuid4())
+        w = {**w, "id": wid}
+        out_widgets.append(w)
+        layout.append({
+            "i": wid,
+            "x": (i % per_row) * span,
+            "y": (i // per_row) * height,
+            "w": span,
+            "h": height,
+            "moved": False,
+            "static": False,
+        })
+    return out_widgets, layout
 
 
 def _agent_traces_query(agent_service: str, expression: str, *, name: str = "A",
@@ -302,6 +337,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "query": {"queryType": "builder", "builder": {"queryData": [
             _p99_latency_builder_query(agent_service)]}},
     }
+    widgets, layout = _lay_out(
+        [cost_panel, steps_panel, tokens_panel, tools_panel, latency_panel])
     return {
         "title": f"ChronoLens Agent Watch - {agent_service}",
         "description": (
@@ -310,7 +347,8 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
             "silently changes behaviour while still returning 200 OK."
         ),
         "tags": ["chronolens", "agent-watch", "genai", agent_service],
-        "widgets": [cost_panel, steps_panel, tokens_panel, tools_panel, latency_panel],
+        "widgets": widgets,
+        "layout": layout,
     }
 
 
