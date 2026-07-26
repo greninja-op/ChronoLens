@@ -24,17 +24,18 @@ recording and **substitute your own live numbers** rather than reading these.
 
 ## Before you hit record
 
-**Pre-flight (5 minutes).**
+**Pre-flight (5 minutes).** Run these from the `chronolens/` folder in PowerShell, with
+`$env:PYTHONPATH='src'` set:
 
-```bash
+```powershell
 # 1. everything up, and prove it
 python scripts/demo_check.py          # want: 23/23 checks passed
 
 # 2. make the money shot real — inject, run the loop, then build the proof
-curl -X POST "http://localhost:8090/admin/fault?mode=traffic-ramp&level=12"
+.\scripts\fault.ps1 ramp              # traffic-ramp, level 12
 #    wait ~90s for p99 to climb toward the 500ms SLO
 python -m chronolens.cli respond      # want: "Outcome: breach avoided"
-curl -X POST "http://localhost:8090/admin/fault?mode=off&level=0"
+.\scripts\fault.ps1 off               # clear the fault
 #    wait ~60s for recovery, then:
 python -m chronolens.cli proof        # want: prevented=True, a non-zero "breach avoided"
 ```
@@ -249,14 +250,17 @@ seconds you don't have.
 
 ### [1:32 – 1:48] · runs 16s · Blast radius
 
-**A minute before you record**, run this and leave it running:
+**A minute before you record**, open a terminal **in the `chronolens/` folder** and run:
 
-```bash
-curl -X POST "http://localhost:8090/admin/fault?mode=dependency-slow&level=40"
+```powershell
+.\scripts\fault.ps1 dependency
 ```
 
-This one matters. With the traffic ramp instead, the *entry* service is what's degrading, so there's
-nothing upstream to cascade to and you'll get a single victim.
+That's it — leave it. It sets `dependency-slow` at level 40 and prints what it set. Clear it later
+with `.\scripts\fault.ps1 off`.
+
+This fault specifically matters: with the traffic ramp instead, the *entry* service is what's
+degrading, so there's nothing upstream to cascade to and you'll get a single victim.
 
 **Say this**
 

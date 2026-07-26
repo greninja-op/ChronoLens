@@ -55,7 +55,8 @@ won't it start" issues are already here.
 
 ### 12. Prediction won't "land" on camera
 **Cause:** the ramp is too fast/slow for the demo.
-**Fix:** tune the fault level: `POST /admin/fault?mode=traffic-ramp&level=30`. Higher level = faster ramp. Default `level=30` crosses the default capacity (~33s) and breaches the 500ms SLO (~50s) — gradual enough to forecast.
+**Fix:** tune the fault level: `GET /admin/fault?mode=traffic-ramp&level=30` (or
+`.\scripts\fault.ps1 -Preset custom -Mode traffic-ramp -Level 30`). Higher level = faster ramp. Default `level=30` crosses the default capacity (~33s) and breaches the 500ms SLO (~50s) — gradual enough to forecast.
 
 ### 13. ChronoLens acts on noise / flaps up and down
 **Cause:** an over-eager forecaster reacting to a single jittery sample, or scaling repeatedly.

@@ -32,9 +32,9 @@ SigNoz UI on `:8080`, Mission Control on `:8095`, demo store `:8090`, agent `:80
 
 **Where:** Mission Control, `http://localhost:8095`, scrolled to the top.
 
-1. Run one full loop first so the KPIs aren't all `—`:
-   `curl -X POST "http://localhost:8090/admin/fault?mode=traffic-ramp&level=12"`, wait ~90s,
-   `python -m chronolens.cli respond`, then fault off and `python -m chronolens.cli proof`.
+1. Run one full loop first so the KPIs aren't all `—`: `.\scripts\fault.ps1 ramp`, wait ~90s,
+   `python -m chronolens.cli respond`, then `.\scripts\fault.ps1 off` and
+   `python -m chronolens.cli proof`.
 2. Hard-refresh (`Ctrl` + `Shift` + `R`).
 3. Capture the **whole browser window** — header, the four KPI chips, and enough of the
    Chrono-Proof chart to show the two lines.
@@ -64,7 +64,7 @@ the two lines and the gap between them are obvious.
 **Where:** Mission Control → **Blast radius** card.
 
 1. Make the deepest tier the cause, or you'll get one victim and a boring shot:
-   `curl -X POST "http://localhost:8090/admin/fault?mode=dependency-slow&level=40"`
+   `.\scripts\fault.ps1 dependency`
 2. Wait ~60s, click **Forecast**.
 3. Capture the card: root line, the ranked victim rows with ETAs, and the
    `signoz-service-map` tag.
