@@ -50,32 +50,26 @@ python -m chronolens.cli proof        # want: prevented=True, a non-zero "breach
 - Zoom Chrome to **125%**. Judges watch on laptops.
 - Your editor open on `casting.yaml` for Act 2, and on the architecture block of `README.md`.
 
-**Approve-to-act prep (this is the beat most likely to fail on camera)**
+**Approve-to-act prep — we film Slack, not WhatsApp**
 
-- Slack listener running in a spare terminal: `python -m chronolens.cli slack`.
+Both surfaces run the same approval engine, so filming one is enough. **Slack is the one we
+film**, because Socket Mode dials outward: no public URL, no tunnel, nothing to expire mid-take.
+WhatsApp gets a single spoken mention and no screen time.
+
+- Start the listener in a spare terminal: `python -m chronolens.cli slack`.
+- Prove it before you record:
+  ```bash
+  python -m chronolens.cli slack test     # want: "sent", and the message in the channel
+  ```
 - Set `CHRONOLENS_AUTONOMY=suggest` in `.env` **and restart Mission Control** — autonomy is read
   at startup, so editing `.env` mid-run changes nothing. Record the autonomous loop beat first
   with `auto`, then restart in `suggest` for the approval beat. Two takes, spliced.
-- **Slack needs no public URL** — Socket Mode dials out. This is the reliable one; do the actual
-  button tap here.
-- **WhatsApp does need a public URL for the tap to come back.** Outbound cards send fine without
-  one, but the button click is a Meta webhook to `POST /webhook/whatsapp`, so without a tunnel
-  (`ngrok http 8095`, then set the callback URL in the Meta app) the card will render and the tap
-  will do nothing. Decide before recording which of these you're doing:
-  - **tunnel up** → tap Approve on the phone, show the ledger update. Best shot.
-  - **no tunnel** → show the card *arriving* on the phone, tap Approve in **Slack**, and say
-    "same contract on WhatsApp" without claiming the phone tap closed the loop. Don't fake it.
-- Meta only allows free-form/interactive sends inside a **24-hour window opened by the user**. If
-  the card doesn't arrive, send any message from your phone to the business number, then retry.
-- Test both, five minutes before recording:
-  ```bash
-  curl -X POST http://localhost:8095/api/whatsapp/test     # want: whatsapp_response.ok = true
-  curl      http://localhost:8095/api/whatsapp/status      # want: enabled = true
-  ```
-- For the phone shot: put the phone in **Do Not Disturb**, brightness up, and either film the
-  screen or mirror it (scrcpy / QuickTime / Windows **Phone Link**). Mirroring is cleaner —
-  a hand-held phone shot at 1080p usually reads as blurry.
-- Silence every other Slack channel and every other notification.
+- Full-screen Slack on the ChronoLens channel and mute every other channel. Nothing else from
+  your workspace should be in frame.
+- Don't claim WhatsApp is live on camera unless you've re-tested it. The WhatsApp path needs a
+  public callback URL for the tap to return, and Meta access tokens expire — ours currently
+  returns `401 / code 190`. Saying "the same contract runs over WhatsApp" is accurate; showing a
+  card you can't tap is not worth the risk.
 
 **Recording:** 1080p minimum, system audio off, mic only. Speak ~15% slower than feels natural.
 
@@ -264,41 +258,37 @@ Timestamps inside a direction are moments *within* that beat.
 
 ---
 
-### [2:10 – 2:32] Approve-to-act — Slack and WhatsApp
+### [2:10 – 2:32] Approve-to-act (Slack)
 
 **On screen**
 
-- **Setup, before this take:** Mission Control restarted with `CHRONOLENS_AUTONOMY=suggest`,
-  Slack listener alive, phone mirrored in a third window. This is a separate take from the
+- **Setup, before this take:** Mission Control restarted with `CHRONOLENS_AUTONOMY=suggest`, Slack
+  listener alive, Slack full-screened on the ChronoLens channel. This is a separate take from the
   autonomous loop beat — splice them.
 - **0:00:** on tab 1, click **Inject rising load** then **Run ChronoLens**. The stage stream stops
-  at **GOVERN** and the `loop-state` pill shows it's waiting on a human, not acting. Point at that
-  for one second — it's the honest half of the trust ladder.
-- **0:04:** cut to the **Slack window**, full-screened so only the ChronoLens channel is visible.
-  The approval card is arriving: service, current p99, slope, ETA to breach, the proposed
-  reversible action, and the rollback — with **Approve** and **Deny**.
-- **0:08:** cut to the **phone / mirrored screen**. The same card is on WhatsApp — header
-  "ChronoLens Reliability Guard", the same numbers, and the two interactive buttons **✅ Approve
-  Fix** and **❌ Deny Fix**. Hold the phone frame for ~3 seconds; this is the shot that sells the
-  story, so don't rush past it.
-- **0:14:** tap **✅ Approve Fix** on the phone **if your tunnel is up**. If it isn't, tap
-  **Approve** in Slack instead and keep the phone in frame as the card, not as the click.
-- **0:15:** **the reply is instant** — before any remediation runs. On Slack the card is
-  replaced with "⏳ Applying `scale_out`…"; on WhatsApp a message arrives saying it's working on
-  it. Stay on that for a beat: it's what tells the approver the tap registered.
-- **0:18:** then the **final outcome** lands on the same surface — acted, verified against
-  SigNoz, p99 back under the SLO. On Slack it's the same message rewritten in place; on WhatsApp
-  it's a second reply. Cut away too early and you lose the payoff.
-- **0:20:** cut back to tab 1 and point at the newest row in the **Prevention ledger** — the
-  receipt carries who approved it and on which surface.
-- **Don't:** show both taps. One approval, one surface, then say the other exists.
+  at **GOVERN** and the `loop-state` pill shows it's waiting on a human instead of acting. Point at
+  that for one second — it's the honest half of the trust ladder.
+- **0:05:** cut to **Slack**. The approval card is arriving: service, current p99, slope, ETA to
+  breach, the proposed reversible action and its rollback, with **✅ Approve** and **✋ Deny**. Hold
+  it for ~3 seconds and let the viewer actually read the card — this is the shot that sells the
+  story, so don't rush it.
+- **0:11:** click **✅ Approve**.
+- **0:12:** the reply is **instant**, before any remediation runs — the card is replaced with
+  "⏳ Applying `scale_out` on chronolens-store (approved by @you)…". Stay on it for a beat: that's
+  what tells an approver the tap registered.
+- **0:16:** the **same message rewrites itself again** with the final outcome — applied, SigNoz
+  confirms p99 back under the SLO, breach avoided, rollback still available. Two rewrites of one
+  message, no new notifications. Cut away too early and you lose the payoff.
+- **0:24:** cut back to tab 1 and point at the newest row in the **Prevention ledger** — the receipt
+  names who approved it and which surface it came from.
+- **Don't:** put WhatsApp on screen. It's one line of narration, not a shot. See the prep note.
 
 > Reversible or not, this is a live system, so the trust ladder can hold it back: suggest, earn, or
-> auto. Here it's suggesting — and this is the part I like. It's three in the morning, you're not at
-> your laptop, no VPN, no dashboard. The forecast, the action and the rollback arrive on your phone,
-> and one tap approves it. You get an answer immediately, then the verified outcome once SigNoz
-> confirms p99 is back under the SLO. Slack for the team, WhatsApp for whoever's actually on call —
-> same engine, and the ledger records which surface approved it. *(90 words)*
+> auto. Here it's suggesting, and this is the part I like. It's three in the morning, you're not at
+> your laptop, no VPN, no dashboard open. The forecast, the action and the rollback come to you, and
+> one tap approves it. You get an answer immediately, then the verified outcome once SigNoz confirms
+> p99 is back under the SLO. Same engine answers on WhatsApp for whoever's actually on call — and the
+> ledger records which surface approved it. *(90 words)*
 
 ---
 
@@ -351,7 +341,7 @@ Timestamps inside a direction are moments *within* that beat.
 | 1:08 | 3 | Demo row → Closed loop | Inject, Run | reversible action, SigNoz-verified |
 | 1:36 | 3 | Blast radius | Forecast | root cause from SigNoz's service map |
 | 1:52 | 3 | Agent Watch | loop → Check | `data_source: signoz` |
-| 2:10 | 3 | Slack + phone | one tap Approve | 3am, no laptop, one tap |
+| 2:10 | 3 | Slack (full screen) | one tap Approve | 3am, no laptop, one tap → instant ack → verified |
 | 2:32 | 3 | SigNoz Dashboards → Alerts | click through | it *writes*; anomaly `firing` |
 | 2:42 | 4 | Mission Control, top | held frame | proving a negative, honestly |
 
@@ -364,8 +354,9 @@ Timestamps inside a direction are moments *within* that beat.
 | Loop returns `pre-empted` / no breach | "It pre-provisioned from what it learned, so there's nothing to prevent — that's LEARN working." Reset capacity (`/admin/lever?action=scale&value=-4`) and re-inject. |
 | Chrono-Proof shows `prevented=False` | Don't hide it: "the fault is still running, so p99 climbed again — it won't claim a save it can't measure." Turn the fault off, wait, refresh. |
 | Slack card doesn't arrive | Check the listener terminal is alive, then `python -m chronolens.cli slack test`. |
-| WhatsApp card doesn't arrive | The 24-hour window is closed. Message the business number from your phone, then `curl -X POST http://localhost:8095/api/whatsapp/test`. |
-| WhatsApp tap does nothing | No public callback URL. Tap in Slack instead and don't claim the phone tap closed the loop. |
+| Tapping Approve does nothing | The listener died. Restart `python -m chronolens.cli slack` — the card stays valid, the button carries its whole payload. |
+| Approve sits on "⏳ Applying…" | Verification is still running (it can take tens of seconds). Wait for the second rewrite; don't tap anything else. |
+| A judge asks about WhatsApp | "Same engine, second door — it's in the repo and documented, we filmed Slack because it needs no public callback URL." Don't demo it live. |
 | Loop acts instead of asking | You're still in `auto`. Set `CHRONOLENS_AUTONOMY=suggest` **and restart** Mission Control. |
 | Blast radius shows 1 victim | Wrong fault. `mode=dependency-slow&level=40`, wait, Forecast again. |
 | Agent verdict badge says `agent-driven` | Logs are cold. Say it out loud, or wait a minute and re-check. |
@@ -376,8 +367,8 @@ Timestamps inside a direction are moments *within* that beat.
 ## Alternate 60-second cut
 
 Keep only: the Chrono-Proof chart (measured vs projected, breach-seconds avoided), one full loop
-run ending on VERIFY, the WhatsApp one-tap approval, and the auto-created SigNoz dashboard with
-the firing anomaly alert. Drop Act 2, blast radius and Agent Watch.
+run ending on VERIFY, the Slack one-tap approval, and the auto-created SigNoz dashboard with the
+firing anomaly alert. Drop Act 2, blast radius and Agent Watch.
 
 **If the full cut runs long, drop in this order:** blast radius (1:36) → the `casting.yaml` half
 of Act 2 → Agent Watch (1:52). Never drop Chrono-Proof, the approval tap, or the SigNoz writes —

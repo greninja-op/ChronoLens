@@ -148,7 +148,12 @@ the second, the outcome line with the SigNoz-verified p99. The rewrite is the po
 
 ---
 
-## 9 · `whatsapp_approval.png` — the same card on a phone
+## 9 · `whatsapp_approval.png` — the same card on a phone *(optional)*
+
+**Skip this one unless the WhatsApp token is fresh.** The demo video films Slack only, and the blog
+reads fine without this image — the WhatsApp section can stand on the Slack shot plus its own prose.
+Only capture it if `POST /api/whatsapp/test` returns `ok: true`; a `401 / code 190` means the Meta
+access token has expired and you need a new one first.
 
 **Where:** WhatsApp on your phone (or WhatsApp Web).
 
@@ -223,11 +228,11 @@ nothing.
 | 6 | `docs/images/agent_watch.png` | Mission Control |
 | 7 | `docs/images/signoz_genai_traces.jpg` | SigNoz |
 | 8 | `docs/images/slack_approval.png` | Slack |
-| 9 | `docs/images/whatsapp_approval.png` | WhatsApp |
+| 9 | `docs/images/whatsapp_approval.png` | WhatsApp *(optional — needs a fresh token)* |
 | 10 | `docs/images/signoz_genai_dashboard.png` | SigNoz |
 | 11 | `docs/images/signoz_anomaly_alert.png` | SigNoz |
 | 12 | `docs/images/mcp_copilot.png` | Mission Control |
 
 Efficient order: run one loop → shots 1, 2, 5, 12 (Mission Control) → switch the fault to
 `dependency-slow` → shots 3, 4 → agent into `loop` mode → shots 6, 7, 10, 11 → restart in
-`suggest` mode → shots 8, 9.
+`suggest` mode → shot 8 (and 9 only if WhatsApp is authenticating).
