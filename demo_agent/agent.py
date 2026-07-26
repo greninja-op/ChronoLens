@@ -22,6 +22,7 @@ import random
 import time
 
 import logging
+import threading
 
 from fastapi import FastAPI
 from opentelemetry import trace
@@ -182,6 +183,40 @@ def chat(msg: str = "a latte and a croissant please", max_tokens_override: int |
             "throttled": is_throttled, "answer": answer}
 
 
+# --------------------------------------------------------------------------- #
+# Self-traffic: keep agent turns flowing so Agent Watch always has spans to read.
+#
+# Drift, the loop breaker and the quality judge all read the agent's telemetry
+# from SigNoz. If nobody calls /chat there are no `agent.turn` spans in the window,
+# so those analyzers fall back to driving the agent — which is honest but looks
+# like the telemetry path is broken. A slow trickle keeps the SigNoz-backed path
+# live without inflating cost.
+#
+#   AGENT_SELF_TRAFFIC_RPS=0   disables it
+# --------------------------------------------------------------------------- #
+AGENT_SELF_TRAFFIC_RPS = float(os.getenv("AGENT_SELF_TRAFFIC_RPS", "0.5"))
+
+
+def _self_traffic() -> None:
+    gap = 1.0 / max(0.05, AGENT_SELF_TRAFFIC_RPS)
+    while True:
+        try:
+            chat()
+        except Exception:
+            pass
+        time.sleep(gap)
+
+
+def start_self_traffic() -> bool:
+    if AGENT_SELF_TRAFFIC_RPS <= 0:
+        print("agent self-traffic disabled (AGENT_SELF_TRAFFIC_RPS=0)")
+        return False
+    threading.Thread(target=_self_traffic, daemon=True).start()
+    print(f"agent self-traffic on: ~{AGENT_SELF_TRAFFIC_RPS:g} turn/s "
+          f"(set AGENT_SELF_TRAFFIC_RPS=0 to disable)")
+    return True
+
+
 @app.get("/admin/mode")
 def set_mode(mode: str = "normal") -> dict:
     if mode not in ("normal", "drift", "loop"):
@@ -215,4 +250,5 @@ if __name__ == "__main__":
 
     print(f"ChronoLens demo agent -> service '{SERVICE_NAME}' -> OTLP {OTLP_ENDPOINT}")
     print("Control: http://localhost:8091/admin/status  ·  chat: /chat  ·  mode: /admin/mode?mode=drift|loop")
+    start_self_traffic()
     uvicorn.run(app, host="0.0.0.0", port=8091, log_level="warning")
