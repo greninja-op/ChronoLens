@@ -10,6 +10,22 @@
 <!-- All 12 image slots in this post have shot-by-shot capture instructions in
      docs/SCREENSHOTS.md — what to run, where to click, what must be visible. -->
 
+**Contents**
+
+- [The problem nobody can demo](#the-problem-nobody-can-demo)
+- [Chrono-Proof: a counterfactual made of measurements](#chrono-proof-a-counterfactual-made-of-measurements)
+- [Blast-radius: which service falls next](#blast-radius-which-service-falls-next)
+- [The loop that does the work](#the-loop-that-does-the-work)
+- [Agent Watch: the same loop, pointed at an AI agent](#agent-watch-the-same-loop-pointed-at-an-ai-agent)
+- [Human-in-the-loop: Slack and WhatsApp](#human-in-the-loop-slack-and-whatsapp)
+- [The telemetry stack: OpenTelemetry in, SigNoz out](#the-telemetry-stack-opentelemetry-in-signoz-out)
+- [What SigNoz's APIs taught us](#what-signozs-apis-taught-us)
+- [MCP: calling the server, not just resembling it](#mcp-calling-the-server-not-just-resembling-it)
+- [The demo app and the agent's model](#the-demo-app-and-the-agents-model)
+- [Reproduce it](#reproduce-it)
+- [What we cut, and why it matters](#what-we-cut-and-why-it-matters)
+- [Honest limits](#honest-limits)
+
 ---
 
 ## The problem nobody can demo
@@ -42,9 +58,11 @@ Chrono-Proof does five things:
 
 1. Pulls the **real** p99 series for the service out of SigNoz (Query Builder v5, `time_series`).
 2. Splits that series at the moment ChronoLens acted.
-3. Fits the trend on the **pre-action samples only** — the same EWMA + Holt machinery the
-   forecaster uses — and extrapolates it across the post-action window, with a confidence band
-   derived from the residual spread.
+3. Fits the trend on the **pre-action samples only**, using the same machinery the forecaster
+   uses — EWMA smoothing, then Holt's linear trend, sanity-blended with least squares so a bad
+   Holt initialisation can't dominate — and extends that slope across the post-action window with
+   a confidence band derived from the residual spread. The slope estimate is careful; the
+   extrapolation itself is deliberately simple and linear, which is why it's labelled an estimate.
 4. Overlays the **measured** post-action reality from SigNoz.
 5. Quantifies the gap: breach-seconds avoided, peak milliseconds shaved, and SLO-violation area
    (error budget) saved.
@@ -336,10 +354,10 @@ everything it concludes is written back to SigNoz.
 | **GenAI guard dashboard** | Auto-filed for the watched agent: cost per turn, steps vs ceiling, output tokens, tool-call mix, and turn latency for contrast |
 | **Anomaly alert rule** | A *learned* baseline on agent cost per turn, not a fixed threshold — catches "abnormal for this hour" while still inside the budget |
 
-### Two things the alert API taught us
+## What SigNoz's APIs taught us
 
-Filing the agent-side guards took three rejected payloads, and both causes are worth
-writing down because the error messages don't say either of them.
+Writing to an observability platform is a different skill from reading from one, and four of these
+cost us real debugging time. None of them produce an error message that names the cause.
 
 **Anomaly rules only accept `METRIC_BASED_ALERT`.** Pointing one at a traces query —
 `p99(duration_nano)` grouped by service — is rejected outright:
@@ -360,6 +378,29 @@ usage from read-only to **read *and* write**.
 
 The anomaly rule went to `state: firing` within a minute of creation — it had already
 noticed the cost-per-turn spike from the loop-mode demo.
+
+**A dashboard can store every panel and still render blank.** Our first auto-filed dashboards
+looked perfect over the API — five widgets, correct queries — and the UI showed "Welcome to your new
+dashboard." Nothing errored. SigNoz positions panels from a `layout` array (a react-grid spec keyed
+by widget id) and we had sent neither `layout` nor widget `id`s, so there was nothing to place. The
+same class of failure hides in every field the front-end maps over but the API doesn't require:
+`builder.queryFormulas`, `promql`, `clickhouse_sql`, `selectedLogFields`, `selectedTracesFields`,
+`contextLinks.linksData`, and the dashboard's own `variables`. Missing means `undefined`, not empty.
+We now send empties for all of them and a test asserts every panel carries them, so an empty
+dashboard can't ship again.
+
+**Threshold markers need the long field names.** `{"index","label","value","unit"}` is accepted and
+silently draws nothing; the UI reads `thresholdValue`, `thresholdUnit`, `thresholdOperator`,
+`thresholdFormat` and `thresholdColor`. And latency thresholds are **nanoseconds on dashboards but
+milliseconds on alerts** — set the dashboard marker in ms and your SLO line lands in the wrong place
+by six orders of magnitude.
+
+**A metric only emitted during a run looks identical to a broken metric.** Our "incidents prevented"
+panel read *No Data* over a 30-minute window even though the ledger had saves in it: the gauge was
+only published while a loop was executing, so the newest sample was hours old. Mission Control now
+publishes it on a heartbeat, which turns one dot per incident into a continuous line. Worth
+generalising — if you write your own metrics back to your observability platform, emit them on a
+timer, not only on the event.
 
 <!-- IMAGE: the auto-created GenAI guard dashboard in SigNoz (cost/turn, steps, tokens, tool mix).
      File: docs/images/signoz_genai_dashboard.png -->
@@ -412,8 +453,9 @@ paths hit the same SigNoz.
 
 Two things are watched, and it matters that we're precise about what's real.
 
-**The demo store** is a synthetic multi-service app (store → checkout → payment, each its own
-`service.name`) with two jobs: emit believable traces, and expose *reversible levers* — scale,
+**The demo store** is a synthetic three-tier app (`chronolens-store` → `chronolens-payments` →
+`chronolens-payments-db`, each its own `service.name`) with two jobs: emit believable traces
+SigNoz can derive a dependency graph from, and expose *reversible levers* — scale,
 pool-resize, circuit-break, restart, roll back, reset. Its faults ramp gradually
 (`traffic-ramp`, `dependency-slow`, `pool-leak`, `memory-leak`, `error-spike`) because a step
 function isn't forecastable and a forecast you can't test isn't a forecast.
@@ -451,8 +493,24 @@ Then drive it from the UI, or:
 python -m chronolens.cli respond   # one full loop
 python -m chronolens.cli proof     # the measured counterfactual
 python -m chronolens.cli blast     # who falls next
+python -m chronolens.cli guard     # file the agent dashboard + alerts (incl. the anomaly rule via MCP)
 python -m chronolens.cli slack     # the approval listener
 ```
+
+`python scripts/demo_check.py` runs 23 end-to-end checks (stack up, services reporting into SigNoz,
+each API surface answering) and prints what's missing rather than failing obscurely. Both demo
+services are self-driving — the store at ~6 rps, the agent at ~0.5 turns/s — so a fresh clone shows
+populated dashboards instead of an empty SigNoz, which is a failure mode we hit ourselves.
+
+If you'd rather not run anything, both dashboards are committed as importable JSON in
+`dashboards/`: in SigNoz go **Dashboards → + New dashboard → Import JSON** and paste the file. They
+are generated from the same code that files them over the API (`scripts/export_dashboards.py`), so
+they can't drift from what the project actually creates.
+
+The test suite is **179 tests** — unit plus property-based with Hypothesis — and most of the
+interesting ones are regressions for bugs found against live telemetry rather than in CI: the
+negative projection, the noise-level slope that hijacked the cascade root, the blank dashboard, the
+approval that answered too late.
 
 ---
 
@@ -481,6 +539,10 @@ Fewer features, each of which survives being read. That's the trade we'd make ag
 - The **projected** arm of Chrono-Proof is a linear extrapolation of a measured trend, not a
   measurement. Real systems plateau under saturation, so a long projection is an upper bound. Every
   field is labelled by provenance and the confidence score falls as the pre-action trend gets noisier.
+- **WhatsApp needs a public callback URL to close its loop.** Outbound cards send without one, but
+  the button tap is a Meta webhook, and Meta access tokens expire — so Slack (Socket Mode, outbound
+  only) is the path we demo and recommend. The code is surface-agnostic; the operational burden is
+  not.
 - All three Agent Watch analyzers now read SigNoz. Grading was the last hold-out: span attributes
   carry only a truncated preview of the response, so the agent ships each **full answer as an OTel
   log record** and the judge reads it back with a `requestType:"raw"` logs query
@@ -498,9 +560,27 @@ Fewer features, each of which survives being read. That's the trade we'd make ag
 
 ## What we'd build next
 
-Read `gen_ai.response` bodies from logs so quality grading is fully telemetry-driven; extend the
-blast radius to rank by business impact rather than time-to-breach; and let LEARN tune the
-confidence guard from its own false-positive history.
+Three things, in order of how much they'd change the product:
 
-The idea we keep coming back to is the one this project started from: **an outage that never
-happened should still leave evidence.** Everything else is plumbing.
+- **Rank the blast radius by business impact, not time-to-breach.** "Checkout falls in 40s" and
+  "the recommendations sidecar falls in 40s" are not the same incident, and the ordering should
+  know that.
+- **Let LEARN tune its own confidence guard.** The noise floor and minimum-samples thresholds are
+  configured today; the ledger already records every false start, so the guard could calibrate
+  itself against its own history instead of a constant we picked.
+- **Deploy the AWS scaffold and prove it.** It's a reviewable SAM stack today and nothing more,
+  which is why the blog says so rather than implying otherwise.
+
+Everything else we'd change is plumbing. The idea we keep coming back to is the one this project
+started from: **an outage that never happened should still leave evidence.**
+
+---
+
+**ChronoLens** was built for the *Agents of SigNoz* hackathon, Track 1 — AI & Agent Observability.
+Code, `casting.yaml` and the importable dashboards:
+[github.com/greninja-op/ChronoLens](https://github.com/greninja-op/ChronoLens).
+
+*AI assistants were used during this build — an agentic IDE for implementation, tests and drafting,
+including driving the SigNoz MCP server to create and inspect dashboards and alert rules. The
+architecture, the honesty rules the project is built on, every acceptance decision and everything
+that got cut were mine. Each claim in this post was verified against a live SigNoz deployment.*
