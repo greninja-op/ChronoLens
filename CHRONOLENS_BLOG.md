@@ -88,8 +88,10 @@ exactly that:
 > The 'measured' arm is SigNoz data. The 'projected' arm is a linear extrapolation of the measured
 > pre-action trend (± band) — a labelled estimate, not a measurement.
 
-<!-- IMAGE: Chrono-Proof panel close-up — cyan measured line, amber dashed projection, SLO marker,
-     and the five stats underneath. File: docs/images/chrono_proof.png -->
+<!-- IMAGE: Mission Control's "Chrono-Proof — the outage that never happened" card, close up:
+     solid blue measured line, amber dashed projection with its band, the red SLO marker, and the
+     five stats underneath (measured peak · projected peak · breach avoided · peak shaved ·
+     confidence). File: docs/images/chrono_proof.png -->
 
 ### The bug that made it honest
 
@@ -212,7 +214,8 @@ A run against live SigNoz, abridged:
 [RECORD  ] Case filed: breach avoided · returned 6.0 units (~$3.90)
 ```
 
-<!-- IMAGE: the live loop panel mid-run, stages lighting up.
+<!-- IMAGE: Mission Control's "Closed loop" card mid-run — the stage pills lighting up and the
+     log lines streaming, including the CASCADE root hop and exemplar trace ID.
      File: docs/images/closed_loop.png -->
 
 ---
