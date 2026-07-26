@@ -49,6 +49,16 @@ python scripts/export_dashboards.py
 missing `layout` or widget `id`s — see [API constraints](#api-constraints-worth-knowing). The
 exported files always contain both.
 
+**If a panel renders but says "No Data"**, the panel is fine and the window is wrong. Two cases:
+
+| Panel | Why it can be empty | Fix |
+|---|---|---|
+| ChronoLens impact — incidents prevented | `chronolens.prevented_total` is ChronoLens's *own* gauge. It's published by a 20s heartbeat in Mission Control (`CHRONOLENS_METRICS_HEARTBEAT_S`), so it only exists while the app is running — and before that heartbeat existed it was written only during a loop run, one sample per run. | Make sure Mission Control is up, then widen the range to **Last 6 hours**, or run `python -m chronolens.cli respond` and refresh. |
+| Agent Watch panels | The agent emits GenAI spans per turn. Cold agent, no data. | Let the agent self-drive for a minute (or flip it to `loop` mode), then refresh. |
+
+Everything else on these dashboards reads span data from the demo services, which self-drive
+continuously — those panels should never be empty with the stack up.
+
 ---
 
 ## One-command setup

@@ -46,15 +46,13 @@ python -m chronolens.cli proof        # want: prevented=True, a non-zero "breach
   `5` SigNoz **Alerts**.
 - Pre-open the **Agent Watch** dashboard once so it's warm, then go back to the dashboard list.
   Set every SigNoz time picker to **Last 30 minutes**.
-- Slack in its own window. WhatsApp in a **third** window — see below.
+- Slack in its own window, on the ChronoLens channel, nothing else in frame.
 - Zoom Chrome to **125%**. Judges watch on laptops.
 - Your editor open on `casting.yaml` for Act 2, and on the architecture block of `README.md`.
 
-**Approve-to-act prep — we film Slack, not WhatsApp**
+**Approve-to-act prep (Slack)**
 
-Both surfaces run the same approval engine, so filming one is enough. **Slack is the one we
-film**, because Socket Mode dials outward: no public URL, no tunnel, nothing to expire mid-take.
-WhatsApp gets a single spoken mention and no screen time.
+This is the beat most likely to fail on camera, so set it up first and test it.
 
 - Start the listener in a spare terminal: `python -m chronolens.cli slack`.
 - Prove it before you record:
@@ -66,10 +64,8 @@ WhatsApp gets a single spoken mention and no screen time.
   with `auto`, then restart in `suggest` for the approval beat. Two takes, spliced.
 - Full-screen Slack on the ChronoLens channel and mute every other channel. Nothing else from
   your workspace should be in frame.
-- Don't claim WhatsApp is live on camera unless you've re-tested it. The WhatsApp path needs a
-  public callback URL for the tap to return, and Meta access tokens expire — ours currently
-  returns `401 / code 190`. Saying "the same contract runs over WhatsApp" is accurate; showing a
-  card you can't tap is not worth the risk.
+- Slack's Socket Mode dials outward, so there's no public URL, no tunnel and nothing that can
+  expire mid-take. That's why the approval beat is filmed here.
 
 **Recording:** 1080p minimum, system audio off, mic only. Speak ~15% slower than feels natural.
 
@@ -280,15 +276,15 @@ Timestamps inside a direction are moments *within* that beat.
   confirms p99 back under the SLO, breach avoided, rollback still available. Two rewrites of one
   message, no new notifications. Cut away too early and you lose the payoff.
 - **0:24:** cut back to tab 1 and point at the newest row in the **Prevention ledger** — the receipt
-  names who approved it and which surface it came from.
-- **Don't:** put WhatsApp on screen. It's one line of narration, not a shot. See the prep note.
+  names the approver, so the decision is auditable after the fact.
+- **Don't:** switch to any other messaging surface. One card, one tap, one channel.
 
 > Reversible or not, this is a live system, so the trust ladder can hold it back: suggest, earn, or
 > auto. Here it's suggesting, and this is the part I like. It's three in the morning, you're not at
-> your laptop, no VPN, no dashboard open. The forecast, the action and the rollback come to you, and
-> one tap approves it. You get an answer immediately, then the verified outcome once SigNoz confirms
-> p99 is back under the SLO. Same engine answers on WhatsApp for whoever's actually on call — and the
-> ledger records which surface approved it. *(90 words)*
+> your laptop, no VPN, no dashboard open. The forecast, the proposed fix and the rollback come to
+> you, and one tap approves it. You get an answer immediately, then the verified outcome once SigNoz
+> confirms p99 is back under the SLO. No console, no runbook, no waking anyone else up — and the
+> ledger keeps the receipt with the approver's name on it. *(90 words)*
 
 ---
 
@@ -356,7 +352,7 @@ Timestamps inside a direction are moments *within* that beat.
 | Slack card doesn't arrive | Check the listener terminal is alive, then `python -m chronolens.cli slack test`. |
 | Tapping Approve does nothing | The listener died. Restart `python -m chronolens.cli slack` — the card stays valid, the button carries its whole payload. |
 | Approve sits on "⏳ Applying…" | Verification is still running (it can take tens of seconds). Wait for the second rewrite; don't tap anything else. |
-| A judge asks about WhatsApp | "Same engine, second door — it's in the repo and documented, we filmed Slack because it needs no public callback URL." Don't demo it live. |
+| Asked whether other channels work | Keep it short: "the approval engine is surface-agnostic; Slack is what we ship and demo." Don't open anything else on camera. |
 | Loop acts instead of asking | You're still in `auto`. Set `CHRONOLENS_AUTONOMY=suggest` **and restart** Mission Control. |
 | Blast radius shows 1 victim | Wrong fault. `mode=dependency-slow&level=40`, wait, Forecast again. |
 | Agent verdict badge says `agent-driven` | Logs are cold. Say it out loud, or wait a minute and re-check. |

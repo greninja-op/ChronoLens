@@ -43,6 +43,38 @@ def health_state(p99_ms: float, slo_ms: float) -> str:
 app = FastAPI(title="ChronoLens Mission Control")
 
 
+# --------------------------------------------------------------------------- #
+# Self-metrics heartbeat.
+#
+# ChronoLens's own gauges (prevented_total, capacity_units, …) used to be emitted
+# only *during* a loop run: the meter provider was created on the first
+# record_metrics() call, so a Mission Control process that hadn't run a loop yet
+# exported nothing at all. The guard dashboard's "incidents prevented" panel then
+# read "No Data" over a 30-minute window even though the ledger had saves in it —
+# the metric existed, the last sample was just hours old.
+#
+# A heartbeat fixes that: publish the current ledger state on a timer so the panel
+# shows a continuous line from process start, not a lone dot per loop run.
+# Set CHRONOLENS_METRICS_HEARTBEAT_S=0 to switch it off.
+# --------------------------------------------------------------------------- #
+_HEARTBEAT_S = float(os.getenv("CHRONOLENS_METRICS_HEARTBEAT_S", "20"))
+
+
+def _metrics_heartbeat() -> None:
+    from chronolens.metrics_self import record_metrics
+    while True:
+        try:
+            led = Ledger()
+            record_metrics(prevented_total=led.prevented_count())
+        except Exception:
+            pass  # a metrics heartbeat must never take the UI down
+        time.sleep(_HEARTBEAT_S)
+
+
+if _HEARTBEAT_S > 0:
+    threading.Thread(target=_metrics_heartbeat, daemon=True).start()
+
+
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 
 
