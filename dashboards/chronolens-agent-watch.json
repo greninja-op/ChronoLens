@@ -172,7 +172,7 @@
                 }
               ],
               "filter": {
-                "expression": "service.name = 'chronolens-agent'"
+                "expression": "service.name = 'chronolens-agent' AND name = 'gen_ai.chat'"
               },
               "filters": {
                 "op": "AND",
@@ -229,7 +229,7 @@
                 }
               ],
               "filter": {
-                "expression": "service.name = 'chronolens-agent' AND tool.name EXISTS"
+                "expression": "service.name = 'chronolens-agent' AND name = 'tool.execute'"
               },
               "filters": {
                 "op": "AND",
@@ -298,7 +298,7 @@
                 }
               ],
               "filter": {
-                "expression": "service.name = 'chronolens-agent'"
+                "expression": "service.name = 'chronolens-agent' AND name = 'agent.turn'"
               },
               "filters": {
                 "op": "AND",
@@ -341,44 +341,44 @@
       "i": "963680ca-baa4-50db-95b5-f8c687a0a599",
       "x": 0,
       "y": 0,
-      "w": 6,
-      "h": 6,
+      "w": 12,
+      "h": 5,
       "moved": false,
       "static": false
     },
     {
       "i": "a43c675c-6890-5c2a-ab13-e3a12badfa55",
-      "x": 6,
-      "y": 0,
-      "w": 6,
-      "h": 6,
+      "x": 0,
+      "y": 5,
+      "w": 12,
+      "h": 5,
       "moved": false,
       "static": false
     },
     {
       "i": "1dba3edd-307a-577a-a238-3f1ad953962e",
       "x": 0,
-      "y": 6,
-      "w": 6,
-      "h": 6,
+      "y": 10,
+      "w": 12,
+      "h": 5,
       "moved": false,
       "static": false
     },
     {
       "i": "d7b0362d-41e4-5004-91fb-13440c49d59a",
-      "x": 6,
-      "y": 6,
-      "w": 6,
-      "h": 6,
+      "x": 0,
+      "y": 15,
+      "w": 12,
+      "h": 5,
       "moved": false,
       "static": false
     },
     {
       "i": "1a14358e-7899-5d5a-b146-b26d35e745d0",
       "x": 0,
-      "y": 12,
-      "w": 6,
-      "h": 6,
+      "y": 20,
+      "w": 12,
+      "h": 5,
       "moved": false,
       "static": false
     }

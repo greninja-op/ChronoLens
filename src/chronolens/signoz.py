@@ -378,7 +378,11 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "panelTypes": "graph",
         "yAxisUnit": "short",
         "query": {"queryType": "builder", "builder": {"queryData": [
+            # Scope to the chat span: only it carries the token attributes, and an
+            # unscoped avg makes the panel scan every span the agent emits (~5x more
+            # rows) for the same answer.
             _agent_traces_query(agent_service, "avg(gen_ai.usage.output_tokens)",
+                                extra_filter="name = 'gen_ai.chat'",
                                 legend="output tokens")]}},
     }
     cost_panel = {
@@ -415,7 +419,7 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
                 agent_service, "count()",
                 # Only tool.execute spans carry tool.name; without this the turn and
                 # chat spans land in an unnamed series that dwarfs the real tools.
-                extra_filter="tool.name EXISTS",
+                extra_filter="name = 'tool.execute'",
                 legend="{{tool.name}}",
                 group_by=[{"key": "tool.name", "name": "tool.name",
                            "dataType": "string", "type": "tag",
@@ -429,10 +433,16 @@ def build_agent_dashboard(agent_service: str, *, max_steps: int = 6,
         "panelTypes": "graph",
         "yAxisUnit": LATENCY_Y_AXIS_UNIT,
         "query": {"queryType": "builder", "builder": {"queryData": [
-            _p99_latency_builder_query(agent_service)]}},
+            _agent_traces_query(agent_service, "p99(duration_nano)",
+                                extra_filter="name = 'agent.turn'",
+                                legend="p99")]}},
     }
+    # One panel per row (full width). A 2-per-row grid left the middle row of this
+    # dashboard blank in the SigNoz UI — panels stored and queried fine, they just
+    # never rendered. Full-width rows sidestep it and read better on a projector.
     widgets, layout = _lay_out(
-        [cost_panel, steps_panel, tokens_panel, tools_panel, latency_panel])
+        [cost_panel, steps_panel, tokens_panel, tools_panel, latency_panel],
+        per_row=1, height=5)
     return {
         "title": f"ChronoLens Agent Watch - {agent_service}",
         "description": (
