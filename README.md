@@ -117,7 +117,7 @@ python app.py                       # terminal 2
 python -m chronolens.cli services   # terminal 3
 ```
 
-> **Windows note:** always set `PYTHONPATH=src` (the package lives under `src/`). See `ERROR-AND-FIXES.md` for every gotcha we already hit and fixed.
+> **Windows note:** always set `PYTHONPATH=src` (the package lives under `src/`).
 
 ---
 
@@ -210,7 +210,6 @@ chronolens/
 ├── scripts/bringup.sh         # one-command SigNoz + MCP (Foundry)
 ├── casting.yaml               # committed Foundry install
 ├── requirements.txt  requirements-dev.txt  pytest.ini  .env.example
-└── ERROR-AND-FIXES.md         # every gotcha + fix (read this if something breaks)
 ```
 
 ## Ports

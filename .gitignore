@@ -8,3 +8,13 @@ venv/
 .hypothesis/
 ledger/
 *.log
+
+# Auto-generated Foundry lockfile (casting.yaml is enough)
+casting.yaml.lock
+
+# Video/subtitle files
+*.srt
+*.vtt
+
+# IDE specs
+.kiro/
